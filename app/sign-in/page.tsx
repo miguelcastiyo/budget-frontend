@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +12,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
 import { ArrowRight } from "lucide-react"
 
-export default function SignInPage() {
+function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { refreshProfile } = useAuth()
@@ -228,5 +228,13 @@ export default function SignInPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInPageContent />
+    </Suspense>
   )
 }
