@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { AuthGate } from '@/components/auth/auth-gate'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { GoogleOauthProvider } from '@/components/auth/google-oauth-provider'
@@ -29,6 +30,7 @@ export default function RootLayout({
           </AuthProvider>
         </GoogleOauthProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
