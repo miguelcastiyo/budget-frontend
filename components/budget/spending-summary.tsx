@@ -26,10 +26,10 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
   const budgetLabel = formatCurrency(totalBudget)
   const spentTextClass =
     spentLabel.length >= 10
-      ? "text-[1.9rem] sm:text-[2.15rem]"
+      ? "text-[1.65rem] sm:text-[2.15rem]"
       : spentLabel.length >= 9
-        ? "text-[2.1rem] sm:text-[2.35rem]"
-        : "text-[2.3rem] sm:text-[2.6rem]"
+        ? "text-[1.85rem] sm:text-[2.35rem]"
+        : "text-[2.05rem] sm:text-[2.6rem]"
   const ringSize = 220
   const strokeWidth = 14
   const radius = (ringSize - strokeWidth) / 2
@@ -92,12 +92,12 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
           </svg>
           
           {/* Center content */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Spent</span>
-            <span className={`max-w-[168px] sm:max-w-[188px] mt-1 ${spentTextClass} font-bold tracking-tight leading-none tabular-nums whitespace-nowrap`}>
+            <span className={`max-w-[156px] sm:max-w-[188px] mt-1 ${spentTextClass} font-bold tracking-tight leading-none tabular-nums whitespace-nowrap`}>
               {spentLabel}
             </span>
-            <span className="mt-1 text-base text-muted-foreground leading-none tabular-nums whitespace-nowrap">
+            <span className="mt-1 text-[0.95rem] sm:text-base text-muted-foreground leading-none tabular-nums whitespace-nowrap">
               of {budgetLabel}
             </span>
           </div>

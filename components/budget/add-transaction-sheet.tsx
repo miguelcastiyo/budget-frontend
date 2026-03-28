@@ -230,6 +230,22 @@ export function AddTransactionSheet({
     return parsed.toFixed(2)
   }
 
+  const sanitizeAmountInput = (value: string): string => {
+    const normalized = value.replace(/,/g, ".").replace(/[^\d.]/g, "")
+    const [whole = "", ...fractionParts] = normalized.split(".")
+    const fraction = fractionParts.join("").slice(0, 2)
+
+    if (normalized.startsWith(".")) {
+      return fraction === "" ? "." : `.${fraction}`
+    }
+
+    if (fractionParts.length === 0) {
+      return whole
+    }
+
+    return `${whole}.${fraction}`
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -350,12 +366,14 @@ export function AddTransactionSheet({
               <div className="mt-4 flex items-baseline justify-center gap-1">
                 <span className="text-5xl font-light text-muted-foreground">$</span>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="^\d*([.]\d{0,2})?$"
+                  enterKeyHint="next"
+                  autoComplete="off"
                   placeholder="0.00"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(e) => setAmount(sanitizeAmountInput(e.target.value))}
                   className="text-6xl font-semibold tracking-tight border-0 bg-transparent p-0 h-auto w-auto min-w-[120px] max-w-[320px] text-center focus-visible:ring-0 placeholder:text-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   style={{ fontSize: "3.75rem" }}
                   required

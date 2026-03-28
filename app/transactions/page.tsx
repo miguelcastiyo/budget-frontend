@@ -159,7 +159,7 @@ export default function TransactionsPage() {
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       <Header />
 
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-6">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
         {error && (
           <UiCard className="p-4 mb-6 border-0 shadow-sm">
             <div className="flex items-center justify-between gap-4">
@@ -303,7 +303,10 @@ export default function TransactionsPage() {
         onClick={() => setShowAddTransaction(true)}
         showCoachmark={!isLoading && !hasAnyTransactions}
       />
-      <BottomNav />
+      <BottomNav
+        onAddClick={() => setShowAddTransaction(true)}
+        showAddCoachmark={!isLoading && !hasAnyTransactions}
+      />
 
       <AddTransactionSheet
         open={showAddTransaction}

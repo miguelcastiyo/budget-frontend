@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: 'Budget',
   description: 'Track your spending with a clean, minimal budgeting app',
   generator: 'v0.app',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

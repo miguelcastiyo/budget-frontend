@@ -1,13 +1,25 @@
 <svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
-  <rect width="180" height="180" rx="40" fill="#ffffff"/>
-  <text
-    x="50%"
-    y="54%"
-    text-anchor="middle"
-    dominant-baseline="middle"
-    font-size="112"
-    font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif"
-  >
-    💰
-  </text>
+  <rect width="180" height="180" rx="40" fill="#ffffff" />
+  <path
+    d="M90 38C101 38 110 42 116 49L104 62C100 59 95 58 90 58C85 58 80 59 76 62L64 49C70 42 79 38 90 38Z"
+    fill="#9B6A38"
+  />
+  <path
+    d="M76 60H104C111 60 117 65 117 72C117 79 111 84 104 84H76C69 84 63 79 63 72C63 65 69 60 76 60Z"
+    fill="#B57A42"
+  />
+  <path
+    d="M90 72C117 72 138 92 138 118C138 137 120 150 90 150C60 150 42 137 42 118C42 92 63 72 90 72Z"
+    fill="#D2A56B"
+  />
+  <path
+    d="M91 90C98 90 104 94 107 101L98 105C97 102 94 100 90 100C86 100 83 102 83 106C83 110 86 111 92 113C101 116 108 119 108 129C108 137 102 143 93 145V151H86V145C78 143 72 138 69 130L78 126C80 132 84 135 90 135C95 135 99 132 99 128C99 124 95 122 88 120C80 118 74 114 74 106C74 98 80 92 87 90V84H94V90H91Z"
+    fill="#2E9B47"
+  />
+  <path
+    d="M76 60C79 65 84 68 90 68C96 68 101 65 104 60"
+    stroke="#7A4D24"
+    stroke-width="5"
+    stroke-linecap="round"
+  />
 </svg>

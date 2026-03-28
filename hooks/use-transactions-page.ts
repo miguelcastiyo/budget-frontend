@@ -95,6 +95,7 @@ export function useTransactionsPage() {
   const queryTagId = searchParams.get("tag_id") ?? ""
   const queryCategory = searchParams.get("category") ?? ""
   const queryMonth = searchParams.get("month") ?? ""
+  const queryOpenAdd = searchParams.get("add") === "1"
   const queryMonthLabel = useMemo(() => formatMonthLabel(queryMonth), [queryMonth])
 
   useEffect(() => {
@@ -121,6 +122,18 @@ export function useTransactionsPage() {
 
     setQueryFiltersInitialized(true)
   }, [queryCategory, queryMonth, queryTagId])
+
+  useEffect(() => {
+    if (!queryOpenAdd) {
+      return
+    }
+
+    setShowAddTransaction(true)
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete("add")
+    const nextQuery = nextParams.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }, [pathname, queryOpenAdd, router, searchParams])
 
   const activeTransactionFilters = useMemo<ApiTransactionFilters>(() => {
     const filters: ApiTransactionFilters = {

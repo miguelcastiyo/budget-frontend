@@ -46,7 +46,7 @@ export function Header({ showAvatar = true }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <header className="sticky top-0 z-40 hidden lg:block bg-background/80 backdrop-blur-xl border-b border-border/50">
       <div className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex-1">
           <nav className="hidden lg:flex items-center gap-1">
