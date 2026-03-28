@@ -415,3 +415,7 @@ export interface EmailChangeVerifiedResponse {
   email: string
   email_verified: boolean
 }
+
+export interface ConvertAccountToGoogleRequest {
+  google_id_token: string
+}

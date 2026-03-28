@@ -33,6 +33,7 @@ import type {
   EmailChangeRequestedResponse,
   VerifyEmailChangeRequest,
   EmailChangeVerifiedResponse,
+  ConvertAccountToGoogleRequest,
   ErrorEnvelope,
 } from "./types"
 
@@ -200,6 +201,13 @@ class ApiClient {
 
   async verifyEmailChange(data: VerifyEmailChangeRequest): Promise<EmailChangeVerifiedResponse> {
     return this.request<EmailChangeVerifiedResponse>("/me/email-change/verify", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async convertAccountToGoogle(data: ConvertAccountToGoogleRequest): Promise<Profile> {
+    return this.request<Profile>("/me/auth/convert-google", {
       method: "POST",
       body: JSON.stringify(data),
     })

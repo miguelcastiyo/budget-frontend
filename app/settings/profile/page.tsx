@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ export default function ProfileSettingsPage() {
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [newEmail, setNewEmail] = useState("")
+  const [showConvertDialog, setShowConvertDialog] = useState(false)
   const [showEmailDialog, setShowEmailDialog] = useState(false)
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
   const [verificationCode, setVerificationCode] = useState("")
@@ -36,8 +38,11 @@ export default function ProfileSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isRequestingCode, setIsRequestingCode] = useState(false)
   const [isVerifyingCode, setIsVerifyingCode] = useState(false)
+  const [isConvertingToGoogle, setIsConvertingToGoogle] = useState(false)
+  const [googleButtonWidth, setGoogleButtonWidth] = useState(320)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const hasGoogleClientId = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
 
   useEffect(() => {
     if (!profile) {
@@ -47,6 +52,21 @@ export default function ProfileSettingsPage() {
     setDisplayName(profile.display_name)
     setEmail(profile.email)
   }, [profile])
+
+  useEffect(() => {
+    const updateGoogleButtonWidth = () => {
+      const viewportWidth = window.innerWidth
+      const contentWidth = Math.min(360, viewportWidth - 96)
+      setGoogleButtonWidth(Math.max(220, Math.floor(contentWidth)))
+    }
+
+    updateGoogleButtonWidth()
+    window.addEventListener("resize", updateGoogleButtonWidth)
+
+    return () => {
+      window.removeEventListener("resize", updateGoogleButtonWidth)
+    }
+  }, [])
 
   const canEditEmail = profile?.auth_provider === "password"
 
@@ -132,6 +152,36 @@ export default function ProfileSettingsPage() {
     }
   }
 
+  const handleConvertToGoogle = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setError("Google did not return an ID token.")
+      return
+    }
+
+    setIsConvertingToGoogle(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const updated = await apiClient.convertAccountToGoogle({
+        google_id_token: credentialResponse.credential,
+      })
+
+      setProfile(updated)
+      setEmail(updated.email)
+      setShowConvertDialog(false)
+      setSuccess("Account now uses Google sign-in.")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to switch this account to Google sign-in")
+      }
+    } finally {
+      setIsConvertingToGoogle(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
@@ -195,6 +245,24 @@ export default function ProfileSettingsPage() {
               </span>
             )}
           </div>
+
+          {canEditEmail && (
+            <div className="rounded-2xl border border-border/70 bg-background p-4 space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Switch this account to Google</p>
+                <p className="text-sm text-muted-foreground">
+                  Use the same email already on this account. Password sign-in will stop working after the switch.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full h-12 rounded-xl"
+                onClick={() => setShowConvertDialog(true)}
+              >
+                Continue with Google
+              </Button>
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {success && <p className="text-sm text-green-600">{success}</p>}
@@ -287,6 +355,55 @@ export default function ProfileSettingsPage() {
               className="rounded-xl"
             >
               {isVerifyingCode ? "Verifying..." : "Verify"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Switch To Google</DialogTitle>
+            <DialogDescription>
+              Continue with the Google account that matches {email}. This keeps your existing data and switches future sign-in to Google.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-2xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+              After this change, email/password sign-in will no longer work for this account.
+            </div>
+            <div className="flex justify-center overflow-hidden rounded-xl">
+              {hasGoogleClientId ? (
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => void handleConvertToGoogle(credentialResponse)}
+                  onError={() => setError("Google sign-in was canceled or failed.")}
+                  theme="outline"
+                  size="large"
+                  text="continue_with"
+                  shape="pill"
+                  width={`${googleButtonWidth}`}
+                />
+              ) : (
+                <Button
+                  className="w-full rounded-xl"
+                  onClick={() => setError("Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in.")}
+                >
+                  Continue with Google
+                </Button>
+              )}
+            </div>
+            {isConvertingToGoogle && (
+              <p className="text-sm text-muted-foreground text-center">Finishing account switch...</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConvertDialog(false)}
+              className="rounded-xl"
+              disabled={isConvertingToGoogle}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
