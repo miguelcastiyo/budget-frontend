@@ -1,9 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatCurrency } from "@/lib/formatters"
 import {
@@ -16,6 +18,7 @@ import {
   ChevronRight,
   Moon,
   Bell,
+  LogOut,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
@@ -79,7 +82,8 @@ function SettingsItem({ icon, label, description, href, onClick, rightElement }:
 }
 
 export default function SettingsPage() {
-  const { profile } = useAuth()
+  const router = useRouter()
+  const { profile, signOut } = useAuth()
   const [budgetSettings, setBudgetSettings] = useState<BudgetSettings | null>(null)
   const [stats, setStats] = useState<{
     tagsCount: number | null
@@ -95,6 +99,7 @@ export default function SettingsPage() {
     avgMonthlySpend: null,
   })
   const [error, setError] = useState<string | null>(null)
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -187,6 +192,17 @@ export default function SettingsPage() {
   const budgetDescription = budgetSettings
     ? `${formatCurrency(budgetSettings.monthly_income)}/month`
     : "Set your monthly budget"
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true)
+    try {
+      await signOut()
+      router.push("/sign-in")
+    } finally {
+      setIsSigningOut(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <Header />
@@ -316,6 +332,19 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        <Card className="border-0 shadow-sm p-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
+            className="w-full h-12 justify-center rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            {isSigningOut ? "Logging out..." : "Log out"}
+          </Button>
+        </Card>
       </main>
 
       <BottomNav />

@@ -350,7 +350,7 @@ export function AddTransactionSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto rounded-2xl max-h-[min(90dvh,90vh)]">
         <DialogHeader className="p-6 pb-4 border-b border-border/50">
           <DialogTitle className="text-xl font-semibold">
             {isEditMode ? "Edit Transaction" : "New Transaction"}
