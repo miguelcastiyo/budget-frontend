@@ -60,10 +60,12 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
               
               return metrics.categories.map((cat, index) => {
                 const catSpend = safeNumber(parseFloat(cat.actual_spend))
+                const catBudget = safeNumber(parseFloat(cat.budget_amount))
                 const catPercentage = (catSpend / safeTotalBudget) * 100
                 const dashLength = (catPercentage / 100) * circumference
                 const offset = circumference - currentOffset
                 currentOffset += dashLength
+                const isOverBudget = catBudget > 0 && catSpend > catBudget
                 
                 const colors = {
                   needs: "var(--needs)",
@@ -78,7 +80,7 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
                     cy={ringSize / 2}
                     r={radius}
                     fill="none"
-                    stroke={colors[cat.category]}
+                    stroke={isOverBudget ? "var(--destructive)" : colors[cat.category]}
                     strokeWidth={strokeWidth}
                     strokeLinecap="round"
                     strokeDasharray={`${dashLength} ${circumference - dashLength}`}
@@ -106,6 +108,9 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
         {/* Legend */}
         <div className="flex items-center justify-center gap-5 mt-6">
           {metrics.categories.map((cat) => {
+            const catSpend = safeNumber(parseFloat(cat.actual_spend))
+            const catBudget = safeNumber(parseFloat(cat.budget_amount))
+            const isOverBudget = catBudget > 0 && catSpend > catBudget
             const colorClasses = {
               needs: "bg-needs",
               wants: "bg-wants",
@@ -119,7 +124,7 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
             
             return (
               <div key={cat.category} className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full ${colorClasses[cat.category]}`} />
+                <div className={`w-2.5 h-2.5 rounded-full ${isOverBudget ? "bg-destructive" : colorClasses[cat.category]}`} />
                 <span className="text-xs text-muted-foreground font-medium">{labels[cat.category]}</span>
               </div>
             )
