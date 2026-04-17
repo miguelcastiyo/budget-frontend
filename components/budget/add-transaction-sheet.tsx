@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -371,12 +371,20 @@ export function AddTransactionSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges] rounded-2xl max-h-[min(90dvh,90vh)]">
-        <DialogHeader className="p-6 pb-4 border-b border-border/50">
-          <DialogTitle className="text-xl font-semibold">
+      <DialogContent
+        showCloseButton={false}
+        className="w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges] rounded-2xl max-h-[min(90dvh,90vh)]"
+      >
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 bg-background/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="w-9 shrink-0" aria-hidden="true" />
+          <DialogTitle className="text-center text-xl font-semibold">
             {isEditMode ? "Edit Transaction" : "New Transaction"}
           </DialogTitle>
-        </DialogHeader>
+          <DialogClose className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col" autoComplete="off" data-form-type="other">
           <div className="px-6 py-12 bg-gradient-to-b from-muted/30 to-transparent">
