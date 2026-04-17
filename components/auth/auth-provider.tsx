@@ -1,8 +1,12 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { usePathname } from "next/navigation"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { AuthUser, Profile } from "@/lib/api/types"
+
+const CSRF_STORAGE_KEY = "budget.csrf_token"
+const PUBLIC_PREFIXES = ["/invite/"]
 
 interface AuthContextValue {
   profile: Profile | null
@@ -17,7 +21,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
+function isPublicPath(pathname: string): boolean {
+  if (pathname === "/sign-in") {
+    return true
+  }
+
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -48,10 +61,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const hasStoredSessionHint = useCallback(() => {
+    if (typeof window === "undefined") {
+      return false
+    }
+
+    return Boolean(window.localStorage.getItem(CSRF_STORAGE_KEY))
+  }, [])
+
   useEffect(() => {
     let active = true
 
     const bootstrap = async () => {
+      if (isPublicPath(pathname) && !hasStoredSessionHint()) {
+        if (active) {
+          setProfile(null)
+          setIsLoading(false)
+        }
+        return
+      }
+
       try {
         await refreshProfile()
       } catch {
@@ -70,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false
     }
-  }, [refreshProfile])
+  }, [hasStoredSessionHint, pathname, refreshProfile])
 
   const signOut = useCallback(async () => {
     try {
