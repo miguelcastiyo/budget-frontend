@@ -143,3 +143,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
