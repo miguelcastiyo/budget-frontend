@@ -378,20 +378,28 @@ export function AddTransactionSheet({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col" autoComplete="off" data-form-type="other">
           <div className="px-6 py-12 bg-gradient-to-b from-muted/30 to-transparent">
             <div className="text-center">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <label htmlFor="transaction-amount" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Amount
               </label>
               <div className="mt-4 flex items-baseline justify-center gap-1">
                 <span className="text-5xl font-light text-muted-foreground">$</span>
                 <Input
+                  id="transaction-amount"
+                  name="transaction_amount"
                   type="text"
                   inputMode="decimal"
                   pattern="^\d*([.]\d{0,2})?$"
                   enterKeyHint="next"
                   autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(sanitizeAmountInput(e.target.value))}
