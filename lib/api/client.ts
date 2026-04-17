@@ -20,6 +20,7 @@ import type {
   UpdateTransactionRequest,
   TagMetricsResponse,
   CategoryMetricsResponse,
+  DashboardResponse,
   InsightsMetricsResponse,
   MasterApiKeyMetadata,
   CreateMasterApiKeyRequest,
@@ -351,6 +352,10 @@ class ApiClient {
 
   async getCategoryMetrics(month: string): Promise<CategoryMetricsResponse> {
     return this.request<CategoryMetricsResponse>(`/me/metrics/categories?month=${month}`)
+  }
+
+  async getDashboard(month: string): Promise<DashboardResponse> {
+    return this.request<DashboardResponse>(`/me/dashboard?month=${month}`)
   }
 
   async getInsightsMetrics(dateFrom: string, dateTo: string): Promise<InsightsMetricsResponse> {

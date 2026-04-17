@@ -15,7 +15,7 @@ import { ArrowRight } from "lucide-react"
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { refreshProfile } = useAuth()
+  const { setAuthenticatedUser } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showEmailForm, setShowEmailForm] = useState(false)
@@ -48,12 +48,12 @@ function SignInPageContent() {
     setError(null)
 
     try {
-      await apiClient.signInWithPassword({
+      const result = await apiClient.signInWithPassword({
         email,
         password,
         client_type: "web",
       })
-      await refreshProfile()
+      setAuthenticatedUser(result.user)
       router.push("/")
     } catch (err) {
       if (err instanceof ApiError) {
@@ -77,12 +77,12 @@ function SignInPageContent() {
     setError(null)
 
     try {
-      await apiClient.signInWithGoogle({
+      const result = await apiClient.signInWithGoogle({
         google_id_token: googleIdToken,
         invite_token: inviteToken || undefined,
         client_type: "web",
       })
-      await refreshProfile()
+      setAuthenticatedUser(result.user)
       router.push("/")
     } catch (err) {
       if (err instanceof ApiError) {

@@ -249,6 +249,13 @@ export interface CategoryMetricsResponse {
   categories: CategoryMetricsItem[]
 }
 
+export interface DashboardResponse {
+  month: string
+  category_metrics: CategoryMetricsResponse
+  tag_metrics: TagMetricsResponse
+  recent_transactions: Transaction[]
+}
+
 export interface InsightsMonthlySpendPoint {
   month: string
   total_spend: string

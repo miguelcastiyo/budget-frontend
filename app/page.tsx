@@ -11,7 +11,6 @@ import { TransactionList } from "@/components/budget/transaction-list"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { CategoryMetricsResponse, TagMetricsResponse, Transaction } from "@/lib/api/types"
-import { getMonthDateRange } from "@/lib/date-filters"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -54,21 +53,11 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const monthRange = getMonthDateRange(currentMonth)
-      const [categoryData, tagData, transactionsData] = await Promise.all([
-        apiClient.getCategoryMetrics(currentMonth),
-        apiClient.getTagMetrics(currentMonth),
-        apiClient.getTransactions({
-          page: 1,
-          page_size: 10,
-          sort: "date_desc",
-          ...(monthRange ?? {}),
-        }),
-      ])
+      const dashboard = await apiClient.getDashboard(currentMonth)
 
-      setCategoryMetrics(categoryData)
-      setTagMetrics(tagData)
-      setRecentTransactions(transactionsData.items)
+      setCategoryMetrics(dashboard.category_metrics)
+      setTagMetrics(dashboard.tag_metrics)
+      setRecentTransactions(dashboard.recent_transactions)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
