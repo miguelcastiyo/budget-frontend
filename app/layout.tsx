@@ -11,8 +11,12 @@ export const metadata: Metadata = {
   description: 'Track your spending with a clean, minimal budgeting app',
   generator: 'v0.app',
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-light-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-dark-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-icon.png',
   },
 }
 
