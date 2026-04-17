@@ -408,6 +408,8 @@ class ApiClient {
   }
 
   async importTransactions(file: File, mode: "dry_run" | "commit"): Promise<CsvImportResponse> {
+    this.ensureCsrfTokenLoaded()
+
     const formData = new FormData()
     formData.append("file", file)
     formData.append("mode", mode)
