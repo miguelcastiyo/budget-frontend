@@ -18,8 +18,8 @@ import { formatCategory } from "@/lib/formatters"
 import { RangePreset, dayLabel, getPresetRange, rangePresets } from "@/lib/insights"
 
 export default function InsightsPage() {
-  const [selectedPreset, setSelectedPreset] = useState<RangePreset>("last_6_months")
-  const initialRange = useMemo(() => getPresetRange("last_6_months"), [])
+  const [selectedPreset, setSelectedPreset] = useState<RangePreset>("last_1_month")
+  const initialRange = useMemo(() => getPresetRange("last_1_month"), [])
   const [customFrom, setCustomFrom] = useState(initialRange.date_from)
   const [customTo, setCustomTo] = useState(initialRange.date_to)
   const [appliedRange, setAppliedRange] = useState(initialRange)

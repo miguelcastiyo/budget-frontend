@@ -5,12 +5,19 @@ import type {
 import { formatCurrency } from "@/lib/formatters"
 import { toIsoDate } from "@/lib/date-filters"
 
-export type RangePreset = "last_3_months" | "last_6_months" | "year_to_date" | "last_12_months" | "custom"
+export type RangePreset =
+  | "year_to_date"
+  | "last_1_month"
+  | "last_3_months"
+  | "last_6_months"
+  | "last_12_months"
+  | "custom"
 
 export const rangePresets: { value: Exclude<RangePreset, "custom">; label: string }[] = [
+  { value: "year_to_date", label: "YTD" },
+  { value: "last_1_month", label: "1M" },
   { value: "last_3_months", label: "3M" },
   { value: "last_6_months", label: "6M" },
-  { value: "year_to_date", label: "YTD" },
   { value: "last_12_months", label: "12M" },
 ]
 
@@ -71,7 +78,14 @@ export function getPresetRange(preset: Exclude<RangePreset, "custom">): { date_f
     }
   }
 
-  const monthsBack = preset === "last_3_months" ? 2 : preset === "last_6_months" ? 5 : 11
+  const monthsBack =
+    preset === "last_1_month"
+      ? 0
+      : preset === "last_3_months"
+        ? 2
+        : preset === "last_6_months"
+          ? 5
+          : 11
   const dateFrom = new Date(today.getFullYear(), today.getMonth() - monthsBack, 1)
 
   return {
