@@ -85,7 +85,7 @@ function SettingsItem({ icon, label, description, href, onClick, rightElement }:
 export default function SettingsPage() {
   const router = useRouter()
   const { profile, setProfile, signOut } = useAuth()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { resolvedTheme } = useTheme()
   const [budgetSettings, setBudgetSettings] = useState<BudgetSettings | null>(null)
   const [stats, setStats] = useState<{
     tagsCount: number | null
@@ -216,11 +216,23 @@ export default function SettingsPage() {
 
   const handleThemeToggle = async (checked: boolean) => {
     const nextTheme = checked ? "dark" : "light"
-    const previousTheme = storedTheme
+    const previousProfile = profile
 
-    setTheme(nextTheme)
     setIsUpdatingTheme(true)
     setError(null)
+
+    if (profile) {
+      setProfile({
+        ...profile,
+        user_preferences: {
+          ...profile.user_preferences,
+          appearance: {
+            ...profile.user_preferences.appearance,
+            theme: nextTheme,
+          },
+        },
+      })
+    }
 
     try {
       const preferences = await apiClient.updatePreferences({
@@ -236,7 +248,9 @@ export default function SettingsPage() {
         })
       }
     } catch (err) {
-      setTheme(previousTheme)
+      if (previousProfile) {
+        setProfile(previousProfile)
+      }
       if (err instanceof ApiError) {
         setError(err.error.message)
       } else {

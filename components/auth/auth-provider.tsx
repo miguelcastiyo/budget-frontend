@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { AuthUser, Profile } from "@/lib/api/types"
+import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
 const PUBLIC_PREFIXES = ["/invite/"]
@@ -28,6 +28,28 @@ function isPublicPath(pathname: string): boolean {
   }
 
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
+function applyThemePreference(theme: ThemePreference) {
+  if (typeof document === "undefined") {
+    return
+  }
+
+  const root = document.documentElement
+  if (theme === "dark") {
+    root.classList.add("dark")
+    root.style.colorScheme = "dark"
+    return
+  }
+
+  if (theme === "light") {
+    root.classList.remove("dark")
+    root.style.colorScheme = "light"
+    return
+  }
+
+  root.classList.remove("dark")
+  root.style.removeProperty("color-scheme")
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -107,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const theme = profile?.user_preferences?.appearance?.theme
     if (theme) {
+      applyThemePreference(theme)
       setTheme(theme)
     }
   }, [profile?.user_preferences?.appearance?.theme, setTheme])
