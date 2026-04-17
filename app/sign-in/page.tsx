@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useEffect, useState } from "react"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +16,7 @@ import { ArrowRight } from "lucide-react"
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { resolvedTheme } = useTheme()
   const { setAuthenticatedUser } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -120,6 +122,7 @@ function SignInPageContent() {
                   <GoogleLogin
                     onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
                     onError={() => setError("Google sign-in was canceled or failed.")}
+                    theme={resolvedTheme === "dark" ? "filled_black" : "outline"}
                     text={isInviteFlow ? "signup_with" : "continue_with"}
                     shape="pill"
                     size="large"
