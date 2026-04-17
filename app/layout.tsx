@@ -3,6 +3,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { AuthGate } from '@/components/auth/auth-gate'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { GoogleOauthProvider } from '@/components/auth/google-oauth-provider'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -21,13 +22,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <GoogleOauthProvider>
-          <AuthProvider>
-            <AuthGate>{children}</AuthGate>
-          </AuthProvider>
-        </GoogleOauthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <GoogleOauthProvider>
+            <AuthProvider>
+              <AuthGate>{children}</AuthGate>
+            </AuthProvider>
+          </GoogleOauthProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>

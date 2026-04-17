@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
@@ -84,6 +85,7 @@ function SettingsItem({ icon, label, description, href, onClick, rightElement }:
 export default function SettingsPage() {
   const router = useRouter()
   const { profile, signOut } = useAuth()
+  const { resolvedTheme, setTheme } = useTheme()
   const [budgetSettings, setBudgetSettings] = useState<BudgetSettings | null>(null)
   const [stats, setStats] = useState<{
     tagsCount: number | null
@@ -100,6 +102,7 @@ export default function SettingsPage() {
   })
   const [error, setError] = useState<string | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [themeReady, setThemeReady] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -178,6 +181,10 @@ export default function SettingsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    setThemeReady(true)
+  }, [])
+
   const displayName = profile?.display_name || "Budget User"
   const avatarUrl = profile?.avatar_url || undefined
   const email = profile?.email || ""
@@ -202,6 +209,8 @@ export default function SettingsPage() {
       setIsSigningOut(false)
     }
   }
+
+  const isDarkMode = themeReady && resolvedTheme === "dark"
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -319,8 +328,15 @@ export default function SettingsPage() {
                 <SettingsItem
                   icon={<Moon className="w-5 h-5 text-muted-foreground" />}
                   label="Dark Mode"
-                  description="Coming soon"
-                  rightElement={<Switch disabled />}
+                  description={themeReady ? (isDarkMode ? "Dark appearance enabled" : "Light appearance enabled") : "Loading theme"}
+                  rightElement={
+                    <Switch
+                      checked={isDarkMode}
+                      disabled={!themeReady}
+                      aria-label="Toggle dark mode"
+                      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                    />
+                  }
                 />
                 <SettingsItem
                   icon={<Bell className="w-5 h-5 text-muted-foreground" />}
