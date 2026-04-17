@@ -84,7 +84,7 @@ function SettingsItem({ icon, label, description, href, onClick, rightElement }:
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { profile, signOut } = useAuth()
+  const { profile, setProfile, signOut } = useAuth()
   const { resolvedTheme, setTheme } = useTheme()
   const [budgetSettings, setBudgetSettings] = useState<BudgetSettings | null>(null)
   const [stats, setStats] = useState<{
@@ -103,6 +103,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [themeReady, setThemeReady] = useState(false)
+  const [isUpdatingTheme, setIsUpdatingTheme] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -210,7 +211,41 @@ export default function SettingsPage() {
     }
   }
 
-  const isDarkMode = themeReady && resolvedTheme === "dark"
+  const storedTheme = profile?.user_preferences.appearance.theme ?? "system"
+  const isDarkMode = storedTheme === "dark"
+
+  const handleThemeToggle = async (checked: boolean) => {
+    const nextTheme = checked ? "dark" : "light"
+    const previousTheme = storedTheme
+
+    setTheme(nextTheme)
+    setIsUpdatingTheme(true)
+    setError(null)
+
+    try {
+      const preferences = await apiClient.updatePreferences({
+        appearance: {
+          theme: nextTheme,
+        },
+      })
+
+      if (profile) {
+        setProfile({
+          ...profile,
+          user_preferences: preferences,
+        })
+      }
+    } catch (err) {
+      setTheme(previousTheme)
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to update appearance preference")
+      }
+    } finally {
+      setIsUpdatingTheme(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -328,13 +363,21 @@ export default function SettingsPage() {
                 <SettingsItem
                   icon={<Moon className="w-5 h-5 text-muted-foreground" />}
                   label="Dark Mode"
-                  description={themeReady ? (isDarkMode ? "Dark appearance enabled" : "Light appearance enabled") : "Loading theme"}
+                  description={
+                    !themeReady
+                      ? "Loading theme"
+                      : storedTheme === "system"
+                        ? `Following system appearance (${resolvedTheme === "dark" ? "dark" : "light"})`
+                        : isDarkMode
+                          ? "Dark appearance enabled"
+                          : "Light appearance enabled"
+                  }
                   rightElement={
                     <Switch
                       checked={isDarkMode}
-                      disabled={!themeReady}
+                      disabled={!themeReady || isUpdatingTheme}
                       aria-label="Toggle dark mode"
-                      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                      onCheckedChange={(checked) => void handleThemeToggle(checked)}
                     />
                   }
                 />

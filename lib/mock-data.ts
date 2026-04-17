@@ -18,6 +18,11 @@ export const mockProfile: Profile = {
   email_verified: true,
   created_at: "2024-01-15T10:00:00Z",
   onboarding_complete: true,
+  user_preferences: {
+    appearance: {
+      theme: "system",
+    },
+  },
 }
 
 // Mock tags

@@ -11,6 +11,14 @@ export type Preset = "last_7_days" | "last_30_days" | "month_to_date" | "last_mo
 export type SortOrder = "date_desc" | "date_asc"
 export type SplitFilter = "all" | "split" | "not_split"
 
+export type ThemePreference = "light" | "dark" | "system"
+
+export interface UserPreferences {
+  appearance: {
+    theme: ThemePreference
+  }
+}
+
 // Profile
 export interface Profile {
   id: string
@@ -21,6 +29,7 @@ export interface Profile {
   email_verified: boolean
   created_at: string
   onboarding_complete: boolean
+  user_preferences: UserPreferences
 }
 
 export interface UpdateProfileRequest {
@@ -35,6 +44,13 @@ export interface AuthUser {
   avatar_url: string | null
   auth_provider: AuthProvider
   onboarding_complete: boolean
+  user_preferences: UserPreferences
+}
+
+export interface UpdateUserPreferencesRequest {
+  appearance?: {
+    theme?: ThemePreference
+  }
 }
 
 export interface SessionInfo {

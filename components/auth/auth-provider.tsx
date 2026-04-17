@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { AuthUser, Profile } from "@/lib/api/types"
 
@@ -31,6 +32,7 @@ function isPublicPath(pathname: string): boolean {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { setTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       avatar_url: user.avatar_url,
       auth_provider: user.auth_provider,
       onboarding_complete: user.onboarding_complete,
+      user_preferences: user.user_preferences,
       email_verified: current?.email_verified ?? true,
       created_at: current?.created_at ?? "",
     }))
@@ -100,6 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       active = false
     }
   }, [hasStoredSessionHint, pathname, refreshProfile])
+
+  useEffect(() => {
+    const theme = profile?.user_preferences?.appearance?.theme
+    if (theme) {
+      setTheme(theme)
+    }
+  }, [profile?.user_preferences?.appearance?.theme, setTheme])
 
   const signOut = useCallback(async () => {
     try {

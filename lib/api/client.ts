@@ -1,6 +1,8 @@
 import type {
   Profile,
+  UserPreferences,
   UpdateProfileRequest,
+  UpdateUserPreferencesRequest,
   AuthSessionResponse,
   PasswordSignInRequest,
   GoogleSignInRequest,
@@ -188,6 +190,17 @@ class ApiClient {
 
   async updateProfile(data: UpdateProfileRequest): Promise<Profile> {
     return this.request<Profile>("/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getPreferences(): Promise<UserPreferences> {
+    return this.request<UserPreferences>("/me/preferences")
+  }
+
+  async updatePreferences(data: UpdateUserPreferencesRequest): Promise<UserPreferences> {
+    return this.request<UserPreferences>("/me/preferences", {
       method: "PATCH",
       body: JSON.stringify(data),
     })
