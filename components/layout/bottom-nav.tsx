@@ -63,8 +63,8 @@ export function BottomNav({
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border safe-area-pb lg:hidden">
-      <div className="max-w-lg mx-auto grid grid-cols-5 items-end h-20 px-1">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] backdrop-blur-xl lg:hidden">
+      <div className="mx-auto grid min-h-20 max-w-lg grid-cols-5 items-center px-1 pt-2">
         {primaryNavItems.map((item) => {
           const isActive = pathname === item.href || 
             (item.href !== "/" && pathname.startsWith(item.href))

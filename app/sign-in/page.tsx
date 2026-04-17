@@ -13,6 +13,17 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
 import { ArrowRight } from "lucide-react"
 
+function GoogleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.26-.96 2.33-2.04 3.05l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.5 0-.72-.06-1.4-.2-2.06H12Z" />
+      <path fill="#34A853" d="M12 22c2.97 0 5.46-.98 7.28-2.65l-3.3-2.56c-.92.62-2.1.99-3.98.99-2.86 0-5.29-1.93-6.16-4.52l-3.41 2.63C4.24 19.54 7.83 22 12 22Z" />
+      <path fill="#4A90E2" d="M5.84 13.26A6.59 6.59 0 0 1 5.5 11.2c0-.72.12-1.42.34-2.06L2.43 6.5A11.04 11.04 0 0 0 1.2 11.2c0 1.69.4 3.3 1.23 4.7l3.41-2.64Z" />
+      <path fill="#FBBC05" d="M12 4.62c1.62 0 3.07.56 4.21 1.67l3.15-3.15C17.45 1.38 14.97.4 12 .4 7.83.4 4.24 2.86 2.43 6.5l3.41 2.64c.87-2.6 3.3-4.52 6.16-4.52Z" />
+    </svg>
+  )
+}
+
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -27,6 +38,7 @@ function SignInPageContent() {
   const googleClientIdConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   const inviteToken = searchParams.get("invite_token")?.trim() || ""
   const isInviteFlow = inviteToken.length > 0
+  const isDarkMode = resolvedTheme === "dark"
 
   useEffect(() => {
     const updateGoogleButtonWidth = () => {
@@ -118,20 +130,56 @@ function SignInPageContent() {
               )}
 
               {googleClientIdConfigured ? (
-                <div className="flex justify-center">
-                  <GoogleLogin
-                    onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
-                    onError={() => setError("Google sign-in was canceled or failed.")}
-                    theme={resolvedTheme === "dark" ? "filled_black" : "outline"}
-                    text={isInviteFlow ? "signup_with" : "continue_with"}
-                    shape="pill"
-                    size="large"
-                    width={googleButtonWidth}
-                    containerProps={{
-                      className: "flex w-full justify-center",
-                    }}
-                  />
-                </div>
+                isDarkMode ? (
+                  <div className="relative">
+                    <div className="pointer-events-none flex h-14 items-center justify-between rounded-2xl border border-border/80 bg-secondary/55 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 items-center justify-center rounded-full bg-background/70 ring-1 ring-white/6">
+                          <GoogleGlyph />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-semibold text-foreground">
+                            {isInviteFlow ? "Continue with invited Google account" : "Continue with Google"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Secure sign-in
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight className="size-4 text-muted-foreground" />
+                    </div>
+
+                    <div className="absolute inset-0 z-10 overflow-hidden rounded-2xl opacity-0">
+                      <GoogleLogin
+                        onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
+                        onError={() => setError("Google sign-in was canceled or failed.")}
+                        theme="filled_black"
+                        text={isInviteFlow ? "signup_with" : "continue_with"}
+                        shape="pill"
+                        size="large"
+                        width={googleButtonWidth}
+                        containerProps={{
+                          className: "flex h-full w-full justify-center",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
+                      onError={() => setError("Google sign-in was canceled or failed.")}
+                      theme="outline"
+                      text={isInviteFlow ? "signup_with" : "continue_with"}
+                      shape="pill"
+                      size="large"
+                      width={googleButtonWidth}
+                      containerProps={{
+                        className: "flex w-full justify-center",
+                      }}
+                    />
+                  </div>
+                )
               ) : (
                 <Button
                   variant="outline"
