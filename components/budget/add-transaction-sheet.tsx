@@ -373,7 +373,7 @@ export function AddTransactionSheet({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges] rounded-2xl max-h-[min(90dvh,90vh)]"
+        className="top-[calc(50%+env(safe-area-inset-top)/2)] w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges] rounded-2xl max-h-[min(calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem),90vh)] sm:top-[50%] sm:max-h-[min(90dvh,90vh)]"
       >
         <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 bg-background/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="w-9 shrink-0" aria-hidden="true" />
