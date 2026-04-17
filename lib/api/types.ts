@@ -170,6 +170,8 @@ export interface Transaction {
   amount: string
   category: Category
   is_split: boolean
+  source: "manual" | "import"
+  recurring_expense_id: string | null
   tag: Tag
   card: Card | null
   created_at: string

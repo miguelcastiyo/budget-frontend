@@ -91,6 +91,8 @@ function generateMockTransactions(): Transaction[] {
       amount: exp.amount,
       category: exp.category,
       is_split: index % 5 === 0,
+      source: "manual",
+      recurring_expense_id: null,
       tag: exp.tag,
       card: exp.card,
       created_at: date.toISOString(),

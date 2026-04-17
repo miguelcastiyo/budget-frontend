@@ -82,6 +82,8 @@ export function AddTransactionSheet({
   const [error, setError] = useState<string | null>(null)
 
   const isEditMode = mode === "edit" && transaction !== null
+  const transactionAlreadyRecurring = transaction?.recurring_expense_id !== null
+  const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
 
   const parseTransactionDate = (dateStr: string): Date => {
     const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -134,10 +136,10 @@ export function AddTransactionSheet({
     }
 
     void loadTaxonomy()
-    if (isEditMode && transaction) {
-      setDate(parseTransactionDate(transaction.date))
-      setExpense(transaction.expense)
-      setAmount(transaction.amount)
+      if (isEditMode && transaction) {
+        setDate(parseTransactionDate(transaction.date))
+        setExpense(transaction.expense)
+        setAmount(transaction.amount)
       setCategory(transaction.category)
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
@@ -277,6 +279,25 @@ export function AddTransactionSheet({
           card_id: cardId || undefined,
         }
         const updated = await apiClient.updateTransaction(transaction.id, payload)
+
+        if (makeRecurring && !transactionAlreadyRecurring) {
+          const startsMonth = format(date, "yyyy-MM")
+          const normalizedBillingDay = Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31)
+
+          await apiClient.createRecurringExpense({
+            expense: expense.trim(),
+            amount: normalizedAmount,
+            category,
+            tag_id: tagId,
+            card_id: cardId || null,
+            billing_type: recurringBillingType,
+            billing_day: recurringBillingType === "day_of_month" ? normalizedBillingDay : null,
+            starts_month: startsMonth,
+            is_active: true,
+            seed_transaction_id: updated.id,
+          })
+        }
+
         onTransactionUpdated?.(updated)
       } else {
         const payload: CreateTransactionRequest = {
@@ -434,13 +455,15 @@ export function AddTransactionSheet({
               </Popover>
             </div>
 
-            {!isEditMode && (
+            {canCreateRecurringRule && (
               <div className="space-y-3 rounded-xl border border-border/60 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm font-medium">Make recurring</Label>
                     <p className="text-xs text-muted-foreground">
-                      Adds this expense automatically each month.
+                      {isEditMode
+                        ? "Create a recurring rule using this transaction as the first occurrence."
+                        : "Adds this expense automatically each month."}
                     </p>
                   </div>
                   <Switch
@@ -486,6 +509,15 @@ export function AddTransactionSheet({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {isEditMode && transactionAlreadyRecurring && (
+              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                <p className="text-sm font-medium">Already recurring</p>
+                <p className="text-xs text-muted-foreground">
+                  This transaction is already linked to a recurring expense. Update the recurring rule from Settings.
+                </p>
               </div>
             )}
 
