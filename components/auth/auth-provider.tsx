@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { isLocalMockMode } from "@/lib/local-dev"
+import { mockProfile } from "@/lib/mock-data"
 import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
@@ -98,6 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true
 
     const bootstrap = async () => {
+      if (isLocalMockMode()) {
+        if (active) {
+          setProfile(mockProfile)
+          setIsLoading(false)
+        }
+        return
+      }
+
       if (isPublicPath(pathname) && !hasStoredSessionHint()) {
         if (active) {
           setProfile(null)
@@ -135,6 +145,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile?.user_preferences?.appearance?.theme, setTheme])
 
   const signOut = useCallback(async () => {
+    if (isLocalMockMode()) {
+      setProfile(null)
+      return
+    }
+
     try {
       await apiClient.signOut()
     } catch (error) {
