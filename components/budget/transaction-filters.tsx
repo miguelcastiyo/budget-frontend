@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -24,7 +31,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
   CalendarDays,
   CalendarIcon,
   Folder,
@@ -32,9 +38,11 @@ import {
   CreditCard,
   Download,
   Upload,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
 } from "lucide-react"
 import { format } from "date-fns"
-import type { Tag, Card, Category, Preset, SplitFilter } from "@/lib/api/types"
+import type { Tag, Card, Category, Preset, SplitFilter, SortOrder } from "@/lib/api/types"
 import { parseIsoDate } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
@@ -54,6 +62,9 @@ interface TransactionFiltersProps {
   onSearchChange: (query: string) => void
   splitFilter: SplitFilter
   onSplitFilterChange: (value: SplitFilter) => void
+  sortOrder: SortOrder
+  onSortOrderChange: (value: SortOrder) => void
+  mobileSummaryLabel?: string | null
   monthFilterLabel?: string | null
   onClearMonthFilter?: () => void
   customDateRange?: {
@@ -192,6 +203,9 @@ export function TransactionFilters({
   onSearchChange,
   splitFilter,
   onSplitFilterChange,
+  sortOrder,
+  onSortOrderChange,
+  mobileSummaryLabel,
   monthFilterLabel,
   onClearMonthFilter,
   customDateRange,
@@ -201,7 +215,6 @@ export function TransactionFilters({
   dataActionsDisabled = false,
   desktopSidebarToggle,
 }: TransactionFiltersProps) {
-  const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false)
   const [customFrom, setCustomFrom] = useState(customDateRange?.date_from ?? "")
   const [customTo, setCustomTo] = useState(customDateRange?.date_to ?? "")
   const [customRangeError, setCustomRangeError] = useState<string | null>(null)
@@ -223,6 +236,7 @@ export function TransactionFilters({
   const selectedPresetLabel = preset !== "all"
     ? (presets.find((p) => p.value === preset)?.label ?? null)
     : null
+  const sortLabel = sortOrder === "date_desc" ? "Newest" : "Oldest"
 
   const toggleCategory = (category: Category) => {
     if (selectedCategories.includes(category)) {
@@ -373,7 +387,7 @@ export function TransactionFilters({
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-full h-9 px-3 border border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground flex-1 lg:flex-none justify-center"
+              className="rounded-full h-9 px-3 border border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground justify-center"
             >
               <SlidersHorizontal className="w-4 h-4 mr-1.5" />
               Filters
@@ -403,6 +417,23 @@ export function TransactionFilters({
               {/* Date range */}
               <div>
                 <h3 className="font-semibold mb-4 text-base">Date Range</h3>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {presets.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => onPresetChange(item.value)}
+                      className={cn(
+                        "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                        preset === item.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1.5">From</p>
@@ -498,6 +529,27 @@ export function TransactionFilters({
                 </div>
               </div>
 
+              <div>
+                <h3 className="font-semibold mb-4 text-base">Split</h3>
+                <div className="flex flex-wrap gap-3">
+                  {splitFilterItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={item.onClick}
+                      className={cn(
+                        "px-5 py-2.5 rounded-full text-sm font-medium transition-colors",
+                        item.selected
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Categories */}
               <div>
                 <h3 className="font-semibold mb-4 text-base">Category</h3>
@@ -560,26 +612,70 @@ export function TransactionFilters({
                   ))}
                 </div>
               </div>
+
+              <div>
+                <h3 className="font-semibold mb-4 text-base">Data</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl justify-center gap-2"
+                    disabled={dataActionsDisabled}
+                    onClick={onExport}
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl justify-center gap-2"
+                    disabled={dataActionsDisabled}
+                    onClick={onImport}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import
+                  </Button>
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setMobileQuickFiltersOpen((current) => !current)}
-          className="lg:hidden flex-1 h-9 rounded-full border border-border/70 bg-background px-3 text-muted-foreground hover:border-border hover:text-foreground justify-center gap-1.5"
-        >
-          <span className="text-xs font-medium uppercase tracking-wide">
-            {mobileQuickFiltersOpen ? "Hide Quick" : "Quick Filters"}
-          </span>
-          {mobileQuickFiltersOpen ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 rounded-full border border-border/70 bg-background px-3 text-muted-foreground hover:border-border hover:text-foreground justify-center gap-1.5"
+            >
+              {sortOrder === "date_desc" ? (
+                <ArrowDownWideNarrow className="w-4 h-4" />
+              ) : (
+                <ArrowUpNarrowWide className="w-4 h-4" />
+              )}
+              <span className="text-xs font-medium">{sortLabel}</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 rounded-xl">
+            <DropdownMenuRadioGroup value={sortOrder} onValueChange={(value) => onSortOrderChange(value as SortOrder)}>
+              <DropdownMenuRadioItem value="date_desc" className="cursor-pointer">
+                Newest first
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="date_asc" className="cursor-pointer">
+                Oldest first
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {mobileSummaryLabel && (
+          <div className="lg:hidden min-w-0 flex-1 rounded-full border border-border/70 bg-secondary/45 px-3 py-2 text-xs font-medium text-foreground">
+            <div className="truncate">{mobileSummaryLabel}</div>
+          </div>
+        )}
 
         {activeFiltersCount > 1 && (
           <Button
@@ -594,11 +690,11 @@ export function TransactionFilters({
       </div>
 
       {/* Applied filter badges */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide lg:flex-wrap">
         {monthFilterLabel && (
           <Badge
             variant="secondary"
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => onClearMonthFilter?.()}
           >
             Month: {monthFilterLabel}
@@ -608,7 +704,7 @@ export function TransactionFilters({
         {customDateRange && !monthFilterLabel && (
           <Badge
             variant="secondary"
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={clearCustomDateRange}
           >
             {customDateRange.date_from} to {customDateRange.date_to}
@@ -618,7 +714,7 @@ export function TransactionFilters({
         {selectedPresetLabel && (
           <Badge
             variant="secondary"
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => onPresetChange("all")}
           >
             {selectedPresetLabel}
@@ -629,7 +725,7 @@ export function TransactionFilters({
           <Badge 
             key={cat} 
             variant="secondary" 
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => toggleCategory(cat)}
           >
             {categories.find(c => c.value === cat)?.label}
@@ -640,7 +736,7 @@ export function TransactionFilters({
           <Badge 
             key={tagId} 
             variant="secondary" 
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => toggleTag(tagId)}
           >
             {tags.find(t => t.id === tagId)?.name}
@@ -651,7 +747,7 @@ export function TransactionFilters({
           <Badge 
             key={cardId} 
             variant="secondary" 
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => toggleCard(cardId)}
           >
             {cards.find(c => c.id === cardId)?.name}
@@ -661,7 +757,7 @@ export function TransactionFilters({
         {splitFilter !== "all" && (
           <Badge
             variant="secondary"
-            className="rounded-full cursor-pointer py-1 px-3"
+            className="shrink-0 rounded-full cursor-pointer py-1 px-3"
             onClick={() => onSplitFilterChange("all")}
           >
             {splitFilter === "split" ? "Split" : "Not Split"}
@@ -670,7 +766,7 @@ export function TransactionFilters({
         )}
       </div>
 
-      <div className={cn("space-y-4", !mobileQuickFiltersOpen && "hidden lg:block")}>
+      <div className="hidden space-y-4 lg:block">
         {/* Quick filters */}
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick Filters</p>
