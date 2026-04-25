@@ -194,21 +194,15 @@ export function TransactionList({
       )}
       
       <div className="relative flex-1 min-h-0">
-        <div ref={listRef} className="h-full overflow-y-auto px-2 pb-2 sm:px-0 sm:pb-0">
+        <div ref={listRef} className="h-full overflow-y-auto">
           {Array.from(groupedTransactions.entries()).map(([date, txns]) => (
             <div key={date}>
-              <div
-                className={cn(
-                  "px-2 pt-3 pb-2 sm:px-4 sm:bg-secondary/40",
-                  compact && "sm:py-1",
-                  !compact && "sm:py-2"
-                )}
-              >
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.18em]">
+              <div className={cn("px-4 bg-secondary/40", compact ? "py-1" : "py-2")}>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                   {formatDate(date)}
                 </span>
               </div>
-              <div className="space-y-2 sm:space-y-0 sm:divide-y sm:divide-border/50">
+              <div className="divide-y divide-border/50">
                 {txns.map((transaction) => {
                   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
 
@@ -218,132 +212,93 @@ export function TransactionList({
                       data-transaction-row="true"
                       onClick={() => onTransactionClick?.(transaction)}
                       className={cn(
-                        "w-full text-left transition-colors sm:flex sm:items-center sm:gap-3 sm:hover:bg-accent/50",
-                        "rounded-2xl border border-border/70 bg-background px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-border hover:bg-accent/30",
-                        "sm:rounded-none sm:border-0 sm:bg-transparent sm:px-3 sm:py-3 sm:shadow-none",
-                        compact ? "sm:p-2" : undefined
+                        "w-full flex items-center gap-3 hover:bg-accent/50 transition-colors text-left",
+                        compact ? "p-2" : "p-3"
                       )}
                     >
-                      <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${getCategoryColorClass(transaction.category)} shadow-sm sm:h-9 sm:w-9 sm:rounded-xl`}>
-                          <TagIcon className="h-4 w-4 text-white" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <p className="truncate text-sm font-semibold">{transaction.expense}</p>
-                                {transaction.is_split && (
-                                  <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                    Split
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-1 truncate text-xs text-muted-foreground sm:hidden">
-                                {transaction.tag.name}
-                                {transaction.card && ` · ${transaction.card.name}`}
-                              </p>
-                              {useInlineCompactMetadata ? (
-                                <p className="hidden truncate text-xs text-muted-foreground sm:block">
-                                  {transaction.tag.name}
-                                  {transaction.card && ` · ${transaction.card.name}`}
-                                </p>
-                              ) : (
-                                <div className="mt-1 hidden flex-wrap items-center gap-1.5 sm:flex">
-                                  <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                    <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
-                                    <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
-                                  </span>
-                                  {transaction.card && (
-                                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                      <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
-                                      <span className="truncate max-w-[170px]">{transaction.card.name}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="shrink-0 text-right sm:hidden">
-                              <p className="text-[15px] font-semibold whitespace-nowrap">
-                                -{formatCurrency(transaction.amount)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                      <div className={`w-9 h-9 rounded-xl ${getCategoryColorClass(transaction.category)} flex items-center justify-center flex-shrink-0`}>
+                        <TagIcon className="w-4 h-4 text-white" />
                       </div>
-
-                      <div className="hidden shrink-0 text-right sm:block sm:ml-2">
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-medium text-sm truncate">{transaction.expense}</p>
+                          {transaction.is_split && (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              Split
+                            </span>
+                          )}
+                        </div>
+                        {useInlineCompactMetadata ? (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {transaction.tag.name}
+                            {transaction.card && ` · ${transaction.card.name}`}
+                          </p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                              <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
+                              <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
+                            </span>
+                            {transaction.card && (
+                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+                                <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="truncate max-w-[170px]">{transaction.card.name}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="text-right shrink-0 ml-2">
                         <p className="font-semibold text-sm whitespace-nowrap">
                           -{formatCurrency(transaction.amount)}
                         </p>
                       </div>
-
-                      <ChevronRight className="hidden w-4 h-4 text-muted-foreground/40 flex-shrink-0 sm:block" />
+                      
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
                     </button>
                   ) : (
                     <div
                       key={transaction.id}
                       data-transaction-row="true"
-                      className={cn(
-                        "w-full text-left sm:flex sm:items-center sm:gap-3",
-                        "rounded-2xl border border-border/70 bg-background px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]",
-                        "sm:rounded-none sm:border-0 sm:bg-transparent sm:px-3 sm:py-3 sm:shadow-none",
-                        compact ? "sm:p-2" : undefined
-                      )}
+                      className={cn("w-full flex items-center gap-3 text-left", compact ? "p-2" : "p-3")}
                     >
-                      <div className="flex items-start gap-3 sm:flex-1 sm:items-center">
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${getCategoryColorClass(transaction.category)} shadow-sm sm:h-9 sm:w-9 sm:rounded-xl`}>
-                          <TagIcon className="h-4 w-4 text-white" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <p className="truncate text-sm font-semibold">{transaction.expense}</p>
-                                {transaction.is_split && (
-                                  <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                    Split
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-1 truncate text-xs text-muted-foreground sm:hidden">
-                                {transaction.tag.name}
-                                {transaction.card && ` · ${transaction.card.name}`}
-                              </p>
-                              {useInlineCompactMetadata ? (
-                                <p className="hidden truncate text-xs text-muted-foreground sm:block">
-                                  {transaction.tag.name}
-                                  {transaction.card && ` · ${transaction.card.name}`}
-                                </p>
-                              ) : (
-                                <div className="mt-1 hidden flex-wrap items-center gap-1.5 sm:flex">
-                                  <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                    <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
-                                    <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
-                                  </span>
-                                  {transaction.card && (
-                                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                      <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
-                                      <span className="truncate max-w-[170px]">{transaction.card.name}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="shrink-0 text-right sm:hidden">
-                              <p className="text-[15px] font-semibold whitespace-nowrap">
-                                -{formatCurrency(transaction.amount)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                      <div className={`w-9 h-9 rounded-xl ${getCategoryColorClass(transaction.category)} flex items-center justify-center flex-shrink-0`}>
+                        <TagIcon className="w-4 h-4 text-white" />
                       </div>
 
-                      <div className="hidden shrink-0 text-right sm:block sm:ml-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="font-medium text-sm truncate">{transaction.expense}</p>
+                          {transaction.is_split && (
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                              Split
+                            </span>
+                          )}
+                        </div>
+                        {useInlineCompactMetadata ? (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {transaction.tag.name}
+                            {transaction.card && ` · ${transaction.card.name}`}
+                          </p>
+                        ) : (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
+                              <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
+                              <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
+                            </span>
+                            {transaction.card && (
+                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+                                <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="truncate max-w-[170px]">{transaction.card.name}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0 ml-2">
                         <p className="font-semibold text-sm whitespace-nowrap">
                           -{formatCurrency(transaction.amount)}
                         </p>

@@ -1,1 +1,39 @@
-[https://www.miguelcastillo.info/projects/budget/](https://www.miguelcastillo.info/projects/budget/)
+# Budget Frontend
+
+Production: [https://www.miguelcastillo.info/projects/budget/](https://www.miguelcastillo.info/projects/budget/)
+
+## Local frontend preview
+
+Use the project-owned launcher from this directory:
+
+```bash
+scripts/dev-local.sh
+```
+
+It uses Node 22.x, binds Next.js to `127.0.0.1`, and starts the app at:
+
+```text
+http://127.0.0.1:3000
+```
+
+If port `3000` is already occupied, either open the URL if the existing process is the Budget frontend, or choose a different port:
+
+```bash
+PORT=3001 scripts/dev-local.sh
+```
+
+Run diagnostics when local startup is confusing:
+
+```bash
+scripts/doctor-local.sh
+```
+
+## Runtime
+
+This project is pinned to Node 22.x in `.nvmrc` and `package.json` because it is an LTS runtime and matches the installed dependency types. The local launcher intentionally prefers Homebrew `node@22` or nvm's `.nvmrc` runtime instead of whatever global `node` happens to be first on PATH.
+
+Node 25 can be tested after the local Node 25 install is repaired, but it is not the stabilized default for this project. To intentionally test another Node binary:
+
+```bash
+BUDGET_NODE_BIN=/path/to/node BUDGET_ALLOW_NODE_MISMATCH=1 scripts/dev-local.sh
+```

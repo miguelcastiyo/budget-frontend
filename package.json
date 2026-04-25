@@ -6,7 +6,9 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
+    "dev:local": "bash scripts/dev-local.sh",
+    "doctor:local": "bash scripts/doctor-local.sh",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint ."

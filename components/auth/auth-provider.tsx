@@ -4,12 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { mockProfile } from "@/lib/mock-data"
 import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
 const PUBLIC_PREFIXES = ["/invite/"]
-const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "1"
 
 interface AuthContextValue {
   profile: Profile | null
@@ -100,14 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true
 
     const bootstrap = async () => {
-      if (USE_MOCKS) {
-        if (active) {
-          setProfile(mockProfile)
-          setIsLoading(false)
-        }
-        return
-      }
-
       if (isPublicPath(pathname) && !hasStoredSessionHint()) {
         if (active) {
           setProfile(null)

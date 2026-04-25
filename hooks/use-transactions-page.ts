@@ -5,7 +5,6 @@ import { format } from "date-fns"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getMonthDateRange, getPresetDateRange, parseIsoDate } from "@/lib/date-filters"
-import { mockCards, mockTags, mockTransactions } from "@/lib/mock-data"
 import type { DateRangeFilter } from "@/lib/date-filters"
 import type {
   Card,
@@ -24,69 +23,12 @@ type PartialDateRange = {
   date_to?: string
 }
 
-const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === "1"
-
 function parseCategoryQuery(value: string): Category | null {
   if (value === "needs" || value === "wants" || value === "savings_debts") {
     return value
   }
 
   return null
-}
-
-function applyMockTransactionFilters(
-  transactions: Transaction[],
-  filters: ApiTransactionFilters
-): Transaction[] {
-  const categories = filters.categories ? new Set(filters.categories.split(",")) : null
-  const tagIds = filters.tag_ids ? new Set(filters.tag_ids.split(",")) : null
-  const cardIds = filters.card_ids ? new Set(filters.card_ids.split(",")) : null
-  const query = filters.q?.trim().toLowerCase() ?? ""
-
-  return transactions
-    .filter((transaction) => {
-      if (filters.date_from && transaction.date < filters.date_from) {
-        return false
-      }
-      if (filters.date_to && transaction.date > filters.date_to) {
-        return false
-      }
-      if (categories && !categories.has(transaction.category)) {
-        return false
-      }
-      if (tagIds && !tagIds.has(transaction.tag.id)) {
-        return false
-      }
-      if (cardIds && (!transaction.card || !cardIds.has(transaction.card.id))) {
-        return false
-      }
-      if (filters.is_split === "split" && !transaction.is_split) {
-        return false
-      }
-      if (filters.is_split === "not_split" && transaction.is_split) {
-        return false
-      }
-      if (query) {
-        const searchableText = [
-          transaction.expense,
-          transaction.amount,
-          transaction.category,
-          transaction.tag.name,
-          transaction.card?.name ?? "",
-        ].join(" ").toLowerCase()
-
-        if (!searchableText.includes(query)) {
-          return false
-        }
-      }
-
-      return true
-    })
-    .sort((a, b) => (
-      filters.sort === "date_asc"
-        ? a.date.localeCompare(b.date)
-        : b.date.localeCompare(a.date)
-    ))
 }
 
 export function useTransactionsPage() {
@@ -229,13 +171,6 @@ export function useTransactionsPage() {
   }, [customDateRange, debouncedSearchQuery, preset, selectedCards, selectedCategories, selectedTags, sortOrder, splitFilter])
 
   const loadReferenceData = useCallback(async () => {
-    if (USE_MOCKS) {
-      setTags(mockTags)
-      setCards(mockCards)
-      setHasAnyTransactions(mockTransactions.length > 0)
-      return
-    }
-
     try {
       const [tagsResponse, cardsResponse, transactionsSummary] = await Promise.all([
         apiClient.getTags(),
@@ -258,12 +193,6 @@ export function useTransactionsPage() {
   const loadTransactionsData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
-
-    if (USE_MOCKS) {
-      setTransactions(applyMockTransactionFilters(mockTransactions, activeTransactionFilters))
-      setIsLoading(false)
-      return
-    }
 
     try {
       const pageSize = activeTransactionFilters.page_size ?? 200
@@ -357,10 +286,6 @@ export function useTransactionsPage() {
   }, [transactions])
 
   const exportTransactions = useCallback(async (dateRange: PartialDateRange) => {
-    if (USE_MOCKS) {
-      return
-    }
-
     const filters: ApiTransactionFilters = {
       ...dateRange,
       sort: sortOrder,
@@ -478,12 +403,6 @@ export function useTransactionsPage() {
   const handleDeleteTransaction = useCallback(async (transactionId: string) => {
     setDeletingTransactionId(transactionId)
 
-    if (USE_MOCKS) {
-      setSelectedTransaction((current) => (current?.id === transactionId ? null : current))
-      setDeletingTransactionId(null)
-      return
-    }
-
     try {
       setError(null)
       await apiClient.deleteTransaction(transactionId)
@@ -531,12 +450,6 @@ export function useTransactionsPage() {
     setImportStatus("uploading")
     setImportMessage("")
     setImportErrors([])
-
-    if (USE_MOCKS) {
-      setImportStatus("success")
-      setImportMessage("Mock preview mode does not import files.")
-      return
-    }
 
     try {
       const result = await apiClient.importTransactions(importFile, "commit")

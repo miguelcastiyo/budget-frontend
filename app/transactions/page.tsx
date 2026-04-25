@@ -14,14 +14,12 @@ import type { Preset } from "@/lib/api/types"
 import { useTransactionsPage } from "@/hooks/use-transactions-page"
 import { Button } from "@/components/ui/button"
 import { Card as UiCard } from "@/components/ui/card"
-import { formatCurrency } from "@/lib/formatters"
 import {
   Calendar,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -32,18 +30,6 @@ const exportDatePresets: { value: Preset; label: string }[] = [
   { value: "last_month", label: "Last Month" },
   { value: "quarter_to_date", label: "This Quarter" },
 ]
-
-function formatSummaryDate(dateStr: string): string {
-  const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  const date = isoDateMatch
-    ? new Date(Number(isoDateMatch[1]), Number(isoDateMatch[2]) - 1, Number(isoDateMatch[3]))
-    : new Date(dateStr)
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  })
-}
 
 export default function TransactionsPage() {
   const {
@@ -124,15 +110,6 @@ export default function TransactionsPage() {
       onSearchChange: setSearchQuery,
       splitFilter,
       onSplitFilterChange: setSplitFilter,
-      sortOrder,
-      onSortOrderChange: setSortOrder,
-      mobileSummaryLabel: queryMonthLabel && customDateRange
-        ? queryMonthLabel
-        : customDateRange
-          ? `${formatSummaryDate(customDateRange.date_from)} - ${formatSummaryDate(customDateRange.date_to)}`
-          : preset === "all"
-            ? "All time"
-            : exportDatePresets.find((item) => item.value === preset)?.label ?? "All time",
       monthFilterLabel: queryMonthLabel && customDateRange ? queryMonthLabel : null,
       onClearMonthFilter: clearMonthFilter,
       customDateRange,
@@ -166,8 +143,6 @@ export default function TransactionsPage() {
       selectedCards,
       selectedCategories,
       selectedTags,
-      sortOrder,
-      setSortOrder,
       setDesktopFiltersCollapsed,
       setSearchQuery,
       setSelectedCards,
@@ -245,51 +220,22 @@ export default function TransactionsPage() {
                 )}
               </div>
 
-              <div className="lg:hidden sticky top-0 z-30 -mx-5 border-b border-border/60 bg-background/95 px-5 py-3 backdrop-blur-xl">
+              <div className="lg:hidden">
                 <TransactionFilters {...transactionFiltersProps} />
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
-            <UiCard className="overflow-hidden border-0 bg-gradient-to-br from-background via-secondary/30 to-background shadow-sm lg:hidden">
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Spending snapshot
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {transactionFiltersProps.mobileSummaryLabel}
-                    </p>
-                    <p className="mt-1 text-3xl font-semibold tracking-tight">
-                      {formatCurrency(stats.totalSpent)}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-background/85 px-3 py-2 text-right shadow-sm">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Transactions</p>
-                    <p className="mt-1 text-lg font-semibold">{stats.count}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl border border-border/70 bg-background/80 px-3 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Average</p>
-                    <p className="mt-1 text-sm font-semibold">{formatCurrency(stats.avgTransaction)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border/70 bg-background/80 px-3 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Split</p>
-                    <p className="mt-1 text-sm font-semibold">
-                      {stats.splitCount}
-                      <span className="ml-1 text-xs font-medium text-muted-foreground">
-                        {stats.count === 1 ? "item" : "items"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </UiCard>
+            <div className="grid grid-cols-2 gap-2 lg:hidden">
+              <TransactionStatsGrid
+                compact
+                totalSpent={stats.totalSpent}
+                count={stats.count}
+                avgTransaction={stats.avgTransaction}
+                splitCount={stats.splitCount}
+              />
+            </div>
 
             <div className="hidden lg:grid lg:grid-cols-4 gap-3">
               <TransactionStatsGrid
@@ -311,7 +257,7 @@ export default function TransactionsPage() {
               }
               onEmptyAction={() => setShowAddTransaction(true)}
               headerRight={
-                <div className="hidden items-center gap-2 lg:flex">
+                <div className="flex items-center gap-2">
                   <div className="inline-flex items-center rounded-lg border border-border/70 p-0.5 bg-background">
                     <span className="hidden lg:inline px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       Sort
