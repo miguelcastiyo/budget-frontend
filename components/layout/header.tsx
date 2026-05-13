@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -13,6 +14,7 @@ import {
 import { LayoutDashboard, Receipt, LineChart, Settings, LogOut, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/auth-provider"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 
 interface HeaderProps {
   showAvatar?: boolean
@@ -29,6 +31,7 @@ export function Header({ showAvatar = true }: HeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { profile, signOut } = useAuth()
+  const [transactionsHref, setTransactionsHref] = useState("/transactions")
   
   const displayName = profile?.display_name || "Budget"
   const avatarUrl = profile?.avatar_url || undefined
@@ -39,6 +42,10 @@ export function Header({ showAvatar = true }: HeaderProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "BU"
+
+  useEffect(() => {
+    setTransactionsHref(`/transactions?month=${getCurrentMonthKey()}`)
+  }, [])
 
   const handleLogout = async () => {
     await signOut()
@@ -53,11 +60,12 @@ export function Header({ showAvatar = true }: HeaderProps) {
             {navItems.map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== "/" && pathname.startsWith(item.href))
+              const href = item.href === "/transactions" ? transactionsHref : item.href
               
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                     isActive 

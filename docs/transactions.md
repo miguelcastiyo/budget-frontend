@@ -25,6 +25,7 @@
 - On submit, frontend normalizes valid amounts to 2-decimal format before API requests.
 
 ## Notes
+- Header and bottom navigation links to Transactions include the current month query (`/transactions?month=YYYY-MM`) so normal navigation loads a bounded month-sized result set by default.
 - Search, date range, category, tag, card, and split filters are now pushed down to the API before rendering the list.
 - CSV export reuses the same active transaction filters, including free-text search.
 - Shared date-range parsing/formatting now lives in `lib/date-filters.ts` and is reused across Dashboard, Transactions, and Insights.

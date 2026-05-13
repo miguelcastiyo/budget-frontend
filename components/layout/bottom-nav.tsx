@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Receipt, LineChart, Settings, Plus, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 
 const primaryNavItems = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
@@ -34,10 +35,12 @@ export function BottomNav({
   const router = useRouter()
   const [hasHydrated, setHasHydrated] = useState(false)
   const [coachmarkDismissed, setCoachmarkDismissed] = useState(false)
+  const [transactionsHref, setTransactionsHref] = useState("/transactions")
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
     setCoachmarkDismissed(dismissed)
+    setTransactionsHref(`/transactions?month=${getCurrentMonthKey()}`)
     setHasHydrated(true)
   }, [])
 
@@ -71,11 +74,12 @@ export function BottomNav({
         {primaryNavItems.map((item) => {
           const isActive = pathname === item.href || 
             (item.href !== "/" && pathname.startsWith(item.href))
+          const href = item.href === "/transactions" ? transactionsHref : item.href
           
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={href}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors",
                 isActive 
