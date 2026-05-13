@@ -1,7 +1,6 @@
 "use client"
 
 import { Suspense, useEffect, useState } from "react"
-import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,7 +15,6 @@ import { ArrowRight } from "lucide-react"
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { resolvedTheme } = useTheme()
   const { setAuthenticatedUser } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -27,7 +25,6 @@ function SignInPageContent() {
   const googleClientIdConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   const inviteToken = searchParams.get("invite_token")?.trim() || ""
   const isInviteFlow = inviteToken.length > 0
-  const isDarkMode = resolvedTheme === "dark"
 
   useEffect(() => {
     const updateGoogleButtonWidth = () => {
@@ -99,7 +96,7 @@ function SignInPageContent() {
   }
 
   return (
-    <div className="min-h-[100svh] bg-background">
+    <div className="auth-light min-h-[100svh] bg-background text-foreground">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.04),transparent_28%),linear-gradient(to_bottom,rgba(15,23,42,0.015),transparent_30%)]" />
 
       <main className="mx-auto flex min-h-[100svh] max-w-6xl flex-col items-center justify-start px-4 pt-10 pb-6 sm:px-5 sm:pt-14 sm:pb-10 lg:px-8 lg:pt-20 lg:pb-16">
@@ -123,7 +120,7 @@ function SignInPageContent() {
                   <GoogleLogin
                     onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
                     onError={() => setError("Google sign-in was canceled or failed.")}
-                    theme={isDarkMode ? "filled_black" : "outline"}
+                    theme="outline"
                     text={isInviteFlow ? "signup_with" : "continue_with"}
                     shape="pill"
                     size="large"
