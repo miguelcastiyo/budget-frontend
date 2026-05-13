@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Dialog,
   DialogClose,
@@ -39,6 +39,8 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 
+const MAX_AMOUNT_DIGITS = 9
+
 interface AddTransactionSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -59,6 +61,7 @@ export function AddTransactionSheet({
   const [date, setDate] = useState<Date>(new Date())
   const [expense, setExpense] = useState("")
   const [amount, setAmount] = useState("")
+  const [amountDigits, setAmountDigits] = useState("")
   const [category, setCategory] = useState<Category>("needs")
   const [isSplit, setIsSplit] = useState(false)
   const [tagId, setTagId] = useState("")
@@ -84,6 +87,7 @@ export function AddTransactionSheet({
   const isEditMode = mode === "edit" && transaction !== null
   const transactionAlreadyRecurring = transaction?.recurring_expense_id !== null
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
+  const amountInputRef = useRef<HTMLInputElement>(null)
 
   const parseTransactionDate = (dateStr: string): Date => {
     const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -103,6 +107,62 @@ export function AddTransactionSheet({
   const applyRecurringDefaultsFromDate = (selectedDate: Date) => {
     setRecurringBillingDay(String(selectedDate.getDate()))
     setRecurringBillingType(isLastDayOfMonth(selectedDate) ? "last_day" : "day_of_month")
+  }
+
+  const formatAmountDigits = (digits: string): string => {
+    if (digits.length === 0) {
+      return ""
+    }
+
+    if (digits.length === 1) {
+      return `00.0${digits}`
+    }
+
+    if (digits.length === 2) {
+      return `0.${digits}`
+    }
+
+    if (digits.length === 3) {
+      return `0${digits[0]}.${digits.slice(1)}`
+    }
+
+    return `${digits.slice(0, -2)}.${digits.slice(-2)}`
+  }
+
+  const amountDigitsFromDecimal = (value: string): string => {
+    const normalized = value.trim().replace(/,/g, ".")
+    if (normalized === "") {
+      return ""
+    }
+
+    const [whole = "", fraction = ""] = normalized.split(".")
+    const digits = `${whole.replace(/\D/g, "")}${fraction.replace(/\D/g, "").padEnd(2, "0").slice(0, 2)}`
+
+    return digits.replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
+  }
+
+  const setAmountFromDigits = (digits: string) => {
+    const normalizedDigits = digits.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
+
+    setAmountDigits(normalizedDigits)
+    setAmount(formatAmountDigits(normalizedDigits))
+  }
+
+  const appendAmountDigits = (digits: string) => {
+    if (!digits) {
+      return
+    }
+
+    setAmountFromDigits(`${amountDigits}${digits}`)
+  }
+
+  const amountInputIsFullySelected = (): boolean => {
+    const input = amountInputRef.current
+    if (!input || amount.length === 0) {
+      return false
+    }
+
+    return input.selectionStart === 0 && input.selectionEnd === amount.length
   }
 
   const loadTaxonomy = useCallback(async () => {
@@ -139,7 +199,9 @@ export function AddTransactionSheet({
       if (isEditMode && transaction) {
         setDate(parseTransactionDate(transaction.date))
         setExpense(transaction.expense)
-        setAmount(transaction.amount)
+        const nextAmountDigits = amountDigitsFromDecimal(transaction.amount)
+        setAmountDigits(nextAmountDigits)
+        setAmount(formatAmountDigits(nextAmountDigits))
       setCategory(transaction.category)
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
@@ -162,6 +224,7 @@ export function AddTransactionSheet({
     const now = new Date()
     setExpense("")
     setAmount("")
+    setAmountDigits("")
     setCategory("needs")
     setIsSplit(false)
     setTagId("")
@@ -232,20 +295,74 @@ export function AddTransactionSheet({
     return parsed.toFixed(2)
   }
 
-  const sanitizeAmountInput = (value: string): string => {
-    const normalized = value.replace(/,/g, ".").replace(/[^\d.]/g, "")
-    const [whole = "", ...fractionParts] = normalized.split(".")
-    const fraction = fractionParts.join("").slice(0, 2)
+  const handleAmountBeforeInput = (event: React.FormEvent<HTMLInputElement>) => {
+    const nativeEvent = event.nativeEvent as InputEvent
+    const inputType = nativeEvent.inputType
+    const data = nativeEvent.data ?? ""
 
-    if (normalized.startsWith(".")) {
-      return fraction === "" ? "." : `.${fraction}`
+    if (inputType === "insertText") {
+      event.preventDefault()
+      if (/^\d+$/.test(data)) {
+        appendAmountDigits(data)
+      }
+      return
     }
 
-    if (fractionParts.length === 0) {
-      return whole
+    if (inputType === "deleteContentBackward") {
+      event.preventDefault()
+      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
+      return
     }
 
-    return `${whole}.${fraction}`
+    if (inputType === "deleteContentForward") {
+      event.preventDefault()
+      if (amountInputIsFullySelected()) {
+        setAmountFromDigits("")
+      }
+    }
+  }
+
+  const handleAmountKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (/^\d$/.test(event.key)) {
+      event.preventDefault()
+      appendAmountDigits(event.key)
+      return
+    }
+
+    if (event.key === "Backspace") {
+      event.preventDefault()
+      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
+      return
+    }
+
+    if (event.key === "Delete") {
+      if (amountInputIsFullySelected()) {
+        event.preventDefault()
+        setAmountFromDigits("")
+      }
+      return
+    }
+
+    if (["Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+      return
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return
+    }
+
+    event.preventDefault()
+  }
+
+  const handleAmountPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault()
+
+    const pastedDigits = event.clipboardData.getData("text").replace(/\D/g, "")
+    if (!pastedDigits) {
+      return
+    }
+
+    setAmountFromDigits(amountInputIsFullySelected() ? pastedDigits : `${amountDigits}${pastedDigits}`)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -395,11 +512,12 @@ export function AddTransactionSheet({
               <div className="mt-4 flex items-baseline justify-center gap-1">
                 <span className="text-5xl font-light text-muted-foreground">$</span>
                 <Input
+                  ref={amountInputRef}
                   id="transaction-amount"
                   name="transaction_amount"
                   type="text"
-                  inputMode="decimal"
-                  pattern="^\d*([.]\d{0,2})?$"
+                  inputMode="numeric"
+                  pattern="\d*"
                   enterKeyHint="next"
                   autoComplete="off"
                   autoCorrect="off"
@@ -410,7 +528,10 @@ export function AddTransactionSheet({
                   data-1p-ignore="true"
                   placeholder="0.00"
                   value={amount}
-                  onChange={(e) => setAmount(sanitizeAmountInput(e.target.value))}
+                  onBeforeInput={handleAmountBeforeInput}
+                  onChange={(e) => setAmountFromDigits(e.target.value)}
+                  onKeyDown={handleAmountKeyDown}
+                  onPaste={handleAmountPaste}
                   className="text-6xl font-semibold tracking-tight border-0 bg-transparent p-0 h-auto w-auto min-w-[120px] max-w-[320px] text-center focus-visible:ring-0 placeholder:text-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   style={{ fontSize: "3.75rem" }}
                   required
