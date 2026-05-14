@@ -114,19 +114,9 @@ export function AddTransactionSheet({
       return ""
     }
 
-    if (digits.length === 1) {
-      return `00.0${digits}`
-    }
+    const paddedDigits = digits.padStart(4, "0")
 
-    if (digits.length === 2) {
-      return `0.${digits}`
-    }
-
-    if (digits.length === 3) {
-      return `0${digits[0]}.${digits.slice(1)}`
-    }
-
-    return `${digits.slice(0, -2)}.${digits.slice(-2)}`
+    return `${paddedDigits.slice(0, -2)}.${paddedDigits.slice(-2)}`
   }
 
   const amountDigitsFromDecimal = (value: string): string => {
@@ -517,7 +507,6 @@ export function AddTransactionSheet({
                   name="transaction_amount"
                   type="text"
                   inputMode="numeric"
-                  pattern="\d*"
                   enterKeyHint="next"
                   autoComplete="off"
                   autoCorrect="off"
