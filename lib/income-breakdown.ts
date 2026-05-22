@@ -115,7 +115,7 @@ export function incomeBreakdownPayload(state: IncomeFormState) {
     primary_weekly_hours:
       state.incomeSourceType === "hourly" ? toDecimalString(state.primaryWeeklyHours) : null,
     side_income_type: state.sideIncomeType,
-    side_income_label: state.sideIncomeLabel.trim() || null,
+    side_income_label: state.sideIncomeType === "none" ? null : state.sideIncomeLabel.trim() || null,
     side_monthly_income:
       state.sideIncomeType === "monthly" ? toDecimalString(state.sideMonthlyIncome) : null,
     side_hourly_rate:

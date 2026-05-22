@@ -1,44 +1,34 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatCurrency } from "@/lib/formatters"
-import { ArrowLeft } from "lucide-react"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { BudgetSettings } from "@/lib/api/types"
 import {
-  asNumber,
+  budgetAllocationPayload,
+  defaultBudgetAllocationFormState,
+  hydrateBudgetAllocationForm,
+  isBudgetAllocationValid,
+  type BudgetAllocationFormState,
+} from "@/lib/budget-allocation"
+import {
   calculateMonthlyIncome,
   defaultIncomeFormState,
   hydrateIncomeForm,
   incomeBreakdownPayload,
   isIncomeFormValid,
-  toDecimalString,
   type IncomeFormState,
 } from "@/lib/income-breakdown"
 
-type AllocationMode = "percent" | "amount"
-
 export default function BudgetSettingsPage() {
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
-  const [allocationMode, setAllocationMode] = useState<AllocationMode>("percent")
-
-  const [needsPercent, setNeedsPercent] = useState("50.00")
-  const [wantsPercent, setWantsPercent] = useState("30.00")
-  const [savingsPercent, setSavingsPercent] = useState("20.00")
-
-  const [needsAmount, setNeedsAmount] = useState("0.00")
-  const [wantsAmount, setWantsAmount] = useState("0.00")
-  const [savingsAmount, setSavingsAmount] = useState("0.00")
-
+  const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,11 +40,7 @@ export default function BudgetSettingsPage() {
         const data = await apiClient.getBudgetSettings()
         hydrateForm(data)
       } catch (err) {
-        if (err instanceof ApiError) {
-          setError(err.error.message)
-        } else {
-          setError("Unable to load budget settings")
-        }
+        setError(err instanceof ApiError ? err.error.message : "Unable to load budget settings")
       } finally {
         setIsLoading(false)
       }
@@ -65,97 +51,28 @@ export default function BudgetSettingsPage() {
 
   const hydrateForm = (settings: BudgetSettings) => {
     setIncomeForm(hydrateIncomeForm(settings))
-    setAllocationMode(settings.allocation_mode)
-
-    setNeedsPercent(settings.needs_percent || "0.00")
-    setWantsPercent(settings.wants_percent || "0.00")
-    setSavingsPercent(settings.savings_debts_percent || "0.00")
-
-    setNeedsAmount(settings.needs_amount || "0.00")
-    setWantsAmount(settings.wants_amount || "0.00")
-    setSavingsAmount(settings.savings_debts_amount || "0.00")
+    setAllocationForm(hydrateBudgetAllocationForm(settings))
   }
 
-  const totalPercent = asNumber(needsPercent) + asNumber(wantsPercent) + asNumber(savingsPercent)
-  const totalAmount = asNumber(needsAmount) + asNumber(wantsAmount) + asNumber(savingsAmount)
   const income = calculateMonthlyIncome(incomeForm)
-  const amountDelta = totalAmount - income
-
-  const isPercentValid = Math.abs(totalPercent - 100) < 0.01
-  const isAmountValid = Math.abs(totalAmount - income) < 0.01
-  const isAmountOver = amountDelta > 0.01
-  const isAmountUnder = amountDelta < -0.01
   const hasValidIncome = isIncomeFormValid(incomeForm)
-
-  const handleAllocationModeChange = (value: string) => {
-    const nextMode = value as AllocationMode
-
-    if (allocationMode === "percent" && nextMode === "amount") {
-      const incomeValue = income
-      let nextNeeds = (asNumber(needsPercent) / 100) * incomeValue
-      let nextWants = (asNumber(wantsPercent) / 100) * incomeValue
-      let nextSavings = (asNumber(savingsPercent) / 100) * incomeValue
-
-      if (Math.abs(totalPercent - 100) < 0.01) {
-        const incomeCents = Math.round(incomeValue * 100)
-        const needsCents = Math.round(nextNeeds * 100)
-        const wantsCents = Math.round(nextWants * 100)
-        const savingsCents = Math.round(nextSavings * 100)
-        const adjustedSavingsCents = savingsCents + (incomeCents - (needsCents + wantsCents + savingsCents))
-
-        nextNeeds = needsCents / 100
-        nextWants = wantsCents / 100
-        nextSavings = adjustedSavingsCents / 100
-      }
-
-      setNeedsAmount(nextNeeds.toFixed(2))
-      setWantsAmount(nextWants.toFixed(2))
-      setSavingsAmount(nextSavings.toFixed(2))
-    }
-
-    setAllocationMode(nextMode)
-  }
+  const hasValidAllocation = isBudgetAllocationValid(allocationForm, income)
 
   const handleSave = async () => {
     setIsSaving(true)
     setError(null)
     setSuccess(null)
 
-    const incomePayload = incomeBreakdownPayload(incomeForm)
-    const normalizedNeedsPercent = toDecimalString(needsPercent)
-    const normalizedWantsPercent = toDecimalString(wantsPercent)
-    const normalizedSavingsPercent = toDecimalString(savingsPercent)
-    const normalizedNeedsAmount = toDecimalString(needsAmount)
-    const normalizedWantsAmount = toDecimalString(wantsAmount)
-    const normalizedSavingsAmount = toDecimalString(savingsAmount)
-
     try {
-      const response = await apiClient.updateBudgetSettings(
-        allocationMode === "percent"
-          ? {
-              ...incomePayload,
-              allocation_mode: "percent",
-              needs_percent: normalizedNeedsPercent,
-              wants_percent: normalizedWantsPercent,
-              savings_debts_percent: normalizedSavingsPercent,
-            }
-          : {
-              ...incomePayload,
-              allocation_mode: "amount",
-              needs_amount: normalizedNeedsAmount,
-              wants_amount: normalizedWantsAmount,
-              savings_debts_amount: normalizedSavingsAmount,
-            }
-      )
+      const response = await apiClient.updateBudgetSettings({
+        ...incomeBreakdownPayload(incomeForm),
+        ...budgetAllocationPayload(allocationForm),
+      })
 
       hydrateForm(response)
       setSuccess("Budget saved")
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to save budget")
-      }
+      setError(err instanceof ApiError ? err.error.message : "Unable to save budget")
     } finally {
       setIsSaving(false)
     }
@@ -189,97 +106,17 @@ export default function BudgetSettingsPage() {
 
         <Card className="p-5 border-0 shadow-sm">
           <h3 className="font-semibold mb-4">Budget Allocation</h3>
-
-          <Tabs
-            value={allocationMode}
-            onValueChange={handleAllocationModeChange}
-          >
-            <TabsList className="w-full mb-4">
-              <TabsTrigger value="percent" className="flex-1">By Percentage</TabsTrigger>
-              <TabsTrigger value="amount" className="flex-1">By Amount</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="percent" className="space-y-4">
-              <AllocationInput
-                label="Needs"
-                value={needsPercent}
-                onChange={setNeedsPercent}
-                suffix="%"
-                color="bg-needs"
-                subtext={formatCurrency((asNumber(needsPercent) / 100) * income)}
-              />
-              <AllocationInput
-                label="Wants"
-                value={wantsPercent}
-                onChange={setWantsPercent}
-                suffix="%"
-                color="bg-wants"
-                subtext={formatCurrency((asNumber(wantsPercent) / 100) * income)}
-              />
-              <AllocationInput
-                label="Savings & Debts"
-                value={savingsPercent}
-                onChange={setSavingsPercent}
-                suffix="%"
-                color="bg-savings"
-                subtext={formatCurrency((asNumber(savingsPercent) / 100) * income)}
-              />
-
-              <div className={cn(
-                "p-3 rounded-xl text-center",
-                isPercentValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
-              )}>
-                Total: {totalPercent.toFixed(0)}%
-                {!isPercentValid && " (must equal 100%)"}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="amount" className="space-y-4">
-              <AllocationInput
-                label="Needs"
-                value={needsAmount}
-                onChange={setNeedsAmount}
-                prefix="$"
-                color="bg-needs"
-                subtext={`${income > 0 ? ((asNumber(needsAmount) / income) * 100).toFixed(0) : "0"}%`}
-              />
-              <AllocationInput
-                label="Wants"
-                value={wantsAmount}
-                onChange={setWantsAmount}
-                prefix="$"
-                color="bg-wants"
-                subtext={`${income > 0 ? ((asNumber(wantsAmount) / income) * 100).toFixed(0) : "0"}%`}
-              />
-              <AllocationInput
-                label="Savings & Debts"
-                value={savingsAmount}
-                onChange={setSavingsAmount}
-                prefix="$"
-                color="bg-savings"
-                subtext={`${income > 0 ? ((asNumber(savingsAmount) / income) * 100).toFixed(0) : "0"}%`}
-              />
-
-              <div className={cn(
-                "p-3 rounded-xl text-center",
-                isAmountValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
-              )}>
-                Total: {formatCurrency(totalAmount)}
-                {!isAmountValid && (
-                  isAmountOver
-                    ? ` (${formatCurrency(amountDelta)} over ${formatCurrency(income)})`
-                    : isAmountUnder
-                      ? ` (${formatCurrency(Math.abs(amountDelta))} under ${formatCurrency(income)})`
-                      : ` (must equal ${formatCurrency(income)})`
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+          <BudgetAllocationForm
+            value={allocationForm}
+            income={income}
+            onChange={setAllocationForm}
+            disabled={isLoading || isSaving}
+          />
 
           <Button
             className="w-full h-12 rounded-xl mt-4"
             onClick={() => void handleSave()}
-            disabled={isLoading || isSaving || !hasValidIncome || (allocationMode === "percent" ? !isPercentValid : !isAmountValid)}
+            disabled={isLoading || isSaving || !hasValidIncome || !hasValidAllocation}
           >
             {isSaving ? "Saving..." : "Save Budget"}
           </Button>
@@ -291,47 +128,6 @@ export default function BudgetSettingsPage() {
       </main>
 
       <BottomNav />
-    </div>
-  )
-}
-
-interface AllocationInputProps {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  prefix?: string
-  suffix?: string
-  color: string
-  subtext: string
-}
-
-function AllocationInput({ label, value, onChange, prefix, suffix, color, subtext }: AllocationInputProps) {
-  return (
-    <div className="flex items-center gap-4">
-      <div className={`w-4 h-4 rounded-full ${color}`} />
-      <div className="flex-1">
-        <Label className="text-sm text-muted-foreground">{label}</Label>
-        <p className="text-xs text-muted-foreground">{subtext}</p>
-      </div>
-      <div className="relative w-28">
-        {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{prefix}</span>
-        )}
-        <Input
-          type="number"
-          step="0.01"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            "h-10 rounded-xl text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-            prefix && "pl-6",
-            suffix && "pr-8"
-          )}
-        />
-        {suffix && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">{suffix}</span>
-        )}
-      </div>
     </div>
   )
 }
