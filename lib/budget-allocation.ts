@@ -4,7 +4,7 @@ import type {
   BudgetSettingsAmountInput,
   BudgetSettingsPercentInput,
 } from "@/lib/api/types"
-import { asNumber, toDecimalString } from "@/lib/income-breakdown"
+import { asNumber, incomeBreakdownPayload, toDecimalString, type IncomeFormState } from "@/lib/income-breakdown"
 
 export interface BudgetAllocationFormState {
   allocationMode: AllocationMode
@@ -99,6 +99,16 @@ export function budgetAllocationPayload(
     needs_amount: toDecimalString(state.needsAmount),
     wants_amount: toDecimalString(state.wantsAmount),
     savings_debts_amount: toDecimalString(state.savingsAmount),
+  }
+}
+
+export function budgetSettingsPayload(
+  incomeState: IncomeFormState,
+  allocationState: BudgetAllocationFormState
+): BudgetSettingsPercentInput | BudgetSettingsAmountInput {
+  return {
+    ...incomeBreakdownPayload(incomeState),
+    ...budgetAllocationPayload(allocationState),
   }
 }
 

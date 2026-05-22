@@ -12,7 +12,7 @@ import { formatCurrency } from "@/lib/formatters"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useAuth } from "@/components/auth/auth-provider"
 import {
-  budgetAllocationPayload,
+  budgetSettingsPayload,
   defaultBudgetAllocationFormState,
   hydrateBudgetAllocationForm,
   isBudgetAllocationValid,
@@ -24,7 +24,6 @@ import {
   calculateMonthlyIncomeString,
   defaultIncomeFormState,
   hydrateIncomeForm,
-  incomeBreakdownPayload,
   isIncomeFormValid,
   toDecimalString,
   type IncomeFormState,
@@ -126,10 +125,7 @@ export default function OnboardingPage() {
 
     try {
       await apiClient.updateProfile({ display_name: displayName.trim() })
-      await apiClient.updateBudgetSettings({
-        ...incomeBreakdownPayload(incomeForm),
-        ...budgetAllocationPayload(allocationForm),
-      })
+      await apiClient.updateBudgetSettings(budgetSettingsPayload(incomeForm, allocationForm))
 
       await refreshProfile()
       router.replace("/")

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { BudgetSettings } from "@/lib/api/types"
 import {
-  budgetAllocationPayload,
+  budgetSettingsPayload,
   defaultBudgetAllocationFormState,
   hydrateBudgetAllocationForm,
   isBudgetAllocationValid,
@@ -21,7 +21,6 @@ import {
   calculateMonthlyIncome,
   defaultIncomeFormState,
   hydrateIncomeForm,
-  incomeBreakdownPayload,
   isIncomeFormValid,
   type IncomeFormState,
 } from "@/lib/income-breakdown"
@@ -64,10 +63,7 @@ export default function BudgetSettingsPage() {
     setSuccess(null)
 
     try {
-      const response = await apiClient.updateBudgetSettings({
-        ...incomeBreakdownPayload(incomeForm),
-        ...budgetAllocationPayload(allocationForm),
-      })
+      const response = await apiClient.updateBudgetSettings(budgetSettingsPayload(incomeForm, allocationForm))
 
       hydrateForm(response)
       setSuccess("Budget saved")
