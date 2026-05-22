@@ -12,7 +12,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs"
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs",
+    "test": "npm run typecheck && npm run test:budget-helpers"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
