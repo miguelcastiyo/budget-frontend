@@ -19,6 +19,7 @@ import {
   type BudgetAllocationFormState,
 } from "@/lib/budget-allocation"
 import {
+  calculateHourlyMonthlyIncome,
   calculateMonthlyIncome,
   calculateMonthlyIncomeString,
   defaultIncomeFormState,
@@ -200,7 +201,14 @@ export default function OnboardingPage() {
         {step === "review" && (
           <Card className="p-5 border-0 shadow-sm space-y-4">
             <ReviewRow label="Name" value={displayName.trim()} />
-            <ReviewRow label="Monthly income" value={formatCurrency(calculateMonthlyIncomeString(incomeForm))} />
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Income</p>
+              <ReviewRow label="Primary" value={primaryIncomeReviewLabel(incomeForm)} />
+              {incomeForm.sideIncomeType !== "none" && (
+                <ReviewRow label={sideIncomeReviewTitle(incomeForm)} value={sideIncomeReviewLabel(incomeForm)} />
+              )}
+              <ReviewRow label="Monthly total" value={formatCurrency(calculateMonthlyIncomeString(incomeForm))} />
+            </div>
             <ReviewRow label="Budget split" value={budgetSplitLabel(allocationForm)} />
           </Card>
         )}
@@ -245,6 +253,39 @@ function budgetSplitLabel(allocationForm: BudgetAllocationFormState): string {
   }
 
   return `${formatCurrency(allocationForm.needsAmount)} / ${formatCurrency(allocationForm.wantsAmount)} / ${formatCurrency(allocationForm.savingsAmount)}`
+}
+
+function primaryIncomeReviewLabel(incomeForm: IncomeFormState): string {
+  if (incomeForm.incomeSourceType === "monthly") {
+    return `${formatCurrency(incomeForm.primaryMonthlyIncome)} monthly`
+  }
+
+  return hourlyReviewLabel(
+    incomeForm.primaryHourlyRate,
+    incomeForm.primaryWeeklyHours,
+    calculateHourlyMonthlyIncome(incomeForm.primaryHourlyRate, incomeForm.primaryWeeklyHours)
+  )
+}
+
+function sideIncomeReviewTitle(incomeForm: IncomeFormState): string {
+  const label = incomeForm.sideIncomeLabel.trim()
+  return label || "Side income"
+}
+
+function sideIncomeReviewLabel(incomeForm: IncomeFormState): string {
+  if (incomeForm.sideIncomeType === "monthly") {
+    return `${formatCurrency(incomeForm.sideMonthlyIncome)} monthly`
+  }
+
+  return hourlyReviewLabel(
+    incomeForm.sideHourlyRate,
+    incomeForm.sideWeeklyHours,
+    calculateHourlyMonthlyIncome(incomeForm.sideHourlyRate, incomeForm.sideWeeklyHours)
+  )
+}
+
+function hourlyReviewLabel(hourlyRate: string, weeklyHours: string, monthlyIncome: number): string {
+  return `${formatCurrency(hourlyRate)}/hr x ${toDecimalString(weeklyHours)} hrs/week = ${formatCurrency(monthlyIncome)}/mo`
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
