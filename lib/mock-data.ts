@@ -15,6 +15,7 @@ export const mockProfile: Profile = {
   display_name: "Alex",
   avatar_url: null,
   auth_provider: "password",
+  role: "owner",
   email_verified: true,
   created_at: "2024-01-15T10:00:00Z",
   onboarding_complete: true,

@@ -16,6 +16,7 @@ import {
   CreditCard,
   Repeat,
   Key,
+  UserPlus,
   ChevronRight,
   Moon,
   Bell,
@@ -213,6 +214,7 @@ export default function SettingsPage() {
 
   const storedTheme = profile?.user_preferences.appearance.theme ?? "system"
   const isDarkMode = storedTheme === "dark"
+  const isOwner = profile?.role === "owner"
 
   const handleThemeToggle = async (checked: boolean) => {
     const nextTheme = checked ? "dark" : "light"
@@ -365,6 +367,14 @@ export default function SettingsPage() {
                 description="Manage API access"
                 href="/settings/api-keys"
               />
+              {isOwner && (
+                <SettingsItem
+                  icon={<UserPlus className="w-5 h-5 text-muted-foreground" />}
+                  label="Invites"
+                  description="Invite friends to use app"
+                  href="/settings/invites"
+                />
+              )}
             </Card>
           </div>
 

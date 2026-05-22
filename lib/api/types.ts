@@ -3,6 +3,7 @@
 export type Category = "needs" | "wants" | "savings_debts"
 
 export type AuthProvider = "password" | "google"
+export type UserRole = "owner" | "admin" | "member"
 
 export type AllocationMode = "percent" | "amount"
 
@@ -26,6 +27,7 @@ export interface Profile {
   display_name: string
   avatar_url: string | null
   auth_provider: AuthProvider
+  role: UserRole
   email_verified: boolean
   created_at: string
   onboarding_complete: boolean
@@ -43,6 +45,7 @@ export interface AuthUser {
   display_name: string
   avatar_url: string | null
   auth_provider: AuthProvider
+  role: UserRole
   onboarding_complete: boolean
   user_preferences: UserPreferences
 }
@@ -395,16 +398,27 @@ export interface ErrorEnvelope {
 
 // Invitations
 export interface CreateInviteRequest {
+  invitee_name: string
   email: string
-  auth_method: "google_or_password"
-  expires_in_days: number
+  role: Exclude<UserRole, "owner">
+  expires_at: string
+  email_subject: string
+  email_body: string
 }
 
 export interface InviteResponse {
   invite_id: string
+  invitee_name: string
   email: string
-  status: "pending"
+  role: Exclude<UserRole, "owner">
+  status: "pending" | "accepted" | "expired" | "revoked"
   expires_at: string
+  created_at: string
+  accepted_at: string | null
+}
+
+export interface InvitesResponse {
+  items: InviteResponse[]
 }
 
 export interface AcceptInvitePasswordRequest {

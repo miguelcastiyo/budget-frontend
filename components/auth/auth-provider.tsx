@@ -67,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       display_name: user.display_name,
       avatar_url: user.avatar_url,
       auth_provider: user.auth_provider,
+      role: user.role,
       onboarding_complete: user.onboarding_complete,
       user_preferences: user.user_preferences,
       email_verified: current?.email_verified ?? true,

@@ -30,6 +30,7 @@ import type {
   CsvImportResponse,
   CreateInviteRequest,
   InviteResponse,
+  InvitesResponse,
   AcceptInvitePasswordRequest,
   AcceptInviteGoogleRequest,
   RequestEmailChangeRequest,
@@ -52,6 +53,8 @@ import {
 
 const API_BASE = "/api/v1"
 const CSRF_STORAGE_KEY = "budget.csrf_token"
+
+let localMockInvites: InviteResponse[] = []
 
 class ApiClient {
   private csrfToken: string | null = null
@@ -169,10 +172,33 @@ class ApiClient {
   }
 
   async createInvite(data: CreateInviteRequest): Promise<InviteResponse> {
+    if (isLocalMockMode()) {
+      const created: InviteResponse = {
+        invite_id: `inv_${Date.now()}`,
+        invitee_name: data.invitee_name,
+        email: data.email.toLowerCase(),
+        role: data.role,
+        status: "pending",
+        expires_at: data.expires_at,
+        created_at: new Date().toISOString(),
+        accepted_at: null,
+      }
+      localMockInvites = [created, ...localMockInvites]
+      return created
+    }
+
     return this.request<InviteResponse>("/auth/invitations", {
       method: "POST",
       body: JSON.stringify(data),
     })
+  }
+
+  async getInvites(): Promise<InvitesResponse> {
+    if (isLocalMockMode()) {
+      return { items: localMockInvites }
+    }
+
+    return this.request<InvitesResponse>("/auth/invitations")
   }
 
   async acceptInvitePassword(data: AcceptInvitePasswordRequest): Promise<AuthSessionResponse> {
