@@ -11,7 +11,8 @@
     "doctor:local": "bash scripts/doctor-local.sh",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
