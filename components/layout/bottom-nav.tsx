@@ -99,7 +99,7 @@ export function BottomNav({
               <button
                 type="button"
                 onClick={dismissCoachmark}
-                className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                 aria-label="Dismiss add transaction tip"
               >
                 <X className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ export function FloatingAddButton({
           <button
             type="button"
             onClick={dismissCoachmark}
-            className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+            className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
             aria-label="Dismiss add transaction tip"
           >
             <X className="h-3.5 w-3.5" />
@@ -216,7 +216,7 @@ export function FloatingAddButton({
       )}
       <button
         onClick={handleClick}
-        className="h-14 w-14 lg:w-auto rounded-full bg-primary lg:px-5 text-primary-foreground shadow-lg inline-flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+        className="inline-flex h-14 w-14 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 lg:w-auto lg:px-5"
       >
         <Plus className="w-7 h-7 lg:w-5 lg:h-5" />
         <span aria-hidden className="hidden lg:inline text-sm font-semibold">{label}</span>

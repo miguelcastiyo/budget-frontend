@@ -84,7 +84,7 @@ export function Header({ showAvatar = true }: HeaderProps) {
         {showAvatar && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="lg:ml-auto rounded-full border border-border/80 bg-background shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <button className="cursor-pointer rounded-full border border-border/80 bg-background shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:ml-auto">
                 <Avatar className="h-10 w-10 cursor-pointer hover:opacity-80 transition-opacity">
                   {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} className="object-cover" />}
                   <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">

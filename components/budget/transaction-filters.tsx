@@ -136,7 +136,7 @@ function ChipRail({ items }: { items: ChipRailItem[] }) {
         <button
           type="button"
           onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-gradient-to-r from-background via-background to-transparent"
+          className="absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center bg-gradient-to-r from-background via-background to-transparent"
         >
           <ChevronLeft className="w-4 h-4 text-muted-foreground" />
         </button>
@@ -153,7 +153,7 @@ function ChipRail({ items }: { items: ChipRailItem[] }) {
             type="button"
             onClick={item.onClick}
             className={cn(
-              "flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+              "flex-shrink-0 cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
               item.selected
                 ? "border-secondary bg-secondary text-foreground"
                 : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
@@ -168,7 +168,7 @@ function ChipRail({ items }: { items: ChipRailItem[] }) {
         <button
           type="button"
           onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center bg-gradient-to-l from-background via-background to-transparent"
+          className="absolute right-0 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center bg-gradient-to-l from-background via-background to-transparent"
         >
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
@@ -358,7 +358,7 @@ export function TransactionFilters({
           {searchQuery && (
             <button
               onClick={() => onSearchChange("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
+              className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
             >
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -507,7 +507,7 @@ export function TransactionFilters({
                       key={cat.value}
                       onClick={() => toggleCategory(cat.value)}
                       className={cn(
-                        "px-5 py-2.5 rounded-full text-sm font-medium transition-colors",
+                        "cursor-pointer rounded-full px-5 py-2.5 text-sm font-medium transition-colors",
                         selectedCategories.includes(cat.value)
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
@@ -528,7 +528,7 @@ export function TransactionFilters({
                       key={tag.id}
                       onClick={() => toggleTag(tag.id)}
                       className={cn(
-                        "px-5 py-2.5 rounded-full text-sm font-medium transition-colors",
+                        "cursor-pointer rounded-full px-5 py-2.5 text-sm font-medium transition-colors",
                         selectedTags.includes(tag.id)
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
@@ -549,7 +549,7 @@ export function TransactionFilters({
                       key={card.id}
                       onClick={() => toggleCard(card.id)}
                       className={cn(
-                        "px-5 py-2.5 rounded-full text-sm font-medium transition-colors",
+                        "cursor-pointer rounded-full px-5 py-2.5 text-sm font-medium transition-colors",
                         selectedCards.includes(card.id)
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary text-secondary-foreground hover:bg-secondary/80"

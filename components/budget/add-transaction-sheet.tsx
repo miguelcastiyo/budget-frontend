@@ -660,7 +660,7 @@ export function AddTransactionSheet({
                       type="button"
                       onClick={() => setCategory(cat)}
                       className={cn(
-                        "relative h-12 rounded-xl font-medium transition-all duration-200 text-sm",
+                        "relative h-12 cursor-pointer rounded-xl font-medium transition-all duration-200 text-sm",
                         isSelected
                           ? `${config.color} text-white shadow-sm`
                           : "bg-muted/50 text-foreground hover:bg-muted"
@@ -690,7 +690,7 @@ export function AddTransactionSheet({
                   <button
                     type="button"
                     onClick={() => setShowNewTag(true)}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     New tag
@@ -761,7 +761,7 @@ export function AddTransactionSheet({
                   <button
                     type="button"
                     onClick={() => setShowNewCard(true)}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     New card

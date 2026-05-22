@@ -121,7 +121,7 @@ export default function TransactionsPage() {
         <button
           type="button"
           onClick={() => setDesktopFiltersCollapsed(true)}
-          className="inline-flex h-11 items-center justify-center rounded-xl border border-border/60 bg-muted/65 px-2.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-border/60 bg-muted/65 px-2.5 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Hide filters"
           title="Hide filters"
         >
@@ -208,7 +208,7 @@ export default function TransactionsPage() {
                     <button
                       type="button"
                       onClick={() => setDesktopFiltersCollapsed(false)}
-                      className="inline-flex h-8 items-center justify-center rounded-full border border-border/60 bg-muted/65 px-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+                      className="inline-flex h-8 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-muted/65 px-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
                       aria-label="Show filters"
                       title="Show filters"
                     >
@@ -267,7 +267,7 @@ export default function TransactionsPage() {
                       onClick={() => setSortOrder("date_desc")}
                       aria-label="Sort newest first"
                       title="Newest first"
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
                         sortOrder === "date_desc"
                           ? "bg-secondary text-foreground"
                           : "text-muted-foreground hover:text-foreground"
@@ -281,7 +281,7 @@ export default function TransactionsPage() {
                       onClick={() => setSortOrder("date_asc")}
                       aria-label="Sort oldest first"
                       title="Oldest first"
-                      className={`inline-flex items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
+                      className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
                         sortOrder === "date_asc"
                           ? "bg-secondary text-foreground"
                           : "text-muted-foreground hover:text-foreground"

@@ -63,7 +63,7 @@ export function TransactionExportDialog({
                   type="button"
                   onClick={() => onExportPresetChange(option.value)}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                    "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
                     exportPreset === option.value
                       ? "border-secondary bg-secondary text-foreground"
                       : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
@@ -76,7 +76,7 @@ export function TransactionExportDialog({
                 type="button"
                 onClick={() => onExportPresetChange("custom")}
                 className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
+                  "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
                   exportPreset === "custom"
                     ? "border-secondary bg-secondary text-foreground"
                     : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"

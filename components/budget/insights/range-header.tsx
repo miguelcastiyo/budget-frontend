@@ -57,7 +57,7 @@ export function InsightsRangeHeader({
             type="button"
             onClick={() => onPresetSelect(preset.value)}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+              "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
               selectedPreset === preset.value
                 ? "border-secondary bg-secondary text-foreground"
                 : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"

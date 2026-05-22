@@ -146,7 +146,7 @@ export function TransactionList({
     <button
       type="button"
       onClick={onViewAll}
-      className="text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
+      className="cursor-pointer text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
     >
       See All
     </button>
@@ -212,7 +212,7 @@ export function TransactionList({
                       data-transaction-row="true"
                       onClick={() => onTransactionClick?.(transaction)}
                       className={cn(
-                        "w-full flex items-center gap-3 hover:bg-accent/50 transition-colors text-left",
+                        "flex w-full cursor-pointer items-center gap-3 text-left transition-colors hover:bg-accent/50",
                         compact ? "p-2" : "p-3"
                       )}
                     >
@@ -315,7 +315,7 @@ export function TransactionList({
             type="button"
             onClick={handleScrollHintClick}
             aria-label="Scroll to more recent transactions"
-            className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background via-background/90 to-transparent flex items-end justify-center pb-1 text-muted-foreground transition-colors hover:text-foreground"
+            className="absolute inset-x-0 bottom-0 flex h-12 cursor-pointer items-end justify-center bg-gradient-to-t from-background via-background/90 to-transparent pb-1 text-muted-foreground transition-colors hover:text-foreground"
           >
             <ChevronsDown className="w-4 h-4 animate-pulse" />
           </button>
