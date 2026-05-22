@@ -58,6 +58,15 @@ export interface UpdateUserPreferencesRequest {
   }
 }
 
+export interface SettingsSummaryResponse {
+  monthly_income: string | null
+  tags_count: number
+  cards_count: number
+  recurring_count: number
+  recurring_committed_total: string
+  avg_monthly_spend: string
+}
+
 export interface SessionInfo {
   session_id: string
   expires_at: string

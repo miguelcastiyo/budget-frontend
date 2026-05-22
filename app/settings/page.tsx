@@ -26,7 +26,7 @@ import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { BudgetSettings, Transaction } from "@/lib/api/types"
+import type { SettingsSummaryResponse } from "@/lib/api/types"
 
 interface SettingsItemProps {
   icon: React.ReactNode
@@ -87,20 +87,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const { profile, setProfile, signOut } = useAuth()
   const { resolvedTheme } = useTheme()
-  const [budgetSettings, setBudgetSettings] = useState<BudgetSettings | null>(null)
-  const [stats, setStats] = useState<{
-    tagsCount: number | null
-    cardsCount: number | null
-    recurringCount: number | null
-    recurringCommittedTotal: string | null
-    avgMonthlySpend: number | null
-  }>({
-    tagsCount: null,
-    cardsCount: null,
-    recurringCount: null,
-    recurringCommittedTotal: null,
-    avgMonthlySpend: null,
-  })
+  const [summary, setSummary] = useState<SettingsSummaryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [themeReady, setThemeReady] = useState(false)
@@ -110,70 +97,22 @@ export default function SettingsPage() {
     let isMounted = true
 
     const loadSettingsData = async () => {
-      const loadAllTransactions = async (): Promise<Transaction[]> => {
-        const pageSize = 200
-        const maxPages = 50
-        let page = 1
-        let allItems: Transaction[] = []
-        let totalItems = 0
-
-        do {
-          const response = await apiClient.getTransactions({ page, page_size: pageSize, sort: "date_desc" })
-          allItems = [...allItems, ...response.items]
-          totalItems = response.total_items
-          page += 1
-        } while (allItems.length < totalItems && page <= maxPages)
-
-        return allItems
-      }
-
-      const [budgetResult, tagsResult, cardsResult, recurringResult, transactionsResult] = await Promise.allSettled([
-        apiClient.getBudgetSettings(),
-        apiClient.getTags(),
-        apiClient.getCards(),
-        apiClient.getRecurringExpenses(),
-        loadAllTransactions(),
-      ])
-
-      if (!isMounted) {
-        return
-      }
-
-      if (budgetResult.status === "fulfilled") {
-        setBudgetSettings(budgetResult.value)
-      } else if (budgetResult.reason instanceof ApiError) {
-        setError(budgetResult.reason.error.message)
-      } else {
-        setError("Unable to load budget settings")
-      }
-
-      let avgMonthlySpend: number | null = null
-      if (transactionsResult.status === "fulfilled") {
-        const monthlyTotals = new Map<string, number>()
-        for (const transaction of transactionsResult.value) {
-          const monthKey = transaction.date.slice(0, 7)
-          const amount = parseFloat(transaction.amount)
-          if (!Number.isFinite(amount)) {
-            continue
-          }
-          monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) ?? 0) + amount)
+      try {
+        const response = await apiClient.getSettingsSummary()
+        if (isMounted) {
+          setSummary(response)
+          setError(null)
         }
-
-        if (monthlyTotals.size > 0) {
-          const totalAcrossMonths = Array.from(monthlyTotals.values()).reduce((sum, value) => sum + value, 0)
-          avgMonthlySpend = totalAcrossMonths / monthlyTotals.size
+      } catch (err) {
+        if (!isMounted) {
+          return
+        }
+        if (err instanceof ApiError) {
+          setError(err.error.message)
         } else {
-          avgMonthlySpend = 0
+          setError("Unable to load settings summary")
         }
       }
-
-      setStats({
-        tagsCount: tagsResult.status === "fulfilled" ? tagsResult.value.items.length : null,
-        cardsCount: cardsResult.status === "fulfilled" ? cardsResult.value.items.length : null,
-        recurringCount: recurringResult.status === "fulfilled" ? recurringResult.value.items_count : null,
-        recurringCommittedTotal: recurringResult.status === "fulfilled" ? recurringResult.value.committed_total : null,
-        avgMonthlySpend,
-      })
     }
 
     void loadSettingsData()
@@ -198,8 +137,8 @@ export default function SettingsPage() {
     .toUpperCase()
     .slice(0, 2) || "BU"
 
-  const budgetDescription = budgetSettings
-    ? `${formatCurrency(budgetSettings.monthly_income)}/month`
+  const budgetDescription = summary?.monthly_income
+    ? `${formatCurrency(summary.monthly_income)}/month`
     : "Set your monthly budget"
 
   const handleSignOut = async () => {
@@ -289,36 +228,36 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Monthly Income</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {budgetSettings ? formatCurrency(budgetSettings.monthly_income) : "--"}
+                  {summary?.monthly_income ? formatCurrency(summary.monthly_income) : "--"}
                 </p>
               </div>
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg. Monthly Spend</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {stats.avgMonthlySpend === null ? "--" : formatCurrency(stats.avgMonthlySpend)}
+                  {summary === null ? "--" : formatCurrency(summary.avg_monthly_spend)}
                 </p>
               </div>
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Tags</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {stats.tagsCount === null ? "--" : stats.tagsCount}
+                  {summary === null ? "--" : summary.tags_count}
                 </p>
               </div>
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Cards</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {stats.cardsCount === null ? "--" : stats.cardsCount}
+                  {summary === null ? "--" : summary.cards_count}
                 </p>
               </div>
               <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Recurring</p>
                 <p className="mt-1 text-lg font-semibold">
-                  {stats.recurringCount === null ? "--" : stats.recurringCount}
+                  {summary === null ? "--" : summary.recurring_count}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {stats.recurringCommittedTotal === null
+                  {summary === null
                     ? "--"
-                    : `${formatCurrency(stats.recurringCommittedTotal)} committed`}
+                    : `${formatCurrency(summary.recurring_committed_total)} committed`}
                 </p>
               </div>
             </div>

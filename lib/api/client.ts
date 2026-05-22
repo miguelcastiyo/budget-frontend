@@ -38,6 +38,7 @@ import type {
   VerifyEmailChangeRequest,
   EmailChangeVerifiedResponse,
   ConvertAccountToGoogleRequest,
+  SettingsSummaryResponse,
   ErrorEnvelope,
 } from "./types"
 import { isLocalMockMode } from "@/lib/local-dev"
@@ -244,6 +245,34 @@ class ApiClient {
       method: "PATCH",
       body: JSON.stringify(data),
     })
+  }
+
+  async getSettingsSummary(): Promise<SettingsSummaryResponse> {
+    if (isLocalMockMode()) {
+      const monthlyTotals = new Map<string, number>()
+      for (const transaction of mockTransactions) {
+        const monthKey = transaction.date.slice(0, 7)
+        const amount = Number.parseFloat(transaction.amount)
+        if (!Number.isFinite(amount)) {
+          continue
+        }
+        monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) ?? 0) + amount)
+      }
+
+      const totalAcrossMonths = Array.from(monthlyTotals.values()).reduce((sum, value) => sum + value, 0)
+      const avgMonthlySpend = monthlyTotals.size > 0 ? totalAcrossMonths / monthlyTotals.size : 0
+
+      return {
+        monthly_income: mockBudgetSettings.monthly_income,
+        tags_count: mockTags.length,
+        cards_count: mockCards.length,
+        recurring_count: 0,
+        recurring_committed_total: "0.00",
+        avg_monthly_spend: avgMonthlySpend.toFixed(2),
+      }
+    }
+
+    return this.request<SettingsSummaryResponse>("/me/settings-summary")
   }
 
   async requestEmailChange(data: RequestEmailChangeRequest): Promise<EmailChangeRequestedResponse> {
