@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,24 +14,22 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { BudgetSettings } from "@/lib/api/types"
+import {
+  asNumber,
+  calculateMonthlyIncome,
+  defaultIncomeFormState,
+  hydrateIncomeForm,
+  incomeBreakdownPayload,
+  isIncomeFormValid,
+  toDecimalString,
+  type IncomeFormState,
+} from "@/lib/income-breakdown"
 
-function asNumber(value: string): number {
-  const parsed = parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function toDecimalString(value: string): string {
-  const parsed = parseFloat(value.replace(/,/g, "").trim())
-  if (!Number.isFinite(parsed)) {
-    return "0.00"
-  }
-
-  return parsed.toFixed(2)
-}
+type AllocationMode = "percent" | "amount"
 
 export default function BudgetSettingsPage() {
-  const [monthlyIncome, setMonthlyIncome] = useState("0.00")
-  const [allocationMode, setAllocationMode] = useState<"percent" | "amount">("percent")
+  const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>("percent")
 
   const [needsPercent, setNeedsPercent] = useState("50.00")
   const [wantsPercent, setWantsPercent] = useState("30.00")
@@ -65,7 +64,7 @@ export default function BudgetSettingsPage() {
   }, [])
 
   const hydrateForm = (settings: BudgetSettings) => {
-    setMonthlyIncome(settings.monthly_income)
+    setIncomeForm(hydrateIncomeForm(settings))
     setAllocationMode(settings.allocation_mode)
 
     setNeedsPercent(settings.needs_percent || "0.00")
@@ -79,19 +78,20 @@ export default function BudgetSettingsPage() {
 
   const totalPercent = asNumber(needsPercent) + asNumber(wantsPercent) + asNumber(savingsPercent)
   const totalAmount = asNumber(needsAmount) + asNumber(wantsAmount) + asNumber(savingsAmount)
-  const income = asNumber(monthlyIncome)
+  const income = calculateMonthlyIncome(incomeForm)
   const amountDelta = totalAmount - income
 
   const isPercentValid = Math.abs(totalPercent - 100) < 0.01
   const isAmountValid = Math.abs(totalAmount - income) < 0.01
   const isAmountOver = amountDelta > 0.01
   const isAmountUnder = amountDelta < -0.01
+  const hasValidIncome = isIncomeFormValid(incomeForm)
 
   const handleAllocationModeChange = (value: string) => {
-    const nextMode = value as "percent" | "amount"
+    const nextMode = value as AllocationMode
 
     if (allocationMode === "percent" && nextMode === "amount") {
-      const incomeValue = asNumber(monthlyIncome)
+      const incomeValue = income
       let nextNeeds = (asNumber(needsPercent) / 100) * incomeValue
       let nextWants = (asNumber(wantsPercent) / 100) * incomeValue
       let nextSavings = (asNumber(savingsPercent) / 100) * incomeValue
@@ -121,7 +121,7 @@ export default function BudgetSettingsPage() {
     setError(null)
     setSuccess(null)
 
-    const normalizedMonthlyIncome = toDecimalString(monthlyIncome)
+    const incomePayload = incomeBreakdownPayload(incomeForm)
     const normalizedNeedsPercent = toDecimalString(needsPercent)
     const normalizedWantsPercent = toDecimalString(wantsPercent)
     const normalizedSavingsPercent = toDecimalString(savingsPercent)
@@ -133,14 +133,14 @@ export default function BudgetSettingsPage() {
       const response = await apiClient.updateBudgetSettings(
         allocationMode === "percent"
           ? {
-              monthly_income: normalizedMonthlyIncome,
+              ...incomePayload,
               allocation_mode: "percent",
               needs_percent: normalizedNeedsPercent,
               wants_percent: normalizedWantsPercent,
               savings_debts_percent: normalizedSavingsPercent,
             }
           : {
-              monthly_income: normalizedMonthlyIncome,
+              ...incomePayload,
               allocation_mode: "amount",
               needs_amount: normalizedNeedsAmount,
               wants_amount: normalizedWantsAmount,
@@ -179,21 +179,12 @@ export default function BudgetSettingsPage() {
         {success && <p className="text-sm text-green-600">{success}</p>}
 
         <Card className="p-5 border-0 shadow-sm">
-          <div className="space-y-2">
-            <Label htmlFor="income">Monthly Income</Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-              <Input
-                id="income"
-                type="number"
-                step="0.01"
-                value={monthlyIncome}
-                onChange={(e) => setMonthlyIncome(e.target.value)}
-                className="h-14 rounded-xl text-2xl font-bold pl-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
+          <IncomeBreakdownForm
+            value={incomeForm}
+            onChange={setIncomeForm}
+            disabled={isLoading || isSaving}
+            idPrefix="settings-income"
+          />
         </Card>
 
         <Card className="p-5 border-0 shadow-sm">
@@ -288,7 +279,7 @@ export default function BudgetSettingsPage() {
           <Button
             className="w-full h-12 rounded-xl mt-4"
             onClick={() => void handleSave()}
-            disabled={isLoading || isSaving || (allocationMode === "percent" ? !isPercentValid : !isAmountValid)}
+            disabled={isLoading || isSaving || !hasValidIncome || (allocationMode === "percent" ? !isPercentValid : !isAmountValid)}
           >
             {isSaving ? "Saving..." : "Save Budget"}
           </Button>

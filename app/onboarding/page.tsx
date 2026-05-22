@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,29 +12,32 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/formatters"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useAuth } from "@/components/auth/auth-provider"
+import {
+  asNumber,
+  calculateMonthlyIncome,
+  calculateMonthlyIncomeString,
+  defaultIncomeFormState,
+  hydrateIncomeForm,
+  incomeBreakdownPayload,
+  isIncomeFormValid,
+  toDecimalString,
+  type IncomeFormState,
+} from "@/lib/income-breakdown"
 import type { BudgetSettings } from "@/lib/api/types"
 
-function asNumber(value: string): number {
-  const parsed = parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : 0
-}
+type AllocationMode = "percent" | "amount"
+type OnboardingStep = "profile" | "income" | "allocation" | "review"
 
-function toDecimalString(value: string): string {
-  const parsed = parseFloat(value.replace(/,/g, "").trim())
-  if (!Number.isFinite(parsed)) {
-    return "0.00"
-  }
-
-  return parsed.toFixed(2)
-}
+const steps: OnboardingStep[] = ["profile", "income", "allocation", "review"]
 
 export default function OnboardingPage() {
   const router = useRouter()
   const { profile, refreshProfile, needsOnboarding } = useAuth()
 
+  const [step, setStep] = useState<OnboardingStep>("profile")
   const [displayName, setDisplayName] = useState("")
-  const [monthlyIncome, setMonthlyIncome] = useState("0.00")
-  const [allocationMode, setAllocationMode] = useState<"percent" | "amount">("percent")
+  const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
+  const [allocationMode, setAllocationMode] = useState<AllocationMode>("percent")
   const [needsPercent, setNeedsPercent] = useState("50.00")
   const [wantsPercent, setWantsPercent] = useState("30.00")
   const [savingsPercent, setSavingsPercent] = useState("20.00")
@@ -45,11 +49,9 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!profile) {
-      return
+    if (profile) {
+      setDisplayName(profile.display_name)
     }
-
-    setDisplayName(profile.display_name)
   }, [profile])
 
   useEffect(() => {
@@ -58,21 +60,15 @@ export default function OnboardingPage() {
     const bootstrap = async () => {
       try {
         const settings = await apiClient.getBudgetSettings()
-        if (!active) {
-          return
+        if (active) {
+          hydrateBudgetForm(settings)
         }
-
-        hydrateBudgetForm(settings)
       } catch (err) {
         if (!active) {
           return
         }
 
-        if (err instanceof ApiError) {
-          setError(err.error.message)
-        } else {
-          setError("Unable to load onboarding details")
-        }
+        setError(err instanceof ApiError ? err.error.message : "Unable to load onboarding details")
       } finally {
         if (active) {
           setIsLoading(false)
@@ -94,7 +90,7 @@ export default function OnboardingPage() {
   }, [needsOnboarding, router])
 
   const hydrateBudgetForm = (settings: BudgetSettings) => {
-    setMonthlyIncome(settings.monthly_income)
+    setIncomeForm(hydrateIncomeForm(settings))
     setAllocationMode(settings.allocation_mode)
     setNeedsPercent(settings.needs_percent || "50.00")
     setWantsPercent(settings.wants_percent || "30.00")
@@ -104,15 +100,54 @@ export default function OnboardingPage() {
     setSavingsAmount(settings.savings_debts_amount || "0.00")
   }
 
-  const income = useMemo(() => asNumber(monthlyIncome), [monthlyIncome])
-  const totalPercent = useMemo(() => asNumber(needsPercent) + asNumber(wantsPercent) + asNumber(savingsPercent), [needsPercent, wantsPercent, savingsPercent])
-  const totalAmount = useMemo(() => asNumber(needsAmount) + asNumber(wantsAmount) + asNumber(savingsAmount), [needsAmount, wantsAmount, savingsAmount])
+  const income = useMemo(() => calculateMonthlyIncome(incomeForm), [incomeForm])
+  const totalPercent = useMemo(
+    () => asNumber(needsPercent) + asNumber(wantsPercent) + asNumber(savingsPercent),
+    [needsPercent, wantsPercent, savingsPercent]
+  )
+  const totalAmount = useMemo(
+    () => asNumber(needsAmount) + asNumber(wantsAmount) + asNumber(savingsAmount),
+    [needsAmount, wantsAmount, savingsAmount]
+  )
+  const currentStepIndex = steps.indexOf(step)
   const isPercentValid = Math.abs(totalPercent - 100) < 0.01
   const isAmountValid = Math.abs(totalAmount - income) < 0.01
   const hasValidName = displayName.trim().length > 0
-  const hasPositiveIncome = income > 0
+  const hasValidIncome = isIncomeFormValid(incomeForm)
   const hasValidAllocation = allocationMode === "percent" ? isPercentValid : isAmountValid
-  const canSave = hasValidName && hasPositiveIncome && hasValidAllocation && !isSaving
+  const canContinue =
+    step === "profile" ? hasValidName : step === "income" ? hasValidIncome : step === "allocation" ? hasValidAllocation : true
+  const canSave = hasValidName && hasValidIncome && hasValidAllocation && !isSaving
+
+  const handleAllocationModeChange = (value: string) => {
+    const nextMode = value as AllocationMode
+
+    if (allocationMode === "percent" && nextMode === "amount") {
+      const nextNeeds = (asNumber(needsPercent) / 100) * income
+      const nextWants = (asNumber(wantsPercent) / 100) * income
+      const nextSavings = income - nextNeeds - nextWants
+
+      setNeedsAmount(nextNeeds.toFixed(2))
+      setWantsAmount(nextWants.toFixed(2))
+      setSavingsAmount(nextSavings.toFixed(2))
+    }
+
+    setAllocationMode(nextMode)
+  }
+
+  const goNext = () => {
+    if (!canContinue) {
+      return
+    }
+
+    setError(null)
+    setStep(steps[Math.min(currentStepIndex + 1, steps.length - 1)])
+  }
+
+  const goBack = () => {
+    setError(null)
+    setStep(steps[Math.max(currentStepIndex - 1, 0)])
+  }
 
   const handleFinish = async () => {
     if (!canSave) {
@@ -122,7 +157,7 @@ export default function OnboardingPage() {
     setIsSaving(true)
     setError(null)
 
-    const normalizedMonthlyIncome = toDecimalString(monthlyIncome)
+    const incomePayload = incomeBreakdownPayload(incomeForm)
     const normalizedNeedsPercent = toDecimalString(needsPercent)
     const normalizedWantsPercent = toDecimalString(wantsPercent)
     const normalizedSavingsPercent = toDecimalString(savingsPercent)
@@ -135,14 +170,14 @@ export default function OnboardingPage() {
       await apiClient.updateBudgetSettings(
         allocationMode === "percent"
           ? {
-              monthly_income: normalizedMonthlyIncome,
+              ...incomePayload,
               allocation_mode: "percent",
               needs_percent: normalizedNeedsPercent,
               wants_percent: normalizedWantsPercent,
               savings_debts_percent: normalizedSavingsPercent,
             }
           : {
-              monthly_income: normalizedMonthlyIncome,
+              ...incomePayload,
               allocation_mode: "amount",
               needs_amount: normalizedNeedsAmount,
               wants_amount: normalizedWantsAmount,
@@ -153,11 +188,7 @@ export default function OnboardingPage() {
       await refreshProfile()
       router.replace("/")
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to complete onboarding")
-      }
+      setError(err instanceof ApiError ? err.error.message : "Unable to complete onboarding")
     } finally {
       setIsSaving(false)
     }
@@ -167,144 +198,253 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-background">
       <main className="max-w-lg mx-auto px-5 py-10 space-y-6">
         <div className="text-center space-y-2">
-          <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">First-time setup</p>
+          <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">
+            Step {currentStepIndex + 1} of {steps.length}
+          </p>
           <h1 className="text-3xl font-bold tracking-tight">Set up your budget profile</h1>
-          <p className="text-muted-foreground">One quick step before your dashboard.</p>
+          <p className="text-muted-foreground">{stepLabel(step)}</p>
         </div>
 
         {error && (
           <p className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-lg">{error}</p>
         )}
 
-        <Card className="p-5 border-0 shadow-sm">
-          <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name</Label>
-            <Input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className="h-12 rounded-xl"
-              placeholder="How should we call you?"
-              disabled={isLoading || isSaving}
-            />
-          </div>
-        </Card>
-
-        <Card className="p-5 border-0 shadow-sm">
-          <div className="space-y-2">
-            <Label htmlFor="income">Monthly Income</Label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+        {step === "profile" && (
+          <Card className="p-5 border-0 shadow-sm">
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Display Name</Label>
               <Input
-                id="income"
-                type="number"
-                step="0.01"
-                value={monthlyIncome}
-                onChange={(event) => setMonthlyIncome(event.target.value)}
-                className="h-14 rounded-xl text-2xl font-bold pl-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                className="h-12 rounded-xl"
+                placeholder="How should we call you?"
                 disabled={isLoading || isSaving}
               />
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
-        <Card className="p-5 border-0 shadow-sm">
-          <h2 className="font-semibold mb-4">Income Split</h2>
+        {step === "income" && (
+          <Card className="p-5 border-0 shadow-sm">
+            <IncomeBreakdownForm
+              value={incomeForm}
+              onChange={setIncomeForm}
+              disabled={isLoading || isSaving}
+              idPrefix="onboarding-income"
+            />
+          </Card>
+        )}
 
-          <Tabs value={allocationMode} onValueChange={(value) => setAllocationMode(value as "percent" | "amount")}>
-            <TabsList className="w-full mb-4">
-              <TabsTrigger value="percent" className="flex-1">By Percentage</TabsTrigger>
-              <TabsTrigger value="amount" className="flex-1">By Amount</TabsTrigger>
-            </TabsList>
+        {step === "allocation" && (
+          <Card className="p-5 border-0 shadow-sm">
+            <div className="mb-4">
+              <h2 className="font-semibold">Budget Allocation</h2>
+              <p className="text-sm text-muted-foreground">{formatCurrency(income)} per month</p>
+            </div>
+            <AllocationTabs
+              allocationMode={allocationMode}
+              onAllocationModeChange={handleAllocationModeChange}
+              income={income}
+              needsPercent={needsPercent}
+              wantsPercent={wantsPercent}
+              savingsPercent={savingsPercent}
+              needsAmount={needsAmount}
+              wantsAmount={wantsAmount}
+              savingsAmount={savingsAmount}
+              setNeedsPercent={setNeedsPercent}
+              setWantsPercent={setWantsPercent}
+              setSavingsPercent={setSavingsPercent}
+              setNeedsAmount={setNeedsAmount}
+              setWantsAmount={setWantsAmount}
+              setSavingsAmount={setSavingsAmount}
+              isPercentValid={isPercentValid}
+              isAmountValid={isAmountValid}
+              totalPercent={totalPercent}
+              totalAmount={totalAmount}
+              disabled={isLoading || isSaving}
+            />
+          </Card>
+        )}
 
-            <TabsContent value="percent" className="space-y-4">
-              <AllocationInput
-                label="Needs"
-                value={needsPercent}
-                onChange={setNeedsPercent}
-                suffix="%"
-                color="bg-needs"
-                subtext={formatCurrency((asNumber(needsPercent) / 100) * income)}
-                disabled={isLoading || isSaving}
-              />
-              <AllocationInput
-                label="Wants"
-                value={wantsPercent}
-                onChange={setWantsPercent}
-                suffix="%"
-                color="bg-wants"
-                subtext={formatCurrency((asNumber(wantsPercent) / 100) * income)}
-                disabled={isLoading || isSaving}
-              />
-              <AllocationInput
-                label="Savings & Debts"
-                value={savingsPercent}
-                onChange={setSavingsPercent}
-                suffix="%"
-                color="bg-savings"
-                subtext={formatCurrency((asNumber(savingsPercent) / 100) * income)}
-                disabled={isLoading || isSaving}
-              />
+        {step === "review" && (
+          <Card className="p-5 border-0 shadow-sm space-y-4">
+            <ReviewRow label="Name" value={displayName.trim()} />
+            <ReviewRow label="Monthly income" value={formatCurrency(calculateMonthlyIncomeString(incomeForm))} />
+            <ReviewRow
+              label="Budget split"
+              value={
+                allocationMode === "percent"
+                  ? `${toDecimalString(needsPercent)}% / ${toDecimalString(wantsPercent)}% / ${toDecimalString(savingsPercent)}%`
+                  : `${formatCurrency(needsAmount)} / ${formatCurrency(wantsAmount)} / ${formatCurrency(savingsAmount)}`
+              }
+            />
+          </Card>
+        )}
 
-              <div className={cn(
-                "p-3 rounded-xl text-center text-sm",
-                isPercentValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
-              )}>
-                Total: {totalPercent.toFixed(0)}%
-                {!isPercentValid && " (must equal 100%)"}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="amount" className="space-y-4">
-              <AllocationInput
-                label="Needs"
-                value={needsAmount}
-                onChange={setNeedsAmount}
-                prefix="$"
-                color="bg-needs"
-                subtext={`${income > 0 ? ((asNumber(needsAmount) / income) * 100).toFixed(0) : "0"}%`}
-                disabled={isLoading || isSaving}
-              />
-              <AllocationInput
-                label="Wants"
-                value={wantsAmount}
-                onChange={setWantsAmount}
-                prefix="$"
-                color="bg-wants"
-                subtext={`${income > 0 ? ((asNumber(wantsAmount) / income) * 100).toFixed(0) : "0"}%`}
-                disabled={isLoading || isSaving}
-              />
-              <AllocationInput
-                label="Savings & Debts"
-                value={savingsAmount}
-                onChange={setSavingsAmount}
-                prefix="$"
-                color="bg-savings"
-                subtext={`${income > 0 ? ((asNumber(savingsAmount) / income) * 100).toFixed(0) : "0"}%`}
-                disabled={isLoading || isSaving}
-              />
-
-              <div className={cn(
-                "p-3 rounded-xl text-center text-sm",
-                isAmountValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
-              )}>
-                Total: {formatCurrency(totalAmount)}
-                {!isAmountValid && ` (must equal ${formatCurrency(income)})`}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </Card>
-
-        <Button
-          className="w-full h-12 rounded-xl"
-          onClick={() => void handleFinish()}
-          disabled={!canSave || isLoading}
-        >
-          {isSaving ? "Saving..." : "Finish Setup"}
-        </Button>
+        <div className="flex gap-3">
+          {currentStepIndex > 0 && (
+            <Button variant="outline" className="h-12 flex-1 rounded-xl" onClick={goBack} disabled={isSaving}>
+              Back
+            </Button>
+          )}
+          {step === "review" ? (
+            <Button className="h-12 flex-1 rounded-xl" onClick={() => void handleFinish()} disabled={!canSave || isLoading}>
+              {isSaving ? "Saving..." : "Finish Setup"}
+            </Button>
+          ) : (
+            <Button className="h-12 flex-1 rounded-xl" onClick={goNext} disabled={!canContinue || isLoading || isSaving}>
+              Continue
+            </Button>
+          )}
+        </div>
       </main>
     </div>
+  )
+}
+
+function stepLabel(step: OnboardingStep): string {
+  if (step === "profile") {
+    return "Start with your name."
+  }
+  if (step === "income") {
+    return "Estimate your average monthly income."
+  }
+  if (step === "allocation") {
+    return "Split your income into budget categories."
+  }
+  return "Review your setup."
+}
+
+interface AllocationTabsProps {
+  allocationMode: AllocationMode
+  onAllocationModeChange: (value: string) => void
+  income: number
+  needsPercent: string
+  wantsPercent: string
+  savingsPercent: string
+  needsAmount: string
+  wantsAmount: string
+  savingsAmount: string
+  setNeedsPercent: (value: string) => void
+  setWantsPercent: (value: string) => void
+  setSavingsPercent: (value: string) => void
+  setNeedsAmount: (value: string) => void
+  setWantsAmount: (value: string) => void
+  setSavingsAmount: (value: string) => void
+  isPercentValid: boolean
+  isAmountValid: boolean
+  totalPercent: number
+  totalAmount: number
+  disabled?: boolean
+}
+
+function AllocationTabs({
+  allocationMode,
+  onAllocationModeChange,
+  income,
+  needsPercent,
+  wantsPercent,
+  savingsPercent,
+  needsAmount,
+  wantsAmount,
+  savingsAmount,
+  setNeedsPercent,
+  setWantsPercent,
+  setSavingsPercent,
+  setNeedsAmount,
+  setWantsAmount,
+  setSavingsAmount,
+  isPercentValid,
+  isAmountValid,
+  totalPercent,
+  totalAmount,
+  disabled = false,
+}: AllocationTabsProps) {
+  return (
+    <Tabs value={allocationMode} onValueChange={onAllocationModeChange}>
+      <TabsList className="w-full mb-4">
+        <TabsTrigger value="percent" className="flex-1" disabled={disabled}>By Percentage</TabsTrigger>
+        <TabsTrigger value="amount" className="flex-1" disabled={disabled}>By Amount</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="percent" className="space-y-4">
+        <AllocationInput
+          label="Needs"
+          value={needsPercent}
+          onChange={setNeedsPercent}
+          suffix="%"
+          color="bg-needs"
+          subtext={formatCurrency((asNumber(needsPercent) / 100) * income)}
+          disabled={disabled}
+        />
+        <AllocationInput
+          label="Wants"
+          value={wantsPercent}
+          onChange={setWantsPercent}
+          suffix="%"
+          color="bg-wants"
+          subtext={formatCurrency((asNumber(wantsPercent) / 100) * income)}
+          disabled={disabled}
+        />
+        <AllocationInput
+          label="Savings & Debts"
+          value={savingsPercent}
+          onChange={setSavingsPercent}
+          suffix="%"
+          color="bg-savings"
+          subtext={formatCurrency((asNumber(savingsPercent) / 100) * income)}
+          disabled={disabled}
+        />
+
+        <div className={cn(
+          "p-3 rounded-xl text-center text-sm",
+          isPercentValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
+        )}>
+          Total: {totalPercent.toFixed(0)}%
+          {!isPercentValid && " (must equal 100%)"}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="amount" className="space-y-4">
+        <AllocationInput
+          label="Needs"
+          value={needsAmount}
+          onChange={setNeedsAmount}
+          prefix="$"
+          color="bg-needs"
+          subtext={`${income > 0 ? ((asNumber(needsAmount) / income) * 100).toFixed(0) : "0"}%`}
+          disabled={disabled}
+        />
+        <AllocationInput
+          label="Wants"
+          value={wantsAmount}
+          onChange={setWantsAmount}
+          prefix="$"
+          color="bg-wants"
+          subtext={`${income > 0 ? ((asNumber(wantsAmount) / income) * 100).toFixed(0) : "0"}%`}
+          disabled={disabled}
+        />
+        <AllocationInput
+          label="Savings & Debts"
+          value={savingsAmount}
+          onChange={setSavingsAmount}
+          prefix="$"
+          color="bg-savings"
+          subtext={`${income > 0 ? ((asNumber(savingsAmount) / income) * 100).toFixed(0) : "0"}%`}
+          disabled={disabled}
+        />
+
+        <div className={cn(
+          "p-3 rounded-xl text-center text-sm",
+          isAmountValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
+        )}>
+          Total: {formatCurrency(totalAmount)}
+          {!isAmountValid && ` (must equal ${formatCurrency(income)})`}
+        </div>
+      </TabsContent>
+    </Tabs>
   )
 }
 
@@ -343,6 +483,7 @@ function AllocationInput({
         <Input
           type="number"
           step="0.01"
+          min="0"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
@@ -356,6 +497,15 @@ function AllocationInput({
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">{suffix}</span>
         )}
       </div>
+    </div>
+  )
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium text-right">{value}</p>
     </div>
   )
 }

@@ -6,6 +6,8 @@ export type AuthProvider = "password" | "google"
 export type UserRole = "owner" | "admin" | "member"
 
 export type AllocationMode = "percent" | "amount"
+export type IncomeSourceType = "monthly" | "hourly"
+export type SideIncomeType = "none" | "monthly" | "hourly"
 
 export type Preset = "last_7_days" | "last_30_days" | "month_to_date" | "last_month" | "quarter_to_date"
 
@@ -156,6 +158,15 @@ export interface UpdateRecurringExpenseRequest {
 // Budget Settings
 export interface BudgetSettings {
   monthly_income: string
+  income_source_type: IncomeSourceType
+  primary_monthly_income: string | null
+  primary_hourly_rate: string | null
+  primary_weekly_hours: string | null
+  side_income_type: SideIncomeType
+  side_income_label: string | null
+  side_monthly_income: string | null
+  side_hourly_rate: string | null
+  side_weekly_hours: string | null
   allocation_mode: AllocationMode
   needs_percent?: string
   wants_percent?: string
@@ -165,16 +176,27 @@ export interface BudgetSettings {
   savings_debts_amount?: string
 }
 
-export interface BudgetSettingsPercentInput {
+export interface BudgetSettingsIncomeInput {
   monthly_income: string
+  income_source_type?: IncomeSourceType
+  primary_monthly_income?: string | null
+  primary_hourly_rate?: string | null
+  primary_weekly_hours?: string | null
+  side_income_type?: SideIncomeType
+  side_income_label?: string | null
+  side_monthly_income?: string | null
+  side_hourly_rate?: string | null
+  side_weekly_hours?: string | null
+}
+
+export interface BudgetSettingsPercentInput extends BudgetSettingsIncomeInput {
   allocation_mode: "percent"
   needs_percent: string
   wants_percent: string
   savings_debts_percent: string
 }
 
-export interface BudgetSettingsAmountInput {
-  monthly_income: string
+export interface BudgetSettingsAmountInput extends BudgetSettingsIncomeInput {
   allocation_mode: "amount"
   needs_amount: string
   wants_amount: string
