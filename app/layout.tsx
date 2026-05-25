@@ -9,18 +9,12 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Budget',
   description: 'Track your spending with a clean, minimal budgeting app',
-  generator: 'v0.app',
   applicationName: 'Budget',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Budget',
-  },
-  icons: {
-    icon: '/favicon.png',
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
   },
 }
 

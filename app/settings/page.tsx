@@ -19,7 +19,6 @@ import {
   UserPlus,
   ChevronRight,
   Moon,
-  Bell,
   LogOut,
 } from "lucide-react"
 import Link from "next/link"
@@ -343,12 +342,6 @@ export default function SettingsPage() {
                       onCheckedChange={(checked) => void handleThemeToggle(checked)}
                     />
                   }
-                />
-                <SettingsItem
-                  icon={<Bell className="w-5 h-5 text-muted-foreground" />}
-                  label="Notifications"
-                  description="Coming soon"
-                  rightElement={<Switch disabled />}
                 />
               </Card>
             </div>
