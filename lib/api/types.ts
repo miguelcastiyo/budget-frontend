@@ -390,6 +390,7 @@ export interface MasterApiKeyMetadata {
   created_at: string
   last_used_at: string | null
   expires_at: string | null
+  status: "active" | "expired" | "revoked"
 }
 
 export interface CreateMasterApiKeyRequest {

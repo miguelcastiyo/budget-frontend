@@ -38,6 +38,18 @@ function formatDate(dateStr: string | null): string {
   })
 }
 
+function statusLabel(status: MasterApiKeyMetadata["status"]): string {
+  if (status === "active") return "Active"
+  if (status === "expired") return "Expired"
+  return "Revoked"
+}
+
+function statusClassName(status: MasterApiKeyMetadata["status"]): string {
+  if (status === "active") return "bg-green-500/10 text-green-700"
+  if (status === "expired") return "bg-amber-500/10 text-amber-700"
+  return "bg-muted text-muted-foreground"
+}
+
 export default function ApiKeysSettingsPage() {
   const [apiKeys, setApiKeys] = useState<MasterApiKeyMetadata[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -167,7 +179,12 @@ export default function ApiKeysSettingsPage() {
                     <Key className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{key.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{key.name}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClassName(key.status)}`}>
+                        {statusLabel(key.status)}
+                      </span>
+                    </div>
                     <p className="text-sm text-muted-foreground font-mono">
                       {key.key_prefix}...
                     </p>
@@ -175,20 +192,24 @@ export default function ApiKeysSettingsPage() {
                       <span>Created {formatDate(key.created_at)}</span>
                       <span>Last used {formatDate(key.last_used_at)}</span>
                     </div>
-                    {key.expires_at && (
+                    {key.expires_at ? (
                       <p className="text-xs text-amber-600 mt-1">
                         Expires {formatDate(key.expires_at)}
                       </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">No expiration</p>
                     )}
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full text-destructive hover:text-destructive"
-                    onClick={() => setDeleteKeyId(key.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {key.status === "active" && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="rounded-full text-destructive hover:text-destructive"
+                      onClick={() => setDeleteKeyId(key.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
