@@ -408,12 +408,20 @@ class ApiClient {
       const page = filters?.page ?? 1
       const pageSize = filters?.page_size ?? mockTransactions.length
       const start = (page - 1) * pageSize
+      const totalSpent = mockTransactions.reduce((sum, transaction) => sum + Number.parseFloat(transaction.amount), 0)
+      const count = mockTransactions.length
 
       return {
         items: mockTransactions.slice(start, start + pageSize),
         page,
         page_size: pageSize,
         total_items: mockTransactions.length,
+        summary: {
+          total_spent: totalSpent.toFixed(2),
+          count,
+          avg_transaction: count > 0 ? (totalSpent / count).toFixed(2) : "0.00",
+          split_count: mockTransactions.filter((transaction) => transaction.is_split).length,
+        },
       }
     }
 

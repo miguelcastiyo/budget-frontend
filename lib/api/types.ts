@@ -257,6 +257,14 @@ export interface TransactionsPage {
   page: number
   page_size: number
   total_items: number
+  summary: TransactionSummary
+}
+
+export interface TransactionSummary {
+  total_spent: string
+  count: number
+  avg_transaction: string
+  split_count: number
 }
 
 export interface TransactionFilters {

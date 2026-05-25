@@ -6,6 +6,12 @@
 - `Card` is shown as a chip with card icon + card name (when present).
 - On compact list contexts, metadata remains condensed as inline text to preserve density.
 
+## Pagination And Summary Stats
+- The page loads the first 50 matching transactions, then uses `Load More` to append additional pages.
+- Stats cards use the API `summary` object from `GET /api/v1/me/transactions`, so totals reflect the full filtered result set instead of only loaded rows.
+- Filter, search, sort, import, create, update, and delete actions refresh from page 1 to keep the loaded rows and summary aligned.
+- The footer shows how many matching rows are loaded out of `total_items`.
+
 ## Collapsible Desktop Filters
 - The left filters panel on desktop can now be collapsed into a slim icon rail.
 - When collapsed, the transactions content area expands to use the freed space.
@@ -26,7 +32,7 @@
 
 ## Notes
 - Header and bottom navigation links to Transactions include the current month query (`/transactions?month=YYYY-MM`) so normal navigation loads a bounded month-sized result set by default.
-- Search, date range, category, tag, card, and split filters are now pushed down to the API before rendering the list.
+- Search, date range, category, tag, card, split filters, and pagination are pushed down to the API before rendering the list.
 - CSV export reuses the same active transaction filters, including free-text search.
 - Shared date-range parsing/formatting now lives in `lib/date-filters.ts` and is reused across Dashboard, Transactions, and Insights.
 - Applies to both interactive and read-only list row rendering.

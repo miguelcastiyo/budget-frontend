@@ -16,11 +16,21 @@ import type {
   Tag,
   Transaction,
   TransactionFilters as ApiTransactionFilters,
+  TransactionSummary,
 } from "@/lib/api/types"
 
 type PartialDateRange = {
   date_from?: string
   date_to?: string
+}
+
+const TRANSACTIONS_PAGE_SIZE = 50
+
+const emptyTransactionSummary: TransactionSummary = {
+  total_spent: "0.00",
+  count: 0,
+  avg_transaction: "0.00",
+  split_count: 0,
 }
 
 function parseCategoryQuery(value: string): Category | null {
@@ -57,8 +67,12 @@ export function useTransactionsPage() {
   const [desktopFiltersCollapsed, setDesktopFiltersCollapsed] = useState(false)
   const [queryFiltersInitialized, setQueryFiltersInitialized] = useState(false)
   const [hasAnyTransactions, setHasAnyTransactions] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [summary, setSummary] = useState<TransactionSummary>(emptyTransactionSummary)
 
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [showImportModal, setShowImportModal] = useState(false)
@@ -138,7 +152,7 @@ export function useTransactionsPage() {
   const activeTransactionFilters = useMemo<ApiTransactionFilters>(() => {
     const filters: ApiTransactionFilters = {
       sort: sortOrder,
-      page_size: 200,
+      page_size: TRANSACTIONS_PAGE_SIZE,
     }
 
     const dateRange = customDateRange ?? getPresetDateRange(preset)
@@ -195,24 +209,16 @@ export function useTransactionsPage() {
     setError(null)
 
     try {
-      const pageSize = activeTransactionFilters.page_size ?? 200
-      const maxPages = 50
-      let page = 1
-      let allItems: Transaction[] = []
-      let totalItems = 0
+      const response = await apiClient.getTransactions({
+        ...activeTransactionFilters,
+        page: 1,
+        page_size: TRANSACTIONS_PAGE_SIZE,
+      })
 
-      do {
-        const response = await apiClient.getTransactions({
-          ...activeTransactionFilters,
-          page,
-          page_size: pageSize,
-        })
-        allItems = [...allItems, ...response.items]
-        totalItems = response.total_items
-        page += 1
-      } while (allItems.length < totalItems && page <= maxPages)
-
-      setTransactions(allItems)
+      setTransactions(response.items)
+      setCurrentPage(response.page)
+      setTotalItems(response.total_items)
+      setSummary(response.summary)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -223,6 +229,36 @@ export function useTransactionsPage() {
       setIsLoading(false)
     }
   }, [activeTransactionFilters])
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (isLoading || isLoadingMore || transactions.length >= totalItems) {
+      return
+    }
+
+    setIsLoadingMore(true)
+    setError(null)
+
+    try {
+      const response = await apiClient.getTransactions({
+        ...activeTransactionFilters,
+        page: currentPage + 1,
+        page_size: TRANSACTIONS_PAGE_SIZE,
+      })
+
+      setTransactions((current) => [...current, ...response.items])
+      setCurrentPage(response.page)
+      setTotalItems(response.total_items)
+      setSummary(response.summary)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to load more transactions")
+      }
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [activeTransactionFilters, currentPage, isLoading, isLoadingMore, totalItems, transactions.length])
 
   useEffect(() => {
     void loadReferenceData()
@@ -273,17 +309,15 @@ export function useTransactionsPage() {
   }, [pathname, router, searchParams])
 
   const stats = useMemo(() => {
-    const totalSpent = transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0)
-    const avgTransaction = transactions.length > 0 ? totalSpent / transactions.length : 0
-    const splitTransactions = transactions.filter((transaction) => transaction.is_split)
-
     return {
-      totalSpent,
-      avgTransaction,
-      count: transactions.length,
-      splitCount: splitTransactions.length,
+      totalSpent: Number.parseFloat(summary.total_spent),
+      avgTransaction: Number.parseFloat(summary.avg_transaction),
+      count: summary.count,
+      splitCount: summary.split_count,
     }
-  }, [transactions])
+  }, [summary])
+
+  const hasMoreTransactions = transactions.length < totalItems
 
   const exportTransactions = useCallback(async (dateRange: PartialDateRange) => {
     const filters: ApiTransactionFilters = {
@@ -521,7 +555,10 @@ export function useTransactionsPage() {
     desktopFiltersCollapsed,
     setDesktopFiltersCollapsed,
     hasAnyTransactions,
+    hasMoreTransactions,
+    totalItems,
     isLoading,
+    isLoadingMore,
     error,
     showImportModal,
     setShowImportModal,
@@ -558,6 +595,7 @@ export function useTransactionsPage() {
     handleTransactionUpdated,
     handleImportFileSelect,
     handleImport,
+    loadMoreTransactions,
     resetImportModal,
     refreshTransactionSurface,
   }

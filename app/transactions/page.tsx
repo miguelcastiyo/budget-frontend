@@ -55,7 +55,10 @@ export default function TransactionsPage() {
     desktopFiltersCollapsed,
     setDesktopFiltersCollapsed,
     hasAnyTransactions,
+    hasMoreTransactions,
+    totalItems,
     isLoading,
+    isLoadingMore,
     error,
     showImportModal,
     setShowImportModal,
@@ -90,6 +93,7 @@ export default function TransactionsPage() {
     handleTransactionUpdated,
     handleImportFileSelect,
     handleImport,
+    loadMoreTransactions,
     resetImportModal,
     refreshTransactionSurface,
   } = useTransactionsPage()
@@ -295,6 +299,27 @@ export default function TransactionsPage() {
               }
               onTransactionClick={setSelectedTransaction}
             />
+
+            {transactions.length > 0 && (
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-background px-4 py-3 text-center lg:flex-row lg:justify-between lg:text-left">
+                <p className="text-xs text-muted-foreground">
+                  Showing <span className="font-medium text-foreground">{transactions.length}</span> of{" "}
+                  <span className="font-medium text-foreground">{totalItems}</span> matching transactions
+                </p>
+                {hasMoreTransactions && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full px-4"
+                    onClick={() => void loadMoreTransactions()}
+                    disabled={isLoading || isLoadingMore}
+                  >
+                    {isLoadingMore ? "Loading..." : "Load More"}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
