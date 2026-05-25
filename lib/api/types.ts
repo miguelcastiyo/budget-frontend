@@ -91,6 +91,25 @@ export interface GoogleSignInRequest {
   client_type: "web" | "native"
 }
 
+export interface PasswordResetRequest {
+  email: string
+}
+
+export interface PasswordResetRequestedResponse {
+  status: "accepted"
+  message: string
+}
+
+export interface PasswordResetConfirmRequest {
+  reset_token: string
+  password: string
+}
+
+export interface PasswordResetConfirmedResponse {
+  status: "completed"
+  message: string
+}
+
 // Tags
 export interface Tag {
   id: string

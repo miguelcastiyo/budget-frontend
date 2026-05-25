@@ -9,7 +9,7 @@ import { mockProfile } from "@/lib/mock-data"
 import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
-const PUBLIC_PREFIXES = ["/invite/"]
+const PUBLIC_PREFIXES = ["/invite/", "/password-reset"]
 
 interface AuthContextValue {
   profile: Profile | null

@@ -6,6 +6,10 @@ import type {
   AuthSessionResponse,
   PasswordSignInRequest,
   GoogleSignInRequest,
+  PasswordResetRequest,
+  PasswordResetRequestedResponse,
+  PasswordResetConfirmRequest,
+  PasswordResetConfirmedResponse,
   Tag,
   Card,
   CreateNamedEntityRequest,
@@ -170,6 +174,20 @@ class ApiClient {
       method: "DELETE",
     })
     this.setCsrfToken(null)
+  }
+
+  async requestPasswordReset(data: PasswordResetRequest): Promise<PasswordResetRequestedResponse> {
+    return this.request<PasswordResetRequestedResponse>("/auth/password-reset/request", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async confirmPasswordReset(data: PasswordResetConfirmRequest): Promise<PasswordResetConfirmedResponse> {
+    return this.request<PasswordResetConfirmedResponse>("/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
   }
 
   async createInvite(data: CreateInviteRequest): Promise<InviteResponse> {

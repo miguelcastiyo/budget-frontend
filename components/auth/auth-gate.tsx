@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/components/auth/auth-provider"
 
-const PUBLIC_PREFIXES = ["/invite/"]
+const PUBLIC_PREFIXES = ["/invite/", "/password-reset"]
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/sign-in") {
