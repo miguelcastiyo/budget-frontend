@@ -409,13 +409,16 @@ export interface CsvImportErrorItem {
 }
 
 export interface CsvImportResponse {
-  status: "completed" | "failed"
+  status: "completed" | "partial" | "failed"
+  message: string
   mode: "dry_run" | "commit"
   total_rows: number
   valid_rows: number
   imported_rows: number
   duplicate_rows: number
   invalid_rows: number
+  errors_truncated: boolean
+  max_returned_errors: number
   errors: CsvImportErrorItem[]
 }
 

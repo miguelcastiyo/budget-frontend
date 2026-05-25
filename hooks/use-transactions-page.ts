@@ -489,20 +489,15 @@ export function useTransactionsPage() {
       const result = await apiClient.importTransactions(importFile, "commit")
       await refreshTransactionSurface()
 
-      if (result.status === "failed" || result.invalid_rows > 0) {
-        const partialSuccess = result.imported_rows > 0
-        setImportStatus(partialSuccess ? "warning" : "error")
-        setImportMessage(
-          partialSuccess
-            ? `Imported ${result.imported_rows} rows, but ${result.invalid_rows} row(s) failed.`
-            : `Import failed: ${result.invalid_rows} invalid row(s).`
-        )
+      if (result.status === "failed" || result.status === "partial") {
+        setImportStatus(result.status === "partial" ? "warning" : "error")
+        setImportMessage(result.message)
         setImportErrors(result.errors.slice(0, 8))
         return
       }
 
       setImportStatus("success")
-      setImportMessage(`Imported ${result.imported_rows} rows (${result.duplicate_rows} duplicates)`)
+      setImportMessage(result.message)
       setImportErrors([])
 
       setTimeout(() => {
