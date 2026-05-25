@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
-import { MonthSelector, getCurrentMonth } from "@/components/budget/month-selector"
+import { MonthSelector } from "@/components/budget/month-selector"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { CategoryCard } from "@/components/budget/category-card"
 import { TagBreakdown } from "@/components/budget/tag-breakdown"
@@ -39,7 +40,7 @@ function emptyTagMetrics(month: string): TagMetricsResponse {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [currentMonth, setCurrentMonth] = useState(getCurrentMonth())
+  const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [categoryMetrics, setCategoryMetrics] = useState<CategoryMetricsResponse>(emptyCategoryMetrics(currentMonth))
   const [tagMetrics, setTagMetrics] = useState<TagMetricsResponse>(emptyTagMetrics(currentMonth))

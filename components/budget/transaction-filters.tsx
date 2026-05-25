@@ -35,7 +35,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import type { Tag, Card, Category, Preset, SplitFilter } from "@/lib/api/types"
-import { parseIsoDate } from "@/lib/date-filters"
+import { parseIsoDate, transactionFilterPresets } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
 import type { ReactNode } from "react"
 
@@ -66,15 +66,6 @@ interface TransactionFiltersProps {
   dataActionsDisabled?: boolean
   desktopSidebarToggle?: ReactNode
 }
-
-const presets: { value: Preset | "all"; label: string }[] = [
-  { value: "all", label: "All Time" },
-  { value: "last_7_days", label: "Last 7 Days" },
-  { value: "last_30_days", label: "Last 30 Days" },
-  { value: "month_to_date", label: "This Month" },
-  { value: "last_month", label: "Last Month" },
-  { value: "quarter_to_date", label: "This Quarter" },
-]
 
 const categories: { value: Category; label: string }[] = [
   { value: "needs", label: "Needs" },
@@ -221,7 +212,7 @@ export function TransactionFilters({
     selectedCards.length +
     (splitFilter !== "all" ? 1 : 0)
   const selectedPresetLabel = preset !== "all"
-    ? (presets.find((p) => p.value === preset)?.label ?? null)
+    ? (transactionFilterPresets.find((p) => p.value === preset)?.label ?? null)
     : null
 
   const toggleCategory = (category: Category) => {
@@ -307,7 +298,7 @@ export function TransactionFilters({
     },
   ]
 
-  const dateRangeItems: ChipRailItem[] = presets.map((p) => ({
+  const dateRangeItems: ChipRailItem[] = transactionFilterPresets.map((p) => ({
     key: `preset-${p.value}`,
     label: p.label,
     selected: preset === p.value,

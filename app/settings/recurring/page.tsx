@@ -41,6 +41,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { getCurrentMonthKey } from "@/lib/date-filters"
+import { asNumber, toDecimalString } from "@/lib/income-breakdown"
 import type {
   Category,
   RecurringBillingType,
@@ -66,17 +68,12 @@ interface RecurringFormState {
   is_active: boolean
 }
 
-function getCurrentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-}
-
-function toDecimalString(value: string): string {
-  const parsed = parseFloat(value.replace(/,/g, "").trim())
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+function formatRecurringAmount(value: string): string {
+  if (asNumber(value) <= 0) {
     return "0.00"
   }
-  return parsed.toFixed(2)
+
+  return toDecimalString(value)
 }
 
 function emptyForm(month: string, tagId = ""): RecurringFormState {
@@ -216,13 +213,13 @@ function MonthPicker({
 }
 
 export default function RecurringSettingsPage() {
-  const [month, setMonth] = useState(getCurrentMonth())
+  const [month, setMonth] = useState(getCurrentMonthKey())
   const [data, setData] = useState<RecurringExpensesResponse | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<CardType[]>([])
 
   const [showNew, setShowNew] = useState(false)
-  const [newForm, setNewForm] = useState<RecurringFormState>(() => emptyForm(getCurrentMonth()))
+  const [newForm, setNewForm] = useState<RecurringFormState>(() => emptyForm(getCurrentMonthKey()))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingForm, setEditingForm] = useState<RecurringFormState | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -279,7 +276,7 @@ export default function RecurringSettingsPage() {
     try {
       await apiClient.createRecurringExpense({
         expense: newForm.expense.trim(),
-        amount: toDecimalString(newForm.amount),
+        amount: formatRecurringAmount(newForm.amount),
         category: newForm.category,
         tag_id: newForm.tag_id,
         card_id: newForm.card_id || null,
@@ -314,7 +311,7 @@ export default function RecurringSettingsPage() {
     try {
       await apiClient.updateRecurringExpense(editingId, {
         expense: editingForm.expense.trim(),
-        amount: toDecimalString(editingForm.amount),
+        amount: formatRecurringAmount(editingForm.amount),
         category: editingForm.category,
         tag_id: editingForm.tag_id,
         card_id: editingForm.card_id || null,

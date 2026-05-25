@@ -4,12 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { isLocalMockMode } from "@/lib/local-dev"
-import { mockProfile } from "@/lib/mock-data"
 import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
+import { isPublicPath } from "@/lib/auth-routes"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
-const PUBLIC_PREFIXES = ["/invite/", "/password-reset"]
 
 interface AuthContextValue {
   profile: Profile | null
@@ -23,14 +21,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-
-function isPublicPath(pathname: string): boolean {
-  if (pathname === "/sign-in") {
-    return true
-  }
-
-  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-}
 
 function applyThemePreference(theme: ThemePreference) {
   if (typeof document === "undefined") {
@@ -101,14 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let active = true
 
     const bootstrap = async () => {
-      if (isLocalMockMode()) {
-        if (active) {
-          setProfile(mockProfile)
-          setIsLoading(false)
-        }
-        return
-      }
-
       if (isPublicPath(pathname) && !hasStoredSessionHint()) {
         if (active) {
           setProfile(null)
@@ -146,11 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile?.user_preferences?.appearance?.theme, setTheme])
 
   const signOut = useCallback(async () => {
-    if (isLocalMockMode()) {
-      setProfile(null)
-      return
-    }
-
     try {
       await apiClient.signOut()
     } catch (error) {

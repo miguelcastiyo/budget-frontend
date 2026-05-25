@@ -4,16 +4,7 @@ import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/components/auth/auth-provider"
-
-const PUBLIC_PREFIXES = ["/invite/", "/password-reset"]
-
-function isPublicPath(pathname: string): boolean {
-  if (pathname === "/sign-in") {
-    return true
-  }
-
-  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-}
+import { isPublicPath } from "@/lib/auth-routes"
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

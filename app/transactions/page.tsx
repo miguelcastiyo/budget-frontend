@@ -10,8 +10,8 @@ import { TransactionExportDialog } from "@/components/budget/transaction-export-
 import { TransactionImportDialog } from "@/components/budget/transaction-import-dialog"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { TransactionDetailSheet } from "@/components/budget/transaction-detail-sheet"
-import type { Preset } from "@/lib/api/types"
 import { useTransactionsPage } from "@/hooks/use-transactions-page"
+import { transactionExportPresets } from "@/lib/date-filters"
 import { Button } from "@/components/ui/button"
 import { Card as UiCard } from "@/components/ui/card"
 import {
@@ -22,14 +22,6 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const exportDatePresets: { value: Preset; label: string }[] = [
-  { value: "last_7_days", label: "Last 7 Days" },
-  { value: "last_30_days", label: "Last 30 Days" },
-  { value: "month_to_date", label: "This Month" },
-  { value: "last_month", label: "Last Month" },
-  { value: "quarter_to_date", label: "This Quarter" },
-]
 
 export default function TransactionsPage() {
   const {
@@ -373,7 +365,7 @@ export default function TransactionsPage() {
             setExportError(null)
           }
         }}
-        exportDatePresets={exportDatePresets}
+        exportDatePresets={transactionExportPresets}
         exportPreset={exportPreset}
         onExportPresetChange={selectExportPreset}
         selectedExportFromDate={selectedExportFromDate}

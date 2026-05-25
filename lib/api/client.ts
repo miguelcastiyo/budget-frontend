@@ -45,21 +45,9 @@ import type {
   SettingsSummaryResponse,
   ErrorEnvelope,
 } from "./types"
-import { isLocalMockMode } from "@/lib/local-dev"
-import {
-  getMockCategoryMetrics,
-  getMockTagMetrics,
-  mockBudgetSettings,
-  mockCards,
-  mockProfile,
-  mockTags,
-  mockTransactions,
-} from "@/lib/mock-data"
 
 const API_BASE = "/api/v1"
 const CSRF_STORAGE_KEY = "budget.csrf_token"
-
-let localMockInvites: InviteResponse[] = []
 
 class ApiClient {
   private csrfToken: string | null = null
@@ -191,21 +179,6 @@ class ApiClient {
   }
 
   async createInvite(data: CreateInviteRequest): Promise<InviteResponse> {
-    if (isLocalMockMode()) {
-      const created: InviteResponse = {
-        invite_id: `inv_${Date.now()}`,
-        invitee_name: data.invitee_name,
-        email: data.email.toLowerCase(),
-        role: data.role,
-        status: "pending",
-        expires_at: data.expires_at,
-        created_at: new Date().toISOString(),
-        accepted_at: null,
-      }
-      localMockInvites = [created, ...localMockInvites]
-      return created
-    }
-
     return this.request<InviteResponse>("/auth/invitations", {
       method: "POST",
       body: JSON.stringify(data),
@@ -213,10 +186,6 @@ class ApiClient {
   }
 
   async getInvites(): Promise<InvitesResponse> {
-    if (isLocalMockMode()) {
-      return { items: localMockInvites }
-    }
-
     return this.request<InvitesResponse>("/auth/invitations")
   }
 
@@ -240,10 +209,6 @@ class ApiClient {
 
   // Profile
   async getProfile(): Promise<Profile> {
-    if (isLocalMockMode()) {
-      return mockProfile
-    }
-
     return this.request<Profile>("/me")
   }
 
@@ -266,30 +231,6 @@ class ApiClient {
   }
 
   async getSettingsSummary(): Promise<SettingsSummaryResponse> {
-    if (isLocalMockMode()) {
-      const monthlyTotals = new Map<string, number>()
-      for (const transaction of mockTransactions) {
-        const monthKey = transaction.date.slice(0, 7)
-        const amount = Number.parseFloat(transaction.amount)
-        if (!Number.isFinite(amount)) {
-          continue
-        }
-        monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) ?? 0) + amount)
-      }
-
-      const totalAcrossMonths = Array.from(monthlyTotals.values()).reduce((sum, value) => sum + value, 0)
-      const avgMonthlySpend = monthlyTotals.size > 0 ? totalAcrossMonths / monthlyTotals.size : 0
-
-      return {
-        monthly_income: mockBudgetSettings.monthly_income,
-        tags_count: mockTags.length,
-        cards_count: mockCards.length,
-        recurring_count: 0,
-        recurring_committed_total: "0.00",
-        avg_monthly_spend: avgMonthlySpend.toFixed(2),
-      }
-    }
-
     return this.request<SettingsSummaryResponse>("/me/settings-summary")
   }
 
@@ -316,10 +257,6 @@ class ApiClient {
 
   // Tags
   async getTags(): Promise<{ items: Tag[] }> {
-    if (isLocalMockMode()) {
-      return { items: mockTags }
-    }
-
     return this.request<{ items: Tag[] }>("/me/tags")
   }
 
@@ -345,10 +282,6 @@ class ApiClient {
 
   // Cards
   async getCards(): Promise<{ items: Card[] }> {
-    if (isLocalMockMode()) {
-      return { items: mockCards }
-    }
-
     return this.request<{ items: Card[] }>("/me/cards")
   }
 
@@ -404,10 +337,6 @@ class ApiClient {
 
   // Budget Settings
   async getBudgetSettings(): Promise<BudgetSettings> {
-    if (isLocalMockMode()) {
-      return mockBudgetSettings
-    }
-
     return this.request<BudgetSettings>("/me/budget-settings")
   }
 
@@ -422,27 +351,6 @@ class ApiClient {
 
   // Transactions
   async getTransactions(filters?: TransactionFilters): Promise<TransactionsPage> {
-    if (isLocalMockMode()) {
-      const page = filters?.page ?? 1
-      const pageSize = filters?.page_size ?? mockTransactions.length
-      const start = (page - 1) * pageSize
-      const totalSpent = mockTransactions.reduce((sum, transaction) => sum + Number.parseFloat(transaction.amount), 0)
-      const count = mockTransactions.length
-
-      return {
-        items: mockTransactions.slice(start, start + pageSize),
-        page,
-        page_size: pageSize,
-        total_items: mockTransactions.length,
-        summary: {
-          total_spent: totalSpent.toFixed(2),
-          count,
-          avg_transaction: count > 0 ? (totalSpent / count).toFixed(2) : "0.00",
-          split_count: mockTransactions.filter((transaction) => transaction.is_split).length,
-        },
-      }
-    }
-
     const params = new URLSearchParams()
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
@@ -480,31 +388,14 @@ class ApiClient {
 
   // Metrics
   async getTagMetrics(month: string): Promise<TagMetricsResponse> {
-    if (isLocalMockMode()) {
-      return getMockTagMetrics(month)
-    }
-
     return this.request<TagMetricsResponse>(`/me/metrics/tags?month=${month}`)
   }
 
   async getCategoryMetrics(month: string): Promise<CategoryMetricsResponse> {
-    if (isLocalMockMode()) {
-      return getMockCategoryMetrics(month)
-    }
-
     return this.request<CategoryMetricsResponse>(`/me/metrics/categories?month=${month}`)
   }
 
   async getDashboard(month: string): Promise<DashboardResponse> {
-    if (isLocalMockMode()) {
-      return {
-        month,
-        category_metrics: getMockCategoryMetrics(month),
-        tag_metrics: getMockTagMetrics(month),
-        recent_transactions: mockTransactions.slice(0, 8),
-      }
-    }
-
     return this.request<DashboardResponse>(`/me/dashboard?month=${month}`)
   }
 

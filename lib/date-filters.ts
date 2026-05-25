@@ -18,6 +18,31 @@ export function getCurrentMonthKey(date = new Date()): string {
   return `${year}-${month}`
 }
 
+export function getPreviousMonthKey(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number)
+  const date = new Date(year, monthNumber - 2)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+}
+
+export function getNextMonthKey(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number)
+  const date = new Date(year, monthNumber)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+}
+
+export const transactionFilterPresets: { value: Preset | "all"; label: string }[] = [
+  { value: "all", label: "All Time" },
+  { value: "last_7_days", label: "Last 7 Days" },
+  { value: "last_30_days", label: "Last 30 Days" },
+  { value: "month_to_date", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
+  { value: "quarter_to_date", label: "This Quarter" },
+]
+
+export const transactionExportPresets: { value: Preset; label: string }[] = transactionFilterPresets.filter(
+  (preset): preset is { value: Preset; label: string } => preset.value !== "all"
+)
+
 export function parseIsoDate(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null
