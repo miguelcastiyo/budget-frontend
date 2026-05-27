@@ -1,6 +1,6 @@
-import type { ReactNode } from "react"
+import type { ReactElement } from "react"
 
-export function renderBrandIconImage(size: number): ReactNode {
+export function renderBrandIconImage(size: number): ReactElement {
   const radius = Math.round(size * 0.22)
   const fontSize = Math.round(size * 0.48)
 

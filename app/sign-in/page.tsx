@@ -105,8 +105,11 @@ function SignInPageContent() {
           <Card className="gap-0 rounded-[1.5rem] border-border/70 bg-card/95 py-0 shadow-lg shadow-black/5 sm:rounded-[1.75rem]">
             <div className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
               <div className="flex justify-center pt-2 pb-2 sm:pt-3 sm:pb-3">
-                <div className="text-7xl leading-none sm:text-8xl" aria-hidden="true">
-                  💰
+                <div
+                  className="flex size-20 items-center justify-center rounded-[1.35rem] bg-[#1f232b] text-4xl font-bold leading-none text-[#fbfbfb] shadow-sm sm:size-24 sm:rounded-[1.65rem] sm:text-5xl"
+                  aria-label="Budget"
+                >
+                  B
                 </div>
               </div>
 
