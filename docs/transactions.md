@@ -10,7 +10,7 @@
 - The page loads the first 50 matching transactions, then uses `Load More` to append additional pages.
 - Stats cards use the API `summary` object from `GET /api/v1/me/transactions`, so totals reflect the full filtered result set instead of only loaded rows.
 - Filter, search, sort, import, create, update, and delete actions refresh from page 1 to keep the loaded rows and summary aligned.
-- The footer shows how many matching rows are loaded out of `total_items`.
+- The footer shows loaded rows out of `total_items` with a compact `Load more` action when additional pages are available.
 
 ## CSV Import And Export
 - CSV import accepts backend response statuses `completed`, `partial`, and `failed`.

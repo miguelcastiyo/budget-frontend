@@ -18,6 +18,8 @@ import {
   Calendar,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  ChevronDown,
+  Loader2,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react"
@@ -89,6 +91,8 @@ export default function TransactionsPage() {
     resetImportModal,
     refreshTransactionSurface,
   } = useTransactionsPage()
+
+  const remainingTransactions = Math.max(totalItems - transactions.length, 0)
 
   const transactionFiltersProps = useMemo(
     () => ({
@@ -293,21 +297,33 @@ export default function TransactionsPage() {
             />
 
             {transactions.length > 0 && (
-              <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-background px-4 py-3 text-center lg:flex-row lg:justify-between lg:text-left">
-                <p className="text-xs text-muted-foreground">
-                  Showing <span className="font-medium text-foreground">{transactions.length}</span> of{" "}
-                  <span className="font-medium text-foreground">{totalItems}</span> matching transactions
+              <div className="flex flex-col items-stretch gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-center text-sm text-muted-foreground sm:text-left">
+                  Showing <span className="font-medium text-foreground">{transactions.length.toLocaleString()}</span>{" "}
+                  of <span className="font-medium text-foreground">{totalItems.toLocaleString()}</span>
                 </p>
+
                 {hasMoreTransactions && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
-                    className="h-9 rounded-full px-4"
+                    className="h-9 rounded-lg px-4"
                     onClick={() => void loadMoreTransactions()}
                     disabled={isLoading || isLoadingMore}
+                    aria-label={`Load ${Math.min(50, remainingTransactions)} more transactions`}
                   >
-                    {isLoadingMore ? "Loading..." : "Load More"}
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Loading
+                      </>
+                    ) : (
+                      <>
+                        Load more
+                        <ChevronDown className="size-4" />
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
