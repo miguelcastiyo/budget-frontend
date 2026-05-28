@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { format } from "date-fns"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiError, apiClient } from "@/lib/api/client"
+import type { ErrorDialogState } from "@/components/common/error-dialog"
 import { formatMonthLabel, getMonthDateRange, getPresetDateRange, parseIsoDate } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
 import type {
@@ -31,6 +32,27 @@ const emptyTransactionSummary: TransactionSummary = {
   count: 0,
   avg_transaction: "0.00",
   split_count: 0,
+}
+
+function transactionError(err: unknown, fallbackMessage: string): ErrorDialogState | null {
+  if (err instanceof ApiError) {
+    if (err.status >= 500) {
+      return null
+    }
+
+    return {
+      title: "Transaction request failed",
+      message: err.error.message,
+      requestId: err.requestId,
+      status: err.status,
+      code: err.error.code,
+    }
+  }
+
+  return {
+    title: "Transaction request failed",
+    message: fallbackMessage,
+  }
 }
 
 function parseCategoryQuery(value: string): Category | null {
@@ -73,7 +95,7 @@ export function useTransactionsPage() {
 
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<ErrorDialogState | null>(null)
 
   const [showImportModal, setShowImportModal] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
@@ -196,11 +218,7 @@ export function useTransactionsPage() {
       setCards(cardsResponse.items)
       setHasAnyTransactions(transactionsSummary.total_items > 0)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to load transactions")
-      }
+      setError(transactionError(err, "Unable to load transactions"))
     }
   }, [])
 
@@ -220,11 +238,7 @@ export function useTransactionsPage() {
       setTotalItems(response.total_items)
       setSummary(response.summary)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to load transactions")
-      }
+      setError(transactionError(err, "Unable to load transactions"))
     } finally {
       setIsLoading(false)
     }
@@ -250,11 +264,7 @@ export function useTransactionsPage() {
       setTotalItems(response.total_items)
       setSummary(response.summary)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to load more transactions")
-      }
+      setError(transactionError(err, "Unable to load more transactions"))
     } finally {
       setIsLoadingMore(false)
     }
@@ -275,6 +285,10 @@ export function useTransactionsPage() {
   const refreshTransactionSurface = useCallback(async () => {
     await Promise.all([loadTransactionsData(), loadReferenceData()])
   }, [loadReferenceData, loadTransactionsData])
+
+  const dismissError = useCallback(() => {
+    setError(null)
+  }, [])
 
   const handlePresetChange = (nextPreset: Preset | "all") => {
     setPreset(nextPreset)
@@ -443,11 +457,7 @@ export function useTransactionsPage() {
       setSelectedTransaction((current) => (current?.id === transactionId ? null : current))
       await refreshTransactionSurface()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.error.message)
-      } else {
-        setError("Unable to delete transaction")
-      }
+      setError(transactionError(err, "Unable to delete transaction"))
     } finally {
       setDeletingTransactionId(null)
     }
@@ -593,5 +603,6 @@ export function useTransactionsPage() {
     loadMoreTransactions,
     resetImportModal,
     refreshTransactionSurface,
+    dismissError,
   }
 }

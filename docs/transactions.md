@@ -12,6 +12,12 @@
 - Filter, search, sort, import, create, update, and delete actions refresh from page 1 to keep the loaded rows and summary aligned.
 - The footer shows loaded rows out of `total_items` with a compact `Load more` action when additional pages are available.
 
+## Error Handling
+- Load, load-more, and delete failures open a modal instead of rendering only inline text.
+- Backend `X-Request-ID` values are shown in the modal when available so the error can be matched to structured backend logs.
+- The request id can be copied from the modal for support or production log lookup.
+- Backend `5xx` failures are handled by the app-wide error modal; Transactions keeps page-specific handling for non-`5xx` transaction errors.
+
 ## CSV Import And Export
 - CSV import accepts backend response statuses `completed`, `partial`, and `failed`.
 - Partial and failed imports show the backend-provided message plus the first 8 returned row errors.

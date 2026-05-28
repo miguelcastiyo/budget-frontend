@@ -105,6 +105,7 @@ class ApiClient {
       headers,
       credentials: "include",
     })
+    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
       if (response.status === 401) {
@@ -124,11 +125,13 @@ class ApiClient {
         // Keep fallback message for non-JSON errors.
       }
 
-      throw new ApiError(response.status, {
+      const apiError = new ApiError(response.status, {
         code,
         message,
         details,
-      })
+      }, requestId)
+      notifyGlobalApiError(apiError)
+      throw apiError
     }
 
     if (response.status === 204) {
@@ -423,6 +426,7 @@ class ApiClient {
       `${API_BASE}/me/transactions/export.csv${query ? `?${query}` : ""}`,
       { credentials: "include" }
     )
+    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
       let message = `Request failed with status ${response.status}`
@@ -438,11 +442,13 @@ class ApiClient {
         // Keep fallback message for non-JSON errors.
       }
 
-      throw new ApiError(response.status, {
+      const apiError = new ApiError(response.status, {
         code,
         message,
         details,
-      })
+      }, requestId)
+      notifyGlobalApiError(apiError)
+      throw apiError
     }
 
     return response.blob()
@@ -466,10 +472,13 @@ class ApiClient {
       headers,
       credentials: "include",
     })
+    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
       const error: ErrorEnvelope = await response.json()
-      throw new ApiError(response.status, error.error)
+      const apiError = new ApiError(response.status, error.error, requestId)
+      notifyGlobalApiError(apiError)
+      throw apiError
     }
 
     return response.json()
@@ -501,11 +510,26 @@ export class ApiError extends Error {
       code: string
       message: string
       details?: { field: string; message: string }[]
-    }
+    },
+    public requestId?: string
   ) {
     super(error.message)
     this.name = "ApiError"
   }
+}
+
+export const GLOBAL_API_ERROR_EVENT = "budget:global-api-error"
+
+function notifyGlobalApiError(error: ApiError) {
+  if (typeof window === "undefined" || error.status < 500) {
+    return
+  }
+
+  window.dispatchEvent(
+    new CustomEvent<ApiError>(GLOBAL_API_ERROR_EVENT, {
+      detail: error,
+    })
+  )
 }
 
 export const apiClient = new ApiClient()

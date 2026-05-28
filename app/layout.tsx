@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthGate } from '@/components/auth/auth-gate'
 import { AuthProvider } from '@/components/auth/auth-provider'
+import { GlobalErrorProvider } from '@/components/common/global-error-provider'
 import { GoogleOauthProvider } from '@/components/auth/google-oauth-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
@@ -40,7 +41,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <GoogleOauthProvider>
             <AuthProvider>
-              <AuthGate>{children}</AuthGate>
+              <GlobalErrorProvider>
+                <AuthGate>{children}</AuthGate>
+              </GlobalErrorProvider>
             </AuthProvider>
           </GoogleOauthProvider>
         </ThemeProvider>

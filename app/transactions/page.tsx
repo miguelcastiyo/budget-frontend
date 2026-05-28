@@ -10,6 +10,7 @@ import { TransactionExportDialog } from "@/components/budget/transaction-export-
 import { TransactionImportDialog } from "@/components/budget/transaction-import-dialog"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { TransactionDetailSheet } from "@/components/budget/transaction-detail-sheet"
+import { ErrorDialog } from "@/components/common/error-dialog"
 import { useTransactionsPage } from "@/hooks/use-transactions-page"
 import { transactionExportPresets } from "@/lib/date-filters"
 import { Button } from "@/components/ui/button"
@@ -90,6 +91,7 @@ export default function TransactionsPage() {
     loadMoreTransactions,
     resetImportModal,
     refreshTransactionSurface,
+    dismissError,
   } = useTransactionsPage()
 
   const remainingTransactions = Math.max(totalItems - transactions.length, 0)
@@ -158,19 +160,17 @@ export default function TransactionsPage() {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8">
       <Header />
+      <ErrorDialog
+        error={error}
+        onOpenChange={(open) => {
+          if (!open) {
+            dismissError()
+          }
+        }}
+        onRetry={() => void refreshTransactionSurface()}
+      />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
-        {error && (
-          <UiCard className="p-4 mb-6 border-0 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void refreshTransactionSurface()}>
-                Retry
-              </Button>
-            </div>
-          </UiCard>
-        )}
-
         {queryMonthLabel && customDateRange && (
           <UiCard className="p-3 mb-4 border border-primary/20 bg-primary/5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
