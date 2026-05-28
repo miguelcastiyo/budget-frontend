@@ -167,6 +167,18 @@
   }
 }
 
+@layer utilities {
+  .pb-mobile-nav {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 64rem) {
+    .pb-mobile-nav {
+      padding-bottom: 2rem;
+    }
+  }
+}
+
 @media (display-mode: standalone) {
   body {
     padding-top: env(safe-area-inset-top);

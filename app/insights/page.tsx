@@ -152,7 +152,7 @@ export default function InsightsPage() {
 
   if (isLoading && !data) {
     return (
-      <div className="min-h-screen bg-background pb-24 lg:pb-8">
+      <div className="min-h-screen bg-background pb-mobile-nav">
         <Header />
         <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-6">
           <Card className="p-8 border-0 shadow-sm flex items-center justify-center gap-3">
@@ -168,7 +168,7 @@ export default function InsightsPage() {
   const noData = !data || data.total_transactions === 0
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6 space-y-4 lg:space-y-6">

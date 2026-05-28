@@ -202,7 +202,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-6 space-y-6">

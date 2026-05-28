@@ -75,7 +75,7 @@ export default function BudgetSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
         <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-4">
           <Link href="/settings">

@@ -158,7 +158,7 @@ export default function TransactionsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
       <ErrorDialog
         error={error}

@@ -178,7 +178,7 @@ export default function InvitesSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4">
           <Link href="/settings">

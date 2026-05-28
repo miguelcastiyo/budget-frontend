@@ -84,7 +84,7 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pb-24 lg:pb-8">
+      <div className="min-h-screen bg-background pb-mobile-nav">
         <Header />
         <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
           <Card className="p-8 border-0 shadow-sm flex items-center justify-center gap-3">
@@ -98,7 +98,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-8">
+    <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
