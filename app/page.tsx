@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [categoryMetrics, setCategoryMetrics] = useState<CategoryMetricsResponse>(emptyCategoryMetrics(currentMonth))
   const [tagMetrics, setTagMetrics] = useState<TagMetricsResponse>(emptyTagMetrics(currentMonth))
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detailView, setDetailView] = useState<"tags" | "recent">("tags")
@@ -189,7 +190,7 @@ export default function DashboardPage() {
                   })
                   router.push(`/transactions?${params.toString()}`)
                 }}
-                readOnly
+                onTransactionClick={setEditingTransaction}
               />
             </TabsContent>
           </Tabs>
@@ -209,6 +210,18 @@ export default function DashboardPage() {
         open={showAddTransaction}
         onOpenChange={setShowAddTransaction}
         onTransactionCreated={() => void loadDashboardData()}
+      />
+
+      <AddTransactionSheet
+        open={!!editingTransaction}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingTransaction(null)
+          }
+        }}
+        mode="edit"
+        transaction={editingTransaction}
+        onTransactionUpdated={() => void loadDashboardData()}
       />
     </div>
   )
