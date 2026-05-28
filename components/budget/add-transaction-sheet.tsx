@@ -34,7 +34,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon, Plus, X, CreditCard, TagIcon } from "lucide-react"
+import { CalendarIcon, ChevronDown, Plus, X, CreditCard, TagIcon } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
@@ -77,6 +77,7 @@ export function AddTransactionSheet({
   const [newTagName, setNewTagName] = useState("")
   const [showNewCard, setShowNewCard] = useState(false)
   const [newCardName, setNewCardName] = useState("")
+  const [showMoreDetails, setShowMoreDetails] = useState(false)
 
   const [isLoadingTaxonomy, setIsLoadingTaxonomy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -85,7 +86,7 @@ export function AddTransactionSheet({
   const [error, setError] = useState<string | null>(null)
 
   const isEditMode = mode === "edit" && transaction !== null
-  const transactionAlreadyRecurring = transaction?.recurring_expense_id !== null
+  const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
   const amountInputRef = useRef<HTMLInputElement>(null)
 
@@ -186,12 +187,13 @@ export function AddTransactionSheet({
     }
 
     void loadTaxonomy()
-      if (isEditMode && transaction) {
-        setDate(parseTransactionDate(transaction.date))
-        setExpense(transaction.expense)
-        const nextAmountDigits = amountDigitsFromDecimal(transaction.amount)
-        setAmountDigits(nextAmountDigits)
-        setAmount(formatAmountDigits(nextAmountDigits))
+
+    if (isEditMode && transaction) {
+      setDate(parseTransactionDate(transaction.date))
+      setExpense(transaction.expense)
+      const nextAmountDigits = amountDigitsFromDecimal(transaction.amount)
+      setAmountDigits(nextAmountDigits)
+      setAmount(formatAmountDigits(nextAmountDigits))
       setCategory(transaction.category)
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
@@ -200,6 +202,7 @@ export function AddTransactionSheet({
       setNewTagName("")
       setShowNewCard(false)
       setNewCardName("")
+      setShowMoreDetails(Boolean(transaction.card || transaction.is_split || transaction.recurring_expense_id != null))
       setMakeRecurring(false)
       setRecurringBillingType("day_of_month")
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
@@ -224,9 +227,17 @@ export function AddTransactionSheet({
     setNewTagName("")
     setShowNewCard(false)
     setNewCardName("")
+    setShowMoreDetails(false)
     setMakeRecurring(false)
     applyRecurringDefaultsFromDate(now)
     setError(null)
+  }
+
+  const updateTransactionDate = (nextDate: Date) => {
+    setDate(nextDate)
+    if (makeRecurring) {
+      applyRecurringDefaultsFromDate(nextDate)
+    }
   }
 
   const handleCreateTag = async () => {
@@ -475,361 +486,429 @@ export function AddTransactionSheet({
     !makeRecurring ||
     recurringBillingType === "last_day" ||
     (Number.isInteger(recurringDayNumber) && recurringDayNumber >= 1 && recurringDayNumber <= 31)
+  const optionalDetailsCount = [cardId, isSplit, makeRecurring, transactionAlreadyRecurring].filter(Boolean).length
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="top-[calc(50%+env(safe-area-inset-top)/2)] w-[min(calc(100dvw-1rem),32rem)] max-w-[min(calc(100dvw-1rem),32rem)] p-0 gap-0 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable_both-edges] rounded-2xl max-h-[min(calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-1rem),90vh)] sm:top-[50%] sm:max-h-[min(90dvh,90vh)]"
+        className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full max-w-none translate-y-0 grid-rows-none gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
       >
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/50 bg-background/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="w-9 shrink-0" aria-hidden="true" />
-          <DialogTitle className="text-center text-xl font-semibold">
-            {isEditMode ? "Edit Transaction" : "New Transaction"}
-          </DialogTitle>
-          <DialogClose className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col" autoComplete="off" data-form-type="other">
-          <div className="px-6 py-12 bg-gradient-to-b from-muted/30 to-transparent">
-            <div className="text-center">
-              <label htmlFor="transaction-amount" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Amount
-              </label>
-              <div className="mt-4 flex items-baseline justify-center gap-1">
-                <span className="text-5xl font-light text-muted-foreground">$</span>
-                <Input
-                  ref={amountInputRef}
-                  id="transaction-amount"
-                  name="transaction_amount"
-                  type="text"
-                  inputMode="numeric"
-                  enterKeyHint="next"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  data-form-type="other"
-                  data-lpignore="true"
-                  data-1p-ignore="true"
-                  placeholder="0.00"
-                  value={amount}
-                  onBeforeInput={handleAmountBeforeInput}
-                  onChange={(e) => setAmountFromDigits(e.target.value)}
-                  onKeyDown={handleAmountKeyDown}
-                  onPaste={handleAmountPaste}
-                  className="text-6xl font-semibold tracking-tight border-0 bg-transparent p-0 h-auto w-auto min-w-[120px] max-w-[320px] text-center focus-visible:ring-0 placeholder:text-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  style={{ fontSize: "3.75rem" }}
-                  required
-                  autoFocus
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="expense" className="text-sm font-medium">
-                Description
-              </Label>
-              <Input
-                id="expense"
-                placeholder="What did you spend on?"
-                value={expense}
-                onChange={(e) => setExpense(e.target.value)}
-                className="h-12 rounded-xl border-border/60 focus:border-foreground/20"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full h-12 rounded-xl justify-start text-left font-normal border-border/60 hover:border-foreground/20",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">
-                      {date ? format(date, "EEEE, MMMM d, yyyy") : "Pick a date"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(d) => {
-                      if (!d) {
-                        return
-                      }
-                      setDate(d)
-                      if (makeRecurring) {
-                        applyRecurringDefaultsFromDate(d)
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {canCreateRecurringRule && (
-              <div className="space-y-3 rounded-xl border border-border/60 p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Make recurring</Label>
-                    <p className="text-xs text-muted-foreground">
-                      {isEditMode
-                        ? "Create a recurring rule using this transaction as the first occurrence."
-                        : "Adds this expense automatically each month."}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={makeRecurring}
-                    onCheckedChange={(checked) => {
-                      setMakeRecurring(checked)
-                      if (checked) {
-                        applyRecurringDefaultsFromDate(date)
-                      }
-                    }}
-                  />
-                </div>
-
-                {makeRecurring && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Billing rule</Label>
-                      <Select
-                        value={recurringBillingType}
-                        onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
-                      >
-                        <SelectTrigger className="h-10 rounded-xl border-border/60">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="day_of_month">Same day monthly</SelectItem>
-                          <SelectItem value="last_day">Last day monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Billing day</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={recurringBillingType === "last_day" ? "" : recurringBillingDay}
-                        onChange={(e) => setRecurringBillingDay(e.target.value)}
-                        disabled={recurringBillingType === "last_day"}
-                        placeholder={recurringBillingType === "last_day" ? "Auto" : "1-31"}
-                        className="h-10 rounded-xl border-border/60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isEditMode && transactionAlreadyRecurring && (
-              <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                <p className="text-sm font-medium">Already recurring</p>
-                <p className="text-xs text-muted-foreground">
-                  This transaction is already linked to a recurring expense. Update the recurring rule from Settings.
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" autoComplete="off" data-form-type="other">
+          <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="truncate text-lg font-semibold sm:text-xl">
+                  {isEditMode ? "Edit Transaction" : "New Transaction"}
+                </DialogTitle>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {format(date, "EEE, MMM d")} · {categoryConfig[category].label}
                 </p>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Category</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["needs", "wants", "savings_debts"] as const).map((cat) => {
-                  const config = categoryConfig[cat]
-                  const isSelected = category === cat
-
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategory(cat)}
-                      className={cn(
-                        "relative h-12 cursor-pointer rounded-xl font-medium transition-all duration-200 text-sm",
-                        isSelected
-                          ? `${config.color} text-white shadow-sm`
-                          : "bg-muted/50 text-foreground hover:bg-muted"
-                      )}
-                    >
-                      {config.label}
-                    </button>
-                  )
-                })}
-              </div>
+              <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogClose>
             </div>
-
-            <div className="rounded-xl border border-border/60 p-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <Checkbox checked={isSplit} onCheckedChange={(checked) => setIsSplit(Boolean(checked))} />
-                <div>
-                  <p className="text-sm font-medium">Split expense</p>
-                  <p className="text-xs text-muted-foreground">Marks this transaction as your portion of a shared expense.</p>
-                </div>
-              </label>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Tag</Label>
-                {!showNewTag && (
-                  <button
-                    type="button"
-                    onClick={() => setShowNewTag(true)}
-                    className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    New tag
-                  </button>
-                )}
-              </div>
-
-              {showNewTag ? (
-                <div className="flex gap-2">
-                  <div className="relative flex-1 min-w-0">
-                    <TagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Tag name"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      className="h-12 rounded-xl pl-10 border-border/60"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          void handleCreateTag()
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreateTag()}
-                    disabled={!newTagName.trim() || isCreatingTag}
-                    className="h-12 px-4 rounded-xl shrink-0"
-                  >
-                    {isCreatingTag ? "Adding..." : "Add"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowNewTag(false)
-                      setNewTagName("")
-                    }}
-                    className="h-12 w-12 rounded-xl p-0 shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <Select value={tagId} onValueChange={setTagId} required>
-                  <SelectTrigger className="h-12 rounded-xl border-border/60">
-                    <SelectValue placeholder={isLoadingTaxonomy ? "Loading tags..." : "Select a tag"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tags.map((tag) => (
-                      <SelectItem key={tag.id} value={tag.id}>
-                        {tag.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">
-                  Card <span className="text-muted-foreground font-normal">(optional)</span>
-                </Label>
-                {!showNewCard && (
-                  <button
-                    type="button"
-                    onClick={() => setShowNewCard(true)}
-                    className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    New card
-                  </button>
-                )}
-              </div>
-
-              {showNewCard ? (
-                <div className="flex gap-2">
-                  <div className="relative flex-1 min-w-0">
-                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Card name"
-                      value={newCardName}
-                      onChange={(e) => setNewCardName(e.target.value)}
-                      className="h-12 rounded-xl pl-10 border-border/60"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          void handleCreateCard()
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreateCard()}
-                    disabled={!newCardName.trim() || isCreatingCard}
-                    className="h-12 px-4 rounded-xl shrink-0"
-                  >
-                    {isCreatingCard ? "Adding..." : "Add"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowNewCard(false)
-                      setNewCardName("")
-                    }}
-                    className="h-12 w-12 rounded-xl p-0 shrink-0"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <Select value={cardId || "none"} onValueChange={(value) => setCardId(value === "none" ? "" : value)}>
-                  <SelectTrigger className="h-12 rounded-xl border-border/60">
-                    <SelectValue placeholder={isLoadingTaxonomy ? "Loading cards..." : "Select a card"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No card</SelectItem>
-                    {cards.map((card) => (
-                      <SelectItem key={card.id} value={card.id}>
-                        {card.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive bg-destructive/10 p-2 rounded-lg">{error}</p>
-            )}
           </div>
 
-          <div className="p-6 pt-2 border-t border-border/50 bg-background">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
+                <label htmlFor="transaction-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Amount
+                </label>
+                <div className="mt-3 flex justify-center">
+                  <div className="inline-flex items-baseline gap-2">
+                  <span className="text-5xl font-semibold leading-none text-muted-foreground sm:text-6xl md:text-6xl">$</span>
+                  <Input
+                    ref={amountInputRef}
+                    id="transaction-amount"
+                    name="transaction_amount"
+                    type="text"
+                    inputMode="numeric"
+                    enterKeyHint="next"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    placeholder="0.00"
+                    value={amount}
+                    onBeforeInput={handleAmountBeforeInput}
+                    onChange={(e) => setAmountFromDigits(e.target.value)}
+                    onKeyDown={handleAmountKeyDown}
+                    onPaste={handleAmountPaste}
+                    className="h-auto w-[4.25ch] min-w-0 border-0 bg-transparent p-0 text-left text-5xl font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 sm:text-6xl md:text-6xl dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    required
+                  />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="expense" className="text-sm font-medium">
+                      Description
+                    </Label>
+                    <Input
+                      id="expense"
+                      placeholder="What did you spend on?"
+                      value={expense}
+                      onChange={(e) => setExpense(e.target.value)}
+                      className="h-12 rounded-xl border-border/60 focus:border-foreground/20"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Tag</Label>
+                      {!showNewTag && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewTag(true)}
+                          className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          New tag
+                        </button>
+                      )}
+                    </div>
+
+                    {showNewTag ? (
+                      <div className="rounded-xl border border-border/60 bg-card p-3">
+                        <div className="flex items-center justify-between gap-3 pb-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">Create tag</p>
+                            <p className="truncate text-xs text-muted-foreground">It will be selected for this transaction.</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setShowNewTag(false)
+                              setNewTagName("")
+                            }}
+                            className="h-9 w-9 shrink-0 rounded-lg p-0"
+                            aria-label="Cancel new tag"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                          <div className="relative min-w-0">
+                            <TagIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder="Tag name"
+                              value={newTagName}
+                              onChange={(e) => setNewTagName(e.target.value)}
+                              className="h-12 rounded-xl border-border/60 pl-10"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault()
+                                  void handleCreateTag()
+                                }
+                              }}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => void handleCreateTag()}
+                            disabled={!newTagName.trim() || isCreatingTag}
+                            className="h-12 rounded-xl px-4"
+                          >
+                            {isCreatingTag ? "Adding..." : "Add tag"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Select value={tagId} onValueChange={setTagId} required>
+                        <SelectTrigger className="h-12 rounded-xl border-border/60">
+                          <SelectValue placeholder={isLoadingTaxonomy ? "Loading tags..." : "Select a tag"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tags.map((tag) => (
+                            <SelectItem key={tag.id} value={tag.id}>
+                              {tag.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className="text-sm font-medium">Category</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["needs", "wants", "savings_debts"] as const).map((cat) => {
+                        const config = categoryConfig[cat]
+                        const isSelected = category === cat
+
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setCategory(cat)}
+                            className={cn(
+                              "relative h-11 cursor-pointer rounded-xl text-sm font-medium transition-all duration-200 sm:h-12",
+                              isSelected
+                                ? `${config.color} text-white shadow-sm`
+                                : "bg-muted/60 text-foreground hover:bg-muted"
+                            )}
+                          >
+                            {config.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className="text-sm font-medium">Date</Label>
+                    <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-11 rounded-xl px-3 text-sm"
+                        onClick={() => updateTransactionDate(new Date())}
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-11 rounded-xl px-3 text-sm"
+                        onClick={() => {
+                          const yesterday = new Date()
+                          yesterday.setDate(yesterday.getDate() - 1)
+                          updateTransactionDate(yesterday)
+                        }}
+                      >
+                        Yesterday
+                      </Button>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "h-11 min-w-0 rounded-xl border-border/60 px-3 font-normal hover:border-foreground/20",
+                              !date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="truncate">
+                              {date ? format(date, "MMM d, yyyy") : "Pick date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={(d) => {
+                              if (!d) {
+                                return
+                              }
+                              updateTransactionDate(d)
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-card">
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreDetails((current) => !current)}
+                    className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left"
+                    aria-expanded={showMoreDetails}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">More details</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {optionalDetailsCount > 0 ? `${optionalDetailsCount} optional detail${optionalDetailsCount === 1 ? "" : "s"} set` : "Card, split, and recurring settings"}
+                      </p>
+                    </div>
+                    <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", showMoreDetails && "rotate-180")} />
+                  </button>
+
+                  {showMoreDetails && (
+                    <div className="space-y-4 border-t border-border/50 p-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">
+                            Card <span className="font-normal text-muted-foreground">(optional)</span>
+                          </Label>
+                          {!showNewCard && (
+                            <button
+                              type="button"
+                              onClick={() => setShowNewCard(true)}
+                              className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              New card
+                            </button>
+                          )}
+                        </div>
+
+                        {showNewCard ? (
+                          <div className="rounded-xl border border-border/60 bg-background p-3">
+                            <div className="flex items-center justify-between gap-3 pb-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">Create card</p>
+                                <p className="truncate text-xs text-muted-foreground">It will be selected for this transaction.</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                  setShowNewCard(false)
+                                  setNewCardName("")
+                                }}
+                                className="h-9 w-9 shrink-0 rounded-lg p-0"
+                                aria-label="Cancel new card"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                              <div className="relative min-w-0">
+                                <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                  placeholder="Card name"
+                                  value={newCardName}
+                                  onChange={(e) => setNewCardName(e.target.value)}
+                                  className="h-12 rounded-xl border-border/60 pl-10"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault()
+                                      void handleCreateCard()
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                onClick={() => void handleCreateCard()}
+                                disabled={!newCardName.trim() || isCreatingCard}
+                                className="h-12 rounded-xl px-4"
+                              >
+                                {isCreatingCard ? "Adding..." : "Add card"}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Select value={cardId || "none"} onValueChange={(value) => setCardId(value === "none" ? "" : value)}>
+                            <SelectTrigger className="h-12 rounded-xl border-border/60">
+                              <SelectValue placeholder={isLoadingTaxonomy ? "Loading cards..." : "Select a card"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No card</SelectItem>
+                              {cards.map((card) => (
+                                <SelectItem key={card.id} value={card.id}>
+                                  {card.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border border-border/60 p-3">
+                        <label className="flex cursor-pointer items-center gap-3">
+                          <Checkbox checked={isSplit} onCheckedChange={(checked) => setIsSplit(Boolean(checked))} />
+                          <div>
+                            <p className="text-sm font-medium">Split expense</p>
+                            <p className="text-xs text-muted-foreground">Marks this transaction as your portion of a shared expense.</p>
+                          </div>
+                        </label>
+                      </div>
+
+                      {canCreateRecurringRule && (
+                        <div className="space-y-3 rounded-xl border border-border/60 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <Label className="text-sm font-medium">Make recurring</Label>
+                              <p className="text-xs text-muted-foreground">
+                                {isEditMode
+                                  ? "Create a recurring rule using this transaction as the first occurrence."
+                                  : "Adds this expense automatically each month."}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={makeRecurring}
+                              onCheckedChange={(checked) => {
+                                setMakeRecurring(checked)
+                                if (checked) {
+                                  applyRecurringDefaultsFromDate(date)
+                                }
+                              }}
+                            />
+                          </div>
+
+                          {makeRecurring && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Billing rule</Label>
+                                <Select
+                                  value={recurringBillingType}
+                                  onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
+                                >
+                                  <SelectTrigger className="h-10 rounded-xl border-border/60">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="day_of_month">Same day monthly</SelectItem>
+                                    <SelectItem value="last_day">Last day monthly</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Billing day</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="31"
+                                  value={recurringBillingType === "last_day" ? "" : recurringBillingDay}
+                                  onChange={(e) => setRecurringBillingDay(e.target.value)}
+                                  disabled={recurringBillingType === "last_day"}
+                                  placeholder={recurringBillingType === "last_day" ? "Auto" : "1-31"}
+                                  className="h-10 rounded-xl border-border/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {isEditMode && transactionAlreadyRecurring && (
+                        <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
+                          <p className="text-sm font-medium">Already recurring</p>
+                          <p className="text-xs text-muted-foreground">
+                            This transaction is already linked to a recurring expense. Update the recurring rule from Settings.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {error && (
+                  <p className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">{error}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-6 sm:pt-4">
             <Button
               type="submit"
               className="w-full h-12 rounded-xl text-base font-semibold"
