@@ -172,9 +172,17 @@
     padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
   }
 
+  .pt-safe-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
   @media (min-width: 64rem) {
     .pb-mobile-nav {
       padding-bottom: 2rem;
+    }
+
+    .pt-safe-header {
+      padding-top: 0;
     }
   }
 }
