@@ -154,7 +154,7 @@ export default function InsightsPage() {
     return (
       <div className="min-h-screen bg-background pb-mobile-nav">
         <Header />
-        <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-3 lg:pt-6">
+        <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-3 pt-standalone-safe-top lg:pt-6">
           <Card className="p-8 border-0 shadow-sm flex items-center justify-center gap-3">
             <Spinner className="size-5" />
             <span className="text-sm text-muted-foreground">Loading insights...</span>
@@ -171,7 +171,7 @@ export default function InsightsPage() {
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 lg:pt-6 space-y-4 lg:space-y-6">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 pt-standalone-safe-top lg:pt-6 space-y-4 lg:space-y-6">
         <InsightsRangeHeader
           rangePresets={rangePresets}
           selectedPreset={selectedPreset}

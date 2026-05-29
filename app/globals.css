@@ -179,6 +179,10 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
 
+  .pt-standalone-safe-top {
+    padding-top: 0;
+  }
+
   @media (min-width: 64rem) {
     .pb-mobile-nav {
       padding-bottom: 2rem;
@@ -187,5 +191,15 @@
     .pt-safe-header {
       padding-top: 0;
     }
+
+    .pt-standalone-safe-top {
+      padding-top: 0;
+    }
+  }
+}
+
+@media (display-mode: standalone) {
+  .pt-standalone-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
