@@ -6,20 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import type { Preset } from "@/lib/api/types"
+import type { ExportDateMode } from "@/hooks/use-transaction-data-tools"
 import { cn } from "@/lib/utils"
-
-interface ExportDatePreset {
-  value: Preset
-  label: string
-}
 
 interface TransactionExportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  exportDatePresets: ExportDatePreset[]
-  exportPreset: Preset | "custom"
-  onExportPresetChange: (value: Preset | "custom") => void
+  exportDateMode: ExportDateMode
+  onExportDateModeChange: (value: ExportDateMode) => void
   selectedExportFromDate: Date | null
   selectedExportToDate: Date | null
   onExportCustomFromChange: (value: string) => void
@@ -32,9 +26,8 @@ interface TransactionExportDialogProps {
 export function TransactionExportDialog({
   open,
   onOpenChange,
-  exportDatePresets,
-  exportPreset,
-  onExportPresetChange,
+  exportDateMode,
+  onExportDateModeChange,
   selectedExportFromDate,
   selectedExportToDate,
   onExportCustomFromChange,
@@ -49,35 +42,32 @@ export function TransactionExportDialog({
         <DialogHeader>
           <DialogTitle>Export Transactions</DialogTitle>
           <DialogDescription>
-            Choose a date range before exporting. Current category/tag/card/split filters will also be applied.
+            Export all transactions or choose a specific date range.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 pt-3">
           <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick Date Filters</p>
-            <div className="flex flex-wrap gap-2">
-              {exportDatePresets.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onExportPresetChange(option.value)}
-                  className={cn(
-                    "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
-                    exportPreset === option.value
-                      ? "border-secondary bg-secondary text-foreground"
-                      : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Date Range</p>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => onExportPresetChange("custom")}
+                onClick={() => onExportDateModeChange("all")}
                 className={cn(
-                  "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors",
-                  exportPreset === "custom"
+                  "h-11 cursor-pointer rounded-xl border px-3 text-sm font-medium transition-colors",
+                  exportDateMode === "all"
+                    ? "border-secondary bg-secondary text-foreground"
+                    : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+                )}
+              >
+                All Time
+              </button>
+              <button
+                type="button"
+                onClick={() => onExportDateModeChange("custom")}
+                className={cn(
+                  "h-11 cursor-pointer rounded-xl border px-3 text-sm font-medium transition-colors",
+                  exportDateMode === "custom"
                     ? "border-secondary bg-secondary text-foreground"
                     : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
                 )}
@@ -87,7 +77,7 @@ export function TransactionExportDialog({
             </div>
           </div>
 
-          {exportPreset === "custom" && (
+          {exportDateMode === "custom" && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custom Range</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

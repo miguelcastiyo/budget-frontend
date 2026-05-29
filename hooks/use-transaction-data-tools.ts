@@ -1,30 +1,21 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { format } from "date-fns"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { getPresetDateRange, parseIsoDate } from "@/lib/date-filters"
-import type { CsvImportErrorItem, Preset, TransactionFilters as ApiTransactionFilters } from "@/lib/api/types"
+import { parseIsoDate } from "@/lib/date-filters"
+import type { CsvImportErrorItem, TransactionFilters as ApiTransactionFilters } from "@/lib/api/types"
+
+export type ExportDateMode = "all" | "custom"
 
 type PartialDateRange = {
   date_from?: string
   date_to?: string
 }
 
-function monthToDateRange() {
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-  return {
-    date_from: format(startOfMonth, "yyyy-MM-dd"),
-    date_to: format(now, "yyyy-MM-dd"),
-  }
-}
-
 export function useTransactionDataTools() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportPreset, setExportPreset] = useState<Preset | "custom">("month_to_date")
+  const [exportDateMode, setExportDateMode] = useState<ExportDateMode>("all")
   const [exportCustomFrom, setExportCustomFrom] = useState("")
   const [exportCustomTo, setExportCustomTo] = useState("")
   const [isExporting, setIsExporting] = useState(false)
@@ -35,10 +26,7 @@ export function useTransactionDataTools() {
   const [importErrors, setImportErrors] = useState<CsvImportErrorItem[]>([])
 
   const exportTransactions = useCallback(async (dateRange: PartialDateRange) => {
-    const filters: ApiTransactionFilters = {
-      ...dateRange,
-      sort: "date_desc",
-    }
+    const filters: ApiTransactionFilters = { ...dateRange }
     const blob = await apiClient.exportTransactions(filters)
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
@@ -49,27 +37,15 @@ export function useTransactionDataTools() {
   }, [])
 
   const openExportModal = useCallback(() => {
-    const defaultRange = monthToDateRange()
-
     setExportError(null)
-    setExportPreset("month_to_date")
-    setExportCustomFrom(defaultRange.date_from)
-    setExportCustomTo(defaultRange.date_to)
+    setExportDateMode("all")
     setShowExportModal(true)
   }, [])
 
-  const selectExportPreset = useCallback((next: Preset | "custom") => {
-    setExportPreset(next)
+  const selectExportDateMode = useCallback((next: ExportDateMode) => {
+    setExportDateMode(next)
     setExportError(null)
-
-    if (next !== "custom" || (exportCustomFrom && exportCustomTo)) {
-      return
-    }
-
-    const defaultRange = monthToDateRange()
-    setExportCustomFrom(defaultRange.date_from)
-    setExportCustomTo(defaultRange.date_to)
-  }, [exportCustomFrom, exportCustomTo])
+  }, [])
 
   const confirmExport = useCallback(async () => {
     try {
@@ -77,7 +53,7 @@ export function useTransactionDataTools() {
       setIsExporting(true)
 
       let range: PartialDateRange
-      if (exportPreset === "custom") {
+      if (exportDateMode === "custom") {
         const from = exportCustomFrom.trim()
         const to = exportCustomTo.trim()
 
@@ -95,7 +71,7 @@ export function useTransactionDataTools() {
           date_to: to,
         }
       } else {
-        range = getPresetDateRange(exportPreset)
+        range = {}
       }
 
       await exportTransactions(range)
@@ -109,7 +85,7 @@ export function useTransactionDataTools() {
     } finally {
       setIsExporting(false)
     }
-  }, [exportCustomFrom, exportCustomTo, exportPreset, exportTransactions])
+  }, [exportCustomFrom, exportCustomTo, exportDateMode, exportTransactions])
 
   const handleImportFileSelect = useCallback((file: File | null) => {
     if (file) {
@@ -184,7 +160,7 @@ export function useTransactionDataTools() {
     setShowImportModal,
     showExportModal,
     setShowExportModal,
-    exportPreset,
+    exportDateMode,
     exportCustomFrom,
     exportCustomTo,
     isExporting,
@@ -199,7 +175,7 @@ export function useTransactionDataTools() {
     setExportCustomFrom,
     setExportCustomTo,
     openExportModal,
-    selectExportPreset,
+    selectExportDateMode,
     confirmExport,
     handleImportFileSelect,
     handleImport,

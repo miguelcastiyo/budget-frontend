@@ -31,7 +31,6 @@ import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useTransactionDataTools } from "@/hooks/use-transaction-data-tools"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { transactionExportPresets } from "@/lib/date-filters"
 import type { SettingsSummaryResponse } from "@/lib/api/types"
 
 interface SettingsItemProps {
@@ -397,9 +396,8 @@ export default function SettingsPage() {
             dataTools.setExportError(null)
           }
         }}
-        exportDatePresets={transactionExportPresets}
-        exportPreset={dataTools.exportPreset}
-        onExportPresetChange={dataTools.selectExportPreset}
+        exportDateMode={dataTools.exportDateMode}
+        onExportDateModeChange={dataTools.selectExportDateMode}
         selectedExportFromDate={dataTools.selectedExportFromDate}
         selectedExportToDate={dataTools.selectedExportToDate}
         onExportCustomFromChange={dataTools.setExportCustomFrom}
