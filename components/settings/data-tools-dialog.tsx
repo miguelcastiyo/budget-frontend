@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { cn } from "@/lib/utils"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 
 interface DataToolsDialogProps {
   open: boolean
@@ -41,12 +42,11 @@ export function DataToolsDialog({ open, onOpenChange, onImport, onExport }: Data
         {...swipeDismiss}
         className={cn(
           "gap-0 overflow-hidden border-border/70 p-0 shadow-2xl sm:max-w-md",
-          "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[2rem] max-sm:border-x-0 max-sm:border-b-0",
-          "max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=closed]:zoom-out-100"
+          mobileDrawerDialogClassName
         )}
       >
         <div data-swipe-handle="true" className="flex justify-center pt-3 sm:hidden">
-          <div className="h-1.5 w-16 rounded-full bg-muted-foreground/20" />
+          <div className={cn(mobileDrawerHandleClassName, "sm:hidden")} />
         </div>
         <div ref={contentRef} className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 sm:p-6">
           <DialogHeader className="gap-2 pr-10 text-left">

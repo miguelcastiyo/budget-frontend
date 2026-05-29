@@ -39,6 +39,7 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 
 const MAX_AMOUNT_DIGITS = 9
 
@@ -508,11 +509,14 @@ export function AddTransactionSheet({
       <DialogContent
         {...swipeDismiss}
         showCloseButton={false}
-        className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full max-w-none translate-y-0 grid-rows-none gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 max-sm:duration-300 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:zoom-in-100 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+        className={cn(
+          "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
+          mobileDrawerDialogClassName
+        )}
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
-            <div data-swipe-handle="true" className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <DialogTitle className="truncate text-lg font-semibold sm:text-xl">

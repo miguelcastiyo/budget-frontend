@@ -36,6 +36,7 @@ import type { Tag, Card, Category, Preset, SplitFilter } from "@/lib/api/types"
 import { parseIsoDate, transactionFilterPresets } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
+import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import type { ReactNode } from "react"
 
 interface TransactionFiltersProps {
@@ -381,7 +382,7 @@ export function TransactionFilters({
             className="h-[80vh] lg:h-auto lg:max-h-[70vh] rounded-t-3xl p-0 gap-0"
           >
             <SheetHeader className="px-6 pt-6 pb-4 border-b border-border/50">
-              <div data-swipe-handle="true" className="mx-auto -mt-2 mb-4 h-1 w-10 rounded-full bg-border lg:hidden" aria-hidden="true" />
+              <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-2 mb-4 lg:hidden")} aria-hidden="true" />
               <div className="flex items-center justify-between">
                 <SheetTitle className="text-xl font-semibold">Filters</SheetTitle>
                 {activeFiltersCount > 0 && (

@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
+import { cn } from "@/lib/utils"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 
 interface ProfileEditDialogProps {
   open: boolean
@@ -217,10 +219,13 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
       <DialogContent
         {...swipeDismiss}
         showCloseButton={false}
-        className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] w-full max-w-none translate-y-0 grid-rows-none flex-col gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 max-sm:duration-300 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:zoom-in-100 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,42rem)] sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+        className={cn(
+          "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,42rem)] sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem] sm:rounded-2xl sm:border",
+          mobileDrawerDialogClassName
+        )}
       >
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
-          <div data-swipe-handle="true" className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
           <div className="flex items-start justify-between gap-3">
             <div>
               <DialogTitle className="text-xl">Edit Profile</DialogTitle>
