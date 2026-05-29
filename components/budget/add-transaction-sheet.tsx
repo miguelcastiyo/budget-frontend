@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   Dialog,
   DialogClose,
@@ -487,12 +487,20 @@ export function AddTransactionSheet({
     recurringBillingType === "last_day" ||
     (Number.isInteger(recurringDayNumber) && recurringDayNumber >= 1 && recurringDayNumber <= 31)
   const optionalDetailsCount = [cardId, isSplit, makeRecurring, transactionAlreadyRecurring].filter(Boolean).length
+  const displayAmount = amount || "00.00"
+  const amountLength = displayAmount.length
+  const amountInputStyle = {
+    width: `${Math.min(Math.max(amountLength + 0.25, 5), 10.5)}ch`,
+  } satisfies CSSProperties
+  const amountTextClassName = amountLength > 7
+    ? "text-4xl sm:text-5xl md:text-5xl"
+    : "text-5xl sm:text-6xl md:text-6xl"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full max-w-none translate-y-0 grid-rows-none gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
+        className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full max-w-none translate-y-0 grid-rows-none gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 max-sm:duration-300 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:zoom-in-100 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
@@ -521,30 +529,36 @@ export function AddTransactionSheet({
                 </label>
                 <div className="mt-3 flex justify-center">
                   <div className="inline-flex items-baseline gap-2">
-                  <span className="text-5xl font-semibold leading-none text-muted-foreground sm:text-6xl md:text-6xl">$</span>
-                  <Input
-                    ref={amountInputRef}
-                    id="transaction-amount"
-                    name="transaction_amount"
-                    type="text"
-                    inputMode="numeric"
-                    enterKeyHint="next"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    data-form-type="other"
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    placeholder="0.00"
-                    value={amount}
-                    onBeforeInput={handleAmountBeforeInput}
-                    onChange={(e) => setAmountFromDigits(e.target.value)}
-                    onKeyDown={handleAmountKeyDown}
-                    onPaste={handleAmountPaste}
-                    className="h-auto w-[4.25ch] min-w-0 border-0 bg-transparent p-0 text-left text-5xl font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 sm:text-6xl md:text-6xl dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    required
-                  />
+                    <span className={cn("font-semibold leading-none text-muted-foreground", amountTextClassName)}>
+                      $
+                    </span>
+                    <Input
+                      ref={amountInputRef}
+                      id="transaction-amount"
+                      name="transaction_amount"
+                      type="text"
+                      inputMode="numeric"
+                      enterKeyHint="next"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-form-type="other"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      placeholder="00.00"
+                      value={amount}
+                      style={amountInputStyle}
+                      onBeforeInput={handleAmountBeforeInput}
+                      onChange={(e) => setAmountFromDigits(e.target.value)}
+                      onKeyDown={handleAmountKeyDown}
+                      onPaste={handleAmountPaste}
+                      className={cn(
+                        "h-auto min-w-0 max-w-[68vw] border-0 bg-transparent p-0 text-left font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                        amountTextClassName
+                      )}
+                      required
+                    />
                   </div>
                 </div>
               </div>
