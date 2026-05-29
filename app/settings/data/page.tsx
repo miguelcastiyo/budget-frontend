@@ -13,6 +13,7 @@ import type { CsvImportResponse, DataRunItem, DataRunStatus } from "@/lib/api/ty
 import { cn } from "@/lib/utils"
 
 type ExportDateMode = "all" | "custom"
+type DataView = "activity" | "import" | "export"
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("en-US", {
@@ -143,6 +144,7 @@ function ActivityRow({ item }: { item: DataRunItem }) {
 
 export default function DataSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [activeView, setActiveView] = useState<DataView>("activity")
   const [dataRuns, setDataRuns] = useState<DataRunItem[]>([])
   const [isLoadingRuns, setIsLoadingRuns] = useState(true)
   const [runsError, setRunsError] = useState<string | null>(null)
@@ -246,6 +248,7 @@ export default function DataSettingsPage() {
       const result = await apiClient.importTransactions(importFile, "commit")
       setCommitResult(result)
       await loadDataRuns()
+      setActiveView("activity")
     } catch (err) {
       if (err instanceof ApiError) {
         setImportError(err.error.message)
@@ -291,6 +294,7 @@ export default function DataSettingsPage() {
       anchor.click()
       URL.revokeObjectURL(url)
       await loadDataRuns()
+      setActiveView("activity")
     } catch (err) {
       if (err instanceof ApiError) {
         setExportError(err.error.message)
@@ -303,6 +307,14 @@ export default function DataSettingsPage() {
   }
 
   const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
+
+  const pillButtonClassName = (view: DataView) =>
+    cn(
+      "h-10 flex-1 rounded-full border px-3 text-sm font-medium transition-colors sm:flex-none sm:px-4",
+      activeView === view
+        ? "border-secondary bg-secondary text-foreground shadow-sm"
+        : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
+    )
 
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
@@ -318,10 +330,77 @@ export default function DataSettingsPage() {
             <p className="hidden text-sm text-muted-foreground sm:block">Move transaction data in and out of Budget.</p>
           </div>
         </div>
+
+        <div className="mx-auto max-w-lg px-5 pb-3 lg:max-w-6xl lg:px-8">
+          <div className="flex gap-2 overflow-x-auto rounded-full border border-border/60 bg-muted/40 p-1 shadow-sm scrollbar-hide">
+            <button
+              type="button"
+              className={pillButtonClassName("activity")}
+              onClick={() => setActiveView("activity")}
+            >
+              Recent Activity
+            </button>
+            <button
+              type="button"
+              className={pillButtonClassName("import")}
+              onClick={() => setActiveView("import")}
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              className={pillButtonClassName("export")}
+              onClick={() => setActiveView("export")}
+            >
+              Export
+            </button>
+          </div>
+        </div>
       </header>
 
       <main className="mx-auto max-w-lg space-y-5 px-5 pt-4 lg:max-w-6xl lg:px-8">
-        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        {activeView === "activity" && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent Activity</h2>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-3"
+                onClick={() => void loadDataRuns()}
+                disabled={isLoadingRuns}
+              >
+                Refresh
+              </Button>
+            </div>
+
+            {runsError && <p className="px-1 text-sm text-destructive">{runsError}</p>}
+
+            {isLoadingRuns ? (
+              <Card className="border-0 p-8 text-center shadow-sm">
+                <Loader2 className="mx-auto mb-3 size-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading activity...</p>
+              </Card>
+            ) : dataRuns.length > 0 ? (
+              <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
+                {dataRuns.map((item) => (
+                  <ActivityRow key={item.id} item={item} />
+                ))}
+              </Card>
+            ) : (
+              <Card className="border-0 p-8 text-center shadow-sm">
+                <Database className="mx-auto mb-4 size-12 text-muted-foreground" />
+                <h3 className="mb-2 font-semibold">No data activity yet</h3>
+                <p className="text-sm text-muted-foreground">Imports and exports will appear here after they run.</p>
+              </Card>
+            )}
+          </section>
+        )}
+
+        {activeView === "import" && (
           <Card className="border-0 p-4 shadow-sm sm:p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary">
@@ -409,7 +488,9 @@ export default function DataSettingsPage() {
               </div>
             </div>
           </Card>
+        )}
 
+        {activeView === "export" && (
           <Card className="border-0 p-4 shadow-sm sm:p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary">
@@ -502,46 +583,7 @@ export default function DataSettingsPage() {
               </Button>
             </div>
           </Card>
-        </div>
-
-        <section>
-          <div className="mb-2 flex items-center justify-between px-1">
-            <div>
-              <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent Activity</h2>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 rounded-full px-3"
-              onClick={() => void loadDataRuns()}
-              disabled={isLoadingRuns}
-            >
-              Refresh
-            </Button>
-          </div>
-
-          {runsError && <p className="mb-3 px-1 text-sm text-destructive">{runsError}</p>}
-
-          {isLoadingRuns ? (
-            <Card className="border-0 p-8 text-center shadow-sm">
-              <Loader2 className="mx-auto mb-3 size-6 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading activity...</p>
-            </Card>
-          ) : dataRuns.length > 0 ? (
-            <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
-              {dataRuns.map((item) => (
-                <ActivityRow key={item.id} item={item} />
-              ))}
-            </Card>
-          ) : (
-            <Card className="border-0 p-8 text-center shadow-sm">
-              <Database className="mx-auto mb-4 size-12 text-muted-foreground" />
-              <h3 className="mb-2 font-semibold">No data activity yet</h3>
-              <p className="text-sm text-muted-foreground">Imports and exports will appear here after they run.</p>
-            </Card>
-          )}
-        </section>
+        )}
       </main>
 
       <BottomNav />

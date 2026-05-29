@@ -308,7 +308,7 @@ export default function SettingsPage() {
               />
               <SettingsItem
                 icon={<Database className="w-5 h-5 text-muted-foreground" />}
-                label="Data Import / Export"
+                label="Data"
                 description="Import or export transaction CSVs"
                 href="/settings/data"
               />
