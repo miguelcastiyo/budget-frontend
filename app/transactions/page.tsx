@@ -140,7 +140,7 @@ export default function TransactionsPage() {
         onRetry={() => void refreshTransactionSurface()}
       />
 
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 lg:pt-6">
         {queryMonthLabel && customDateRange && (
           <UiCard className="p-3 mb-4 border border-primary/20 bg-primary/5 shadow-sm">
             <div className="flex items-center justify-between gap-3">

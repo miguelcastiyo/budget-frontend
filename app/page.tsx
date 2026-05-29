@@ -87,7 +87,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-background pb-mobile-nav">
         <Header />
-        <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
+        <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 lg:pt-6">
           <Card className="p-8 border-0 shadow-sm flex items-center justify-center gap-3">
             <Spinner className="size-5" />
             <span className="text-sm text-muted-foreground">Loading dashboard...</span>
@@ -102,7 +102,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 lg:pt-6">
         {error && (
           <Card className="p-4 mb-6 border-0 shadow-sm">
             <div className="flex items-center justify-between gap-4">
