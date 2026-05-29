@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import {
   Sheet,
   SheetContent,
@@ -22,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 interface TransactionDetailSheetProps {
   transaction: Transaction | null
@@ -54,6 +56,13 @@ export function TransactionDetailSheet({
   onDelete,
   isDeleting = false,
 }: TransactionDetailSheetProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const swipeDismiss = useSwipeDismiss({
+    open,
+    onDismiss: () => onOpenChange(false),
+    scrollRef: scrollContainerRef,
+  })
+
   if (!transaction) return null
   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
 
@@ -65,9 +74,12 @@ export function TransactionDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        {...swipeDismiss}
+        ref={scrollContainerRef}
         side="bottom"
         className="h-auto max-h-[90vh] overflow-y-auto rounded-t-3xl px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
       >
+        <div data-swipe-handle="true" className="mx-auto mt-1 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden="true" />
         <SheetHeader className="pb-6">
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-2xl ${getCategoryColorClass(transaction.category)} flex items-center justify-center`}>

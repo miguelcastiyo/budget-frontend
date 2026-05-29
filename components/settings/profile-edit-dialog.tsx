@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
 import { Check, Mail, X } from "lucide-react"
 import {
@@ -18,6 +18,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 interface ProfileEditDialogProps {
   open: boolean
@@ -41,8 +42,15 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const [googleButtonWidth, setGoogleButtonWidth] = useState(320)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const hasGoogleClientId = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
   const canEditEmail = profile?.auth_provider === "password"
+  const swipeDismiss = useSwipeDismiss({
+    open,
+    onDismiss: () => handleOpenChange(false),
+    scrollRef: scrollContainerRef,
+    baseTransform: "translateX(-50%)",
+  })
 
   useEffect(() => {
     if (!profile || !open) {
@@ -208,11 +216,12 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        {...swipeDismiss}
         showCloseButton={false}
         className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] w-full max-w-none translate-y-0 grid-rows-none flex-col gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 max-sm:duration-300 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:zoom-in-100 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,42rem)] sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
       >
         <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+          <div data-swipe-handle="true" className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
           <div className="flex items-start justify-between gap-3">
             <div>
               <DialogTitle className="text-xl">Edit Profile</DialogTitle>
@@ -225,7 +234,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
           </div>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+        <div ref={scrollContainerRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
           <div className="space-y-2">
             <Label htmlFor="settings-display-name">Display Name</Label>
             <Input

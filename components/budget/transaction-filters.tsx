@@ -37,6 +37,7 @@ import { format } from "date-fns"
 import type { Tag, Card, Category, Preset, SplitFilter } from "@/lib/api/types"
 import { parseIsoDate, transactionFilterPresets } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import type { ReactNode } from "react"
 
 interface TransactionFiltersProps {
@@ -193,9 +194,16 @@ export function TransactionFilters({
   desktopSidebarToggle,
 }: TransactionFiltersProps) {
   const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [customFrom, setCustomFrom] = useState(customDateRange?.date_from ?? "")
   const [customTo, setCustomTo] = useState(customDateRange?.date_to ?? "")
   const [customRangeError, setCustomRangeError] = useState<string | null>(null)
+  const filtersScrollRef = useRef<HTMLDivElement>(null)
+  const filtersSwipeDismiss = useSwipeDismiss({
+    open: filtersOpen,
+    onDismiss: () => setFiltersOpen(false),
+    scrollRef: filtersScrollRef,
+  })
 
   useEffect(() => {
     setCustomFrom(customDateRange?.date_from ?? "")
@@ -359,7 +367,7 @@ export function TransactionFilters({
 
       {/* Filter controls */}
       <div className="flex items-center gap-2">
-        <Sheet>
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
           <SheetTrigger asChild>
             <Button
               variant="ghost"
@@ -376,10 +384,12 @@ export function TransactionFilters({
             </Button>
           </SheetTrigger>
           <SheetContent
+            {...filtersSwipeDismiss}
             side="bottom"
             className="h-[80vh] lg:h-auto lg:max-h-[70vh] rounded-t-3xl p-0 gap-0"
           >
             <SheetHeader className="px-6 pt-6 pb-4 border-b border-border/50">
+              <div data-swipe-handle="true" className="mx-auto -mt-2 mb-4 h-1 w-10 rounded-full bg-border lg:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between">
                 <SheetTitle className="text-xl font-semibold">Filters</SheetTitle>
                 {activeFiltersCount > 0 && (
@@ -390,7 +400,7 @@ export function TransactionFilters({
               </div>
             </SheetHeader>
             
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+            <div ref={filtersScrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
               {/* Date range */}
               <div>
                 <h3 className="font-semibold mb-4 text-base">Date Range</h3>

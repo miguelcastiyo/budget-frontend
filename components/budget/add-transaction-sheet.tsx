@@ -38,6 +38,7 @@ import { CalendarIcon, ChevronDown, Plus, X, CreditCard, TagIcon } from "lucide-
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 const MAX_AMOUNT_DIGITS = 9
 
@@ -89,6 +90,7 @@ export function AddTransactionSheet({
   const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
   const amountInputRef = useRef<HTMLInputElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const parseTransactionDate = (dateStr: string): Date => {
     const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -495,16 +497,23 @@ export function AddTransactionSheet({
   const amountTextClassName = amountLength > 7
     ? "text-4xl sm:text-5xl md:text-5xl"
     : "text-5xl sm:text-6xl md:text-6xl"
+  const swipeDismiss = useSwipeDismiss({
+    open,
+    onDismiss: () => onOpenChange(false),
+    scrollRef: scrollContainerRef,
+    baseTransform: "translateX(-50%)",
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        {...swipeDismiss}
         showCloseButton={false}
         className="top-auto bottom-0 left-1/2 flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full max-w-none translate-y-0 grid-rows-none gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 max-sm:duration-300 max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=open]:zoom-in-100 sm:top-1/2 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:-translate-y-1/2 sm:rounded-2xl sm:border"
       >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+            <div data-swipe-handle="true" className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <DialogTitle className="truncate text-lg font-semibold sm:text-xl">
@@ -521,7 +530,7 @@ export function AddTransactionSheet({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
             <div className="grid gap-4">
               <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
                 <label htmlFor="transaction-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
