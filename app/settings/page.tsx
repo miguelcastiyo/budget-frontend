@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { ProfileEditDialog } from "@/components/settings/profile-edit-dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatCurrency } from "@/lib/formatters"
 import {
-  User,
   Wallet,
   Tag,
   CreditCard,
@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Moon,
   LogOut,
+  Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
@@ -91,6 +92,7 @@ export default function SettingsPage() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [themeReady, setThemeReady] = useState(false)
   const [isUpdatingTheme, setIsUpdatingTheme] = useState(false)
+  const [showProfileEditor, setShowProfileEditor] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -208,9 +210,19 @@ export default function SettingsPage() {
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-4 lg:pt-6 space-y-6">
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Card className="p-5 lg:p-6 border-0 shadow-sm">
+        <Card className="relative p-5 lg:p-6 border-0 shadow-sm">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4 h-11 w-11 rounded-xl text-muted-foreground hover:text-foreground lg:right-5 lg:top-5"
+            onClick={() => setShowProfileEditor(true)}
+            aria-label="Edit profile"
+          >
+            <Pencil className="h-5 w-5" />
+          </Button>
           <div className="space-y-5">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 pr-12">
               <Avatar className="h-16 w-16">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                 <AvatarFallback className="bg-secondary text-secondary-foreground text-xl font-semibold">
@@ -269,12 +281,6 @@ export default function SettingsPage() {
               Account
             </h3>
             <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
-              <SettingsItem
-                icon={<User className="w-5 h-5 text-muted-foreground" />}
-                label="Profile"
-                description="Edit your name and email"
-                href="/settings/profile"
-              />
               <SettingsItem
                 icon={<Wallet className="w-5 h-5 text-muted-foreground" />}
                 label="Budget"
@@ -362,6 +368,7 @@ export default function SettingsPage() {
         </Card>
       </main>
 
+      <ProfileEditDialog open={showProfileEditor} onOpenChange={setShowProfileEditor} />
       <BottomNav />
     </div>
   )
