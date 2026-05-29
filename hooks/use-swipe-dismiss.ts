@@ -6,7 +6,6 @@ interface UseSwipeDismissOptions {
   open: boolean
   onDismiss: () => void
   scrollRef: RefObject<HTMLElement | null>
-  baseTransform?: string
 }
 
 interface SwipeDismissProps {
@@ -17,10 +16,12 @@ interface SwipeDismissProps {
   style?: CSSProperties
 }
 
-const CLOSE_DISTANCE = 96
-const CLOSE_VELOCITY = 0.65
+const CLOSE_DISTANCE = 110
+const CLOSE_VELOCITY = 0.5
 const HORIZONTAL_TOLERANCE = 1.25
 const MOBILE_QUERY = "(max-width: 639px)"
+const SNAP_BACK_MS = 260
+const DISMISS_MS = 220
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -50,11 +51,11 @@ export function useSwipeDismiss({
   open,
   onDismiss,
   scrollRef,
-  baseTransform = "",
 }: UseSwipeDismissOptions): SwipeDismissProps {
   const [dragY, setDragY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const [isSettling, setIsSettling] = useState(false)
+  const [isDismissing, setIsDismissing] = useState(false)
   const startXRef = useRef(0)
   const startYRef = useRef(0)
   const startTimeRef = useRef(0)
@@ -69,6 +70,7 @@ export function useSwipeDismiss({
     gestureRejectedRef.current = false
     lastDragYRef.current = 0
     setIsDragging(false)
+    setIsDismissing(false)
     setDragY(0)
   }, [])
 
@@ -79,8 +81,21 @@ export function useSwipeDismiss({
     window.setTimeout(() => {
       setIsSettling(false)
       resetDrag()
-    }, 180)
+    }, SNAP_BACK_MS)
   }, [resetDrag])
+
+  const dismissWithMomentum = useCallback(() => {
+    setIsDragging(false)
+    setIsSettling(true)
+    setIsDismissing(true)
+    setDragY(Math.max(window.innerHeight, lastDragYRef.current))
+
+    window.setTimeout(() => {
+      onDismiss()
+      resetDrag()
+      setIsSettling(false)
+    }, DISMISS_MS)
+  }, [onDismiss, resetDrag])
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (!open || !isMobileViewport() || event.pointerType === "mouse" || isInteractiveTarget(event.target)) {
@@ -136,7 +151,9 @@ export function useSwipeDismiss({
       return
     }
 
-    const resistedDrag = deltaY > 220 ? 220 + (deltaY - 220) * 0.35 : deltaY
+    const resistedDrag = deltaY < 180
+      ? deltaY
+      : 180 + (1 - Math.exp(-(deltaY - 180) / 260)) * 150
     lastDragYRef.current = resistedDrag
     setDragY(resistedDrag)
     event.preventDefault()
@@ -158,32 +175,34 @@ export function useSwipeDismiss({
 
     const elapsed = Math.max(performance.now() - startTimeRef.current, 1)
     const velocity = lastDragYRef.current / elapsed
-    const shouldClose = lastDragYRef.current >= CLOSE_DISTANCE || velocity >= CLOSE_VELOCITY
+    const projectedDistance = lastDragYRef.current + velocity * 180
+    const shouldClose = lastDragYRef.current >= CLOSE_DISTANCE || velocity >= CLOSE_VELOCITY || projectedDistance >= CLOSE_DISTANCE
 
     if (shouldClose) {
-      setIsDragging(false)
-      onDismiss()
-      resetDrag()
+      dismissWithMomentum()
       return
     }
 
     snapBack()
-  }, [onDismiss, resetDrag, snapBack])
+  }, [dismissWithMomentum, resetDrag, snapBack])
 
-  const transform = dragY > 0 || isSettling
-    ? `${baseTransform ? `${baseTransform} ` : ""}translateY(${dragY}px)`
-    : undefined
+  const translate = dragY > 0 || isSettling ? `0 ${dragY}px` : undefined
 
   return {
     onPointerDown: handlePointerDown,
     onPointerMove: handlePointerMove,
     onPointerUp: handlePointerEnd,
     onPointerCancel: handlePointerEnd,
-    style: transform
+    style: translate
       ? {
-          transform,
-          transition: isDragging ? "none" : "transform 180ms ease-out",
+          translate,
+          transition: isDragging
+            ? "none"
+            : isDismissing
+              ? `translate ${DISMISS_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`
+              : `translate ${SNAP_BACK_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
           touchAction: isDragging ? "none" : "pan-y",
+          willChange: "translate",
         }
       : undefined,
   }

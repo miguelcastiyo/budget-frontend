@@ -49,7 +49,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     open,
     onDismiss: () => handleOpenChange(false),
     scrollRef: scrollContainerRef,
-    baseTransform: "translateX(-50%)",
   })
 
   useEffect(() => {

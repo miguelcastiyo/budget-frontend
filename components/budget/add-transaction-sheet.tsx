@@ -501,7 +501,6 @@ export function AddTransactionSheet({
     open,
     onDismiss: () => onOpenChange(false),
     scrollRef: scrollContainerRef,
-    baseTransform: "translateX(-50%)",
   })
 
   return (
