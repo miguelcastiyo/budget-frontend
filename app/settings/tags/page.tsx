@@ -40,6 +40,10 @@ export default function TagsSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const editingTag = tags.find((tag) => tag.id === editingId) ?? null
+  const hasEditingTagChanges = editingTag
+    ? editingName.trim() !== editingTag.name.trim() || (editingIconKey || "") !== (editingTag.icon_key ?? "")
+    : false
 
   useEffect(() => {
     const loadTags = async () => {
@@ -298,7 +302,7 @@ export default function TagsSettingsPage() {
                     variant="ghost"
                     className="rounded-full"
                     onClick={() => void handleSaveEdit()}
-                    disabled={!editingName.trim() || isMutating}
+                    disabled={!editingName.trim() || isMutating || !hasEditingTagChanges}
                   >
                     <Check className="w-5 h-5" />
                   </Button>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
@@ -32,6 +32,7 @@ export default function BudgetSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
 
   useEffect(() => {
     const loadBudgetSettings = async () => {
@@ -49,13 +50,21 @@ export default function BudgetSettingsPage() {
   }, [])
 
   const hydrateForm = (settings: BudgetSettings) => {
-    setIncomeForm(hydrateIncomeForm(settings))
-    setAllocationForm(hydrateBudgetAllocationForm(settings))
+    const hydratedIncome = hydrateIncomeForm(settings)
+    const hydratedAllocation = hydrateBudgetAllocationForm(settings)
+    setIncomeForm(hydratedIncome)
+    setAllocationForm(hydratedAllocation)
+    setLoadedPayloadKey(JSON.stringify(budgetSettingsPayload(hydratedIncome, hydratedAllocation)))
   }
 
   const income = calculateMonthlyIncome(incomeForm)
   const hasValidIncome = isIncomeFormValid(incomeForm)
   const hasValidAllocation = isBudgetAllocationValid(allocationForm, income)
+  const currentPayloadKey = useMemo(
+    () => JSON.stringify(budgetSettingsPayload(incomeForm, allocationForm)),
+    [incomeForm, allocationForm]
+  )
+  const hasBudgetChanges = loadedPayloadKey !== null && currentPayloadKey !== loadedPayloadKey
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -112,7 +121,7 @@ export default function BudgetSettingsPage() {
           <Button
             className="w-full h-12 rounded-xl mt-4"
             onClick={() => void handleSave()}
-            disabled={isLoading || isSaving || !hasValidIncome || !hasValidAllocation}
+            disabled={isLoading || isSaving || !hasValidIncome || !hasValidAllocation || !hasBudgetChanges}
           >
             {isSaving ? "Saving..." : "Save Budget"}
           </Button>

@@ -106,6 +106,23 @@ function formFromItem(item: RecurringExpense): RecurringFormState {
   }
 }
 
+function normalizeRecurringForm(form: RecurringFormState) {
+  return {
+    expense: form.expense.trim(),
+    amount: formatRecurringAmount(form.amount),
+    category: form.category,
+    tag_id: form.tag_id,
+    card_id: form.card_id || null,
+    billing_type: form.billing_type,
+    billing_day: form.billing_type === "day_of_month"
+      ? Math.min(Math.max(Number.parseInt(form.billing_day || "1", 10) || 1, 1), 31)
+      : null,
+    starts_month: form.starts_month,
+    ends_month: form.ends_month || null,
+    is_active: form.is_active,
+  }
+}
+
 function formatProjectedDate(date: string): string {
   const parsed = new Date(`${date}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) {
@@ -227,6 +244,12 @@ export default function RecurringSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const editingItem = data?.items.find((item) => item.id === editingId) ?? null
+  const hasEditingChanges = Boolean(
+    editingForm &&
+    editingItem &&
+    JSON.stringify(normalizeRecurringForm(editingForm)) !== JSON.stringify(normalizeRecurringForm(formFromItem(editingItem)))
+  )
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -533,6 +556,7 @@ export default function RecurringSettingsPage() {
               tags={tagOptions}
               cards={cards}
               isMutating={isMutating}
+              canSave={hasEditingChanges}
               saveLabel="Save changes"
               onChange={setEditingForm}
               onCancel={() => {
@@ -576,6 +600,7 @@ interface RecurringFormProps {
   tags: Tag[]
   cards: CardType[]
   isMutating: boolean
+  canSave?: boolean
   saveLabel: string
   onChange: (next: RecurringFormState) => void
   onCancel: () => void
@@ -587,6 +612,7 @@ function RecurringForm({
   tags,
   cards,
   isMutating,
+  canSave = true,
   saveLabel,
   onChange,
   onCancel,
@@ -749,7 +775,7 @@ function RecurringForm({
         <Button
           className="rounded-xl"
           onClick={onSave}
-          disabled={isMutating || !form.expense.trim() || !form.tag_id}
+          disabled={isMutating || !form.expense.trim() || !form.tag_id || !canSave}
         >
           {isMutating ? "Saving..." : saveLabel}
         </Button>

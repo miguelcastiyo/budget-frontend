@@ -299,6 +299,33 @@ export function AddTransactionSheet({
     return parsed.toFixed(2)
   }
 
+  const normalizedDate = format(date, "yyyy-MM-dd")
+  const normalizedExpense = expense.trim()
+  const normalizedAmount = normalizeAmount(amount)
+  const normalizedTransactionPayload = {
+    date: normalizedDate,
+    expense: normalizedExpense,
+    amount: normalizedAmount,
+    category,
+    is_split: isSplit,
+    tag_id: tagId,
+    card_id: cardId || undefined,
+  }
+  const baselineTransactionPayload = isEditMode && transaction
+    ? {
+      date: format(parseTransactionDate(transaction.date), "yyyy-MM-dd"),
+      expense: transaction.expense.trim(),
+      amount: Number.parseFloat(transaction.amount).toFixed(2),
+      category: transaction.category,
+      is_split: transaction.is_split,
+      tag_id: transaction.tag.id,
+      card_id: transaction.card?.id || undefined,
+    }
+    : null
+  const hasEditChanges = !isEditMode || !baselineTransactionPayload
+    ? true
+    : JSON.stringify(normalizedTransactionPayload) !== JSON.stringify(baselineTransactionPayload) || (makeRecurring && !transactionAlreadyRecurring)
+
   const handleAmountBeforeInput = (event: React.FormEvent<HTMLInputElement>) => {
     const nativeEvent = event.nativeEvent as InputEvent
     const inputType = nativeEvent.inputType
@@ -377,7 +404,6 @@ export function AddTransactionSheet({
       return
     }
 
-    const normalizedAmount = normalizeAmount(amount)
     if (!normalizedAmount) {
       setError("Please enter a valid amount")
       return
@@ -387,8 +413,6 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const normalizedDate = format(date, "yyyy-MM-dd")
-
       if (isEditMode && transaction) {
         const payload: UpdateTransactionRequest = {
           date: normalizedDate,
@@ -938,7 +962,7 @@ export function AddTransactionSheet({
             <Button
               type="submit"
               className="w-full h-12 rounded-xl text-base font-semibold"
-              disabled={!amount || !expense || !tagId || isSubmitting || isLoadingTaxonomy || !hasValidRecurringConfig}
+              disabled={!amount || !expense || !tagId || isSubmitting || isLoadingTaxonomy || !hasValidRecurringConfig || (isEditMode && !hasEditChanges)}
             >
               {isSubmitting ? (isEditMode ? "Saving..." : "Adding...") : (isEditMode ? "Save Changes" : "Add Transaction")}
             </Button>

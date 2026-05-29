@@ -30,6 +30,8 @@ export default function CardsSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const editingCard = cards.find((card) => card.id === editingId) ?? null
+  const hasEditingCardChanges = editingCard ? editingName.trim() !== editingCard.name.trim() : false
 
   useEffect(() => {
     const loadCards = async () => {
@@ -225,7 +227,7 @@ export default function CardsSettingsPage() {
                     variant="ghost"
                     className="rounded-full"
                     onClick={() => void handleSaveEdit()}
-                    disabled={!editingName.trim() || isMutating}
+                    disabled={!editingName.trim() || isMutating || !hasEditingCardChanges}
                   >
                     <Check className="w-5 h-5" />
                   </Button>

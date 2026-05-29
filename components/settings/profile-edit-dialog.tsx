@@ -64,6 +64,8 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     setSuccess(null)
   }, [open, profile])
 
+  const hasProfileChanges = displayName.trim() !== (profile?.display_name.trim() ?? "")
+
   useEffect(() => {
     if (!open) {
       return
@@ -400,7 +402,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
           <Button
             className="h-12 w-full rounded-xl"
             onClick={() => void handleSaveProfile()}
-            disabled={isSaving || !displayName.trim()}
+            disabled={isSaving || !displayName.trim() || !hasProfileChanges}
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
