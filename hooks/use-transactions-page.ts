@@ -1,16 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { format } from "date-fns"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { ErrorDialogState } from "@/components/common/error-dialog"
-import { formatMonthLabel, getMonthDateRange, getPresetDateRange, parseIsoDate } from "@/lib/date-filters"
+import { formatMonthLabel, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
 import type {
   Card,
   Category,
-  CsvImportErrorItem,
   Preset,
   SortOrder,
   SplitFilter,
@@ -19,11 +17,6 @@ import type {
   TransactionFilters as ApiTransactionFilters,
   TransactionSummary,
 } from "@/lib/api/types"
-
-type PartialDateRange = {
-  date_from?: string
-  date_to?: string
-}
 
 const TRANSACTIONS_PAGE_SIZE = 50
 
@@ -96,18 +89,6 @@ export function useTransactionsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<ErrorDialogState | null>(null)
-
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [exportPreset, setExportPreset] = useState<Preset | "custom">("month_to_date")
-  const [exportCustomFrom, setExportCustomFrom] = useState("")
-  const [exportCustomTo, setExportCustomTo] = useState("")
-  const [isExporting, setIsExporting] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importStatus, setImportStatus] = useState<"idle" | "uploading" | "success" | "warning" | "error">("idle")
-  const [importMessage, setImportMessage] = useState("")
-  const [importErrors, setImportErrors] = useState<CsvImportErrorItem[]>([])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -333,121 +314,6 @@ export function useTransactionsPage() {
 
   const hasMoreTransactions = transactions.length < totalItems
 
-  const exportTransactions = useCallback(async (dateRange: PartialDateRange) => {
-    const filters: ApiTransactionFilters = {
-      ...dateRange,
-      sort: sortOrder,
-    }
-
-    if (selectedCategories.length > 0) {
-      filters.categories = selectedCategories.join(",")
-    }
-    if (selectedTags.length > 0) {
-      filters.tag_ids = selectedTags.join(",")
-    }
-    if (selectedCards.length > 0) {
-      filters.card_ids = selectedCards.join(",")
-    }
-    if (splitFilter !== "all") {
-      filters.is_split = splitFilter
-    }
-    if (searchQuery.trim() !== "") {
-      filters.q = searchQuery.trim()
-    }
-
-    const blob = await apiClient.exportTransactions(filters)
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
-    anchor.href = url
-    anchor.download = "transactions.csv"
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }, [searchQuery, selectedCards, selectedCategories, selectedTags, sortOrder, splitFilter])
-
-  const openExportModal = () => {
-    setExportError(null)
-
-    if (customDateRange) {
-      setExportPreset("custom")
-      setExportCustomFrom(customDateRange.date_from)
-      setExportCustomTo(customDateRange.date_to)
-      setShowExportModal(true)
-      return
-    }
-
-    if (preset !== "all") {
-      setExportPreset(preset)
-      setExportCustomFrom("")
-      setExportCustomTo("")
-      setShowExportModal(true)
-      return
-    }
-
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    setExportPreset("month_to_date")
-    setExportCustomFrom(format(startOfMonth, "yyyy-MM-dd"))
-    setExportCustomTo(format(now, "yyyy-MM-dd"))
-    setShowExportModal(true)
-  }
-
-  const selectExportPreset = (next: Preset | "custom") => {
-    setExportPreset(next)
-    setExportError(null)
-
-    if (next !== "custom") {
-      return
-    }
-
-    if (exportCustomFrom && exportCustomTo) {
-      return
-    }
-
-    const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    setExportCustomFrom(format(startOfMonth, "yyyy-MM-dd"))
-    setExportCustomTo(format(now, "yyyy-MM-dd"))
-  }
-
-  const confirmExport = useCallback(async () => {
-    try {
-      setExportError(null)
-      setIsExporting(true)
-
-      let range: PartialDateRange
-      if (exportPreset === "custom") {
-        const from = exportCustomFrom.trim()
-        const to = exportCustomTo.trim()
-
-        if (!from || !to) {
-          setExportError("Select both a start and end date.")
-          return
-        }
-        if (from > to) {
-          setExportError("Start date must be before or equal to end date.")
-          return
-        }
-        range = {
-          date_from: from,
-          date_to: to,
-        }
-      } else {
-        range = getPresetDateRange(exportPreset)
-      }
-
-      await exportTransactions(range)
-      setShowExportModal(false)
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setExportError(err.error.message)
-      } else {
-        setExportError("Unable to export transactions")
-      }
-    } finally {
-      setIsExporting(false)
-    }
-  }, [exportCustomFrom, exportCustomTo, exportPreset, exportTransactions])
-
   const handleDeleteTransaction = useCallback(async (transactionId: string) => {
     setDeletingTransactionId(transactionId)
 
@@ -467,75 +333,6 @@ export function useTransactionsPage() {
     setSelectedTransaction(null)
     void refreshTransactionSurface()
   }
-
-  const handleImportFileSelect = (file: File | null) => {
-    if (file) {
-      if (file.type !== "text/csv" && !file.name.endsWith(".csv")) {
-        setImportStatus("error")
-        setImportMessage("Please select a valid CSV file")
-        return
-      }
-      setImportFile(file)
-      setImportStatus("idle")
-      setImportMessage("")
-      setImportErrors([])
-      return
-    }
-
-    setImportFile(null)
-    setImportStatus("idle")
-    setImportMessage("")
-    setImportErrors([])
-  }
-
-  const handleImport = useCallback(async () => {
-    if (!importFile) return
-
-    setImportStatus("uploading")
-    setImportMessage("")
-    setImportErrors([])
-
-    try {
-      const result = await apiClient.importTransactions(importFile, "commit")
-      await refreshTransactionSurface()
-
-      if (result.status === "failed" || result.status === "partial") {
-        setImportStatus(result.status === "partial" ? "warning" : "error")
-        setImportMessage(result.message)
-        setImportErrors(result.errors.slice(0, 8))
-        return
-      }
-
-      setImportStatus("success")
-      setImportMessage(result.message)
-      setImportErrors([])
-
-      setTimeout(() => {
-        setShowImportModal(false)
-        setImportFile(null)
-        setImportStatus("idle")
-        setImportMessage("")
-        setImportErrors([])
-      }, 1200)
-    } catch (err) {
-      setImportStatus("error")
-      if (err instanceof ApiError) {
-        setImportMessage(err.error.message)
-      } else {
-        setImportMessage("Failed to import transactions. Please check your file format.")
-      }
-    }
-  }, [importFile, refreshTransactionSurface])
-
-  const resetImportModal = () => {
-    setImportFile(null)
-    setImportStatus("idle")
-    setImportMessage("")
-    setImportErrors([])
-  }
-
-  const selectedExportFromDate = parseIsoDate(exportCustomFrom)
-  const selectedExportToDate = parseIsoDate(exportCustomTo)
 
   return {
     showAddTransaction,
@@ -565,43 +362,19 @@ export function useTransactionsPage() {
     isLoading,
     isLoadingMore,
     error,
-    showImportModal,
-    setShowImportModal,
-    showExportModal,
-    setShowExportModal,
-    exportPreset,
-    exportCustomFrom,
-    exportCustomTo,
-    isExporting,
-    exportError,
-    setExportError,
-    importFile,
-    importStatus,
-    importMessage,
-    importErrors,
     queryMonthLabel,
     stats,
-    selectedExportFromDate,
-    selectedExportToDate,
     setSelectedCategories,
     setSelectedTags,
     setSelectedCards,
     setSearchQuery,
     setSplitFilter,
-    setExportCustomFrom,
-    setExportCustomTo,
     handlePresetChange,
     handleCustomDateRangeChange,
     clearMonthFilter,
-    openExportModal,
-    selectExportPreset,
-    confirmExport,
     handleDeleteTransaction,
     handleTransactionUpdated,
-    handleImportFileSelect,
-    handleImport,
     loadMoreTransactions,
-    resetImportModal,
     refreshTransactionSurface,
     dismissError,
   }

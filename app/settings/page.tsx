@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { TransactionExportDialog } from "@/components/budget/transaction-export-dialog"
+import { TransactionImportDialog } from "@/components/budget/transaction-import-dialog"
+import { DataToolsDialog } from "@/components/settings/data-tools-dialog"
 import { ProfileEditDialog } from "@/components/settings/profile-edit-dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,11 +24,14 @@ import {
   Moon,
   LogOut,
   Pencil,
+  Database,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useTransactionDataTools } from "@/hooks/use-transaction-data-tools"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { transactionExportPresets } from "@/lib/date-filters"
 import type { SettingsSummaryResponse } from "@/lib/api/types"
 
 interface SettingsItemProps {
@@ -93,6 +99,8 @@ export default function SettingsPage() {
   const [themeReady, setThemeReady] = useState(false)
   const [isUpdatingTheme, setIsUpdatingTheme] = useState(false)
   const [showProfileEditor, setShowProfileEditor] = useState(false)
+  const [showDataTools, setShowDataTools] = useState(false)
+  const dataTools = useTransactionDataTools()
 
   useEffect(() => {
     let isMounted = true
@@ -306,6 +314,12 @@ export default function SettingsPage() {
                 href="/settings/recurring"
               />
               <SettingsItem
+                icon={<Database className="w-5 h-5 text-muted-foreground" />}
+                label="Data Import / Export"
+                description="Import or export transaction CSVs"
+                onClick={() => setShowDataTools(true)}
+              />
+              <SettingsItem
                 icon={<Key className="w-5 h-5 text-muted-foreground" />}
                 label="API Keys"
                 description="Manage API access"
@@ -369,6 +383,42 @@ export default function SettingsPage() {
       </main>
 
       <ProfileEditDialog open={showProfileEditor} onOpenChange={setShowProfileEditor} />
+      <DataToolsDialog
+        open={showDataTools}
+        onOpenChange={setShowDataTools}
+        onImport={() => dataTools.setShowImportModal(true)}
+        onExport={dataTools.openExportModal}
+      />
+      <TransactionExportDialog
+        open={dataTools.showExportModal}
+        onOpenChange={(open) => {
+          dataTools.setShowExportModal(open)
+          if (!open) {
+            dataTools.setExportError(null)
+          }
+        }}
+        exportDatePresets={transactionExportPresets}
+        exportPreset={dataTools.exportPreset}
+        onExportPresetChange={dataTools.selectExportPreset}
+        selectedExportFromDate={dataTools.selectedExportFromDate}
+        selectedExportToDate={dataTools.selectedExportToDate}
+        onExportCustomFromChange={dataTools.setExportCustomFrom}
+        onExportCustomToChange={dataTools.setExportCustomTo}
+        exportError={dataTools.exportError}
+        isExporting={dataTools.isExporting}
+        onConfirm={() => void dataTools.confirmExport()}
+      />
+      <TransactionImportDialog
+        open={dataTools.showImportModal}
+        onOpenChange={dataTools.setShowImportModal}
+        importFile={dataTools.importFile}
+        importStatus={dataTools.importStatus}
+        importMessage={dataTools.importMessage}
+        importErrors={dataTools.importErrors}
+        onFileSelect={dataTools.handleImportFileSelect}
+        onReset={dataTools.resetImportModal}
+        onImport={() => void dataTools.handleImport()}
+      />
       <BottomNav />
     </div>
   )

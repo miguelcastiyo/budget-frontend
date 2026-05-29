@@ -6,13 +6,10 @@ import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { TransactionFilters } from "@/components/budget/transaction-filters"
 import { TransactionStatsGrid } from "@/components/budget/transaction-stats-grid"
 import { TransactionList } from "@/components/budget/transaction-list"
-import { TransactionExportDialog } from "@/components/budget/transaction-export-dialog"
-import { TransactionImportDialog } from "@/components/budget/transaction-import-dialog"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { TransactionDetailSheet } from "@/components/budget/transaction-detail-sheet"
 import { ErrorDialog } from "@/components/common/error-dialog"
 import { useTransactionsPage } from "@/hooks/use-transactions-page"
-import { transactionExportPresets } from "@/lib/date-filters"
 import { Button } from "@/components/ui/button"
 import { Card as UiCard } from "@/components/ui/card"
 import {
@@ -55,41 +52,19 @@ export default function TransactionsPage() {
     isLoading,
     isLoadingMore,
     error,
-    showImportModal,
-    setShowImportModal,
-    showExportModal,
-    setShowExportModal,
-    exportPreset,
-    isExporting,
-    exportError,
-    setExportError,
-    importFile,
-    importStatus,
-    importMessage,
-    importErrors,
     queryMonthLabel,
     stats,
-    selectedExportFromDate,
-    selectedExportToDate,
     setSelectedCategories,
     setSelectedTags,
     setSelectedCards,
     setSearchQuery,
     setSplitFilter,
-    setExportCustomFrom,
-    setExportCustomTo,
     handlePresetChange,
     handleCustomDateRangeChange,
     clearMonthFilter,
-    openExportModal,
-    selectExportPreset,
-    confirmExport,
     handleDeleteTransaction,
     handleTransactionUpdated,
-    handleImportFileSelect,
-    handleImport,
     loadMoreTransactions,
-    resetImportModal,
     refreshTransactionSurface,
     dismissError,
   } = useTransactionsPage()
@@ -116,9 +91,6 @@ export default function TransactionsPage() {
       onClearMonthFilter: clearMonthFilter,
       customDateRange,
       onCustomDateRangeChange: handleCustomDateRangeChange,
-      onExport: openExportModal,
-      onImport: () => setShowImportModal(true),
-      dataActionsDisabled: isLoading,
       desktopSidebarToggle: (
         <button
           type="button"
@@ -138,7 +110,6 @@ export default function TransactionsPage() {
       handleCustomDateRangeChange,
       handlePresetChange,
       isLoading,
-      openExportModal,
       preset,
       queryMonthLabel,
       searchQuery,
@@ -150,7 +121,6 @@ export default function TransactionsPage() {
       setSelectedCards,
       setSelectedCategories,
       setSelectedTags,
-      setShowImportModal,
       setSplitFilter,
       splitFilter,
       tags,
@@ -371,38 +341,6 @@ export default function TransactionsPage() {
         mode="edit"
         transaction={editingTransaction}
         onTransactionUpdated={handleTransactionUpdated}
-      />
-
-      <TransactionExportDialog
-        open={showExportModal}
-        onOpenChange={(open) => {
-          setShowExportModal(open)
-          if (!open) {
-            setExportError(null)
-          }
-        }}
-        exportDatePresets={transactionExportPresets}
-        exportPreset={exportPreset}
-        onExportPresetChange={selectExportPreset}
-        selectedExportFromDate={selectedExportFromDate}
-        selectedExportToDate={selectedExportToDate}
-        onExportCustomFromChange={setExportCustomFrom}
-        onExportCustomToChange={setExportCustomTo}
-        exportError={exportError}
-        isExporting={isExporting}
-        onConfirm={() => void confirmExport()}
-      />
-
-      <TransactionImportDialog
-        open={showImportModal}
-        onOpenChange={setShowImportModal}
-        importFile={importFile}
-        importStatus={importStatus}
-        importMessage={importMessage}
-        importErrors={importErrors}
-        onFileSelect={handleImportFileSelect}
-        onReset={resetImportModal}
-        onImport={() => void handleImport()}
       />
     </div>
   )

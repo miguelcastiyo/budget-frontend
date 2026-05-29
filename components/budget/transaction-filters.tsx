@@ -30,8 +30,6 @@ import {
   Folder,
   Tag as TagIcon,
   CreditCard,
-  Download,
-  Upload,
 } from "lucide-react"
 import { format } from "date-fns"
 import type { Tag, Card, Category, Preset, SplitFilter } from "@/lib/api/types"
@@ -62,9 +60,6 @@ interface TransactionFiltersProps {
     date_to: string
   } | null
   onCustomDateRangeChange: (range: { date_from: string; date_to: string } | null) => void
-  onExport: () => void
-  onImport: () => void
-  dataActionsDisabled?: boolean
   desktopSidebarToggle?: ReactNode
 }
 
@@ -188,9 +183,6 @@ export function TransactionFilters({
   onClearMonthFilter,
   customDateRange,
   onCustomDateRangeChange,
-  onExport,
-  onImport,
-  dataActionsDisabled = false,
   desktopSidebarToggle,
 }: TransactionFiltersProps) {
   const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false)
@@ -714,34 +706,6 @@ export function TransactionFilters({
           <ChipRail items={cardItems} />
         </div>
 
-        {/* Data actions */}
-        <div className="space-y-2 pt-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-full justify-center gap-1.5"
-              disabled={dataActionsDisabled}
-              onClick={onExport}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-full justify-center gap-1.5"
-              disabled={dataActionsDisabled}
-              onClick={onImport}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Import
-            </Button>
-          </div>
-        </div>
       </div>
 
     </div>
