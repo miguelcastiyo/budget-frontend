@@ -442,6 +442,29 @@ export interface CsvImportResponse {
   errors: CsvImportErrorItem[]
 }
 
+export type DataRunType = "import" | "export"
+export type DataRunStatus = "started" | "completed" | "partial" | "failed"
+
+export interface DataRunItem {
+  id: string
+  type: DataRunType
+  status: DataRunStatus
+  created_at: string
+  source_filename: string | null
+  date_from: string | null
+  date_to: string | null
+  total_rows: number | null
+  valid_rows: number | null
+  imported_rows: number | null
+  duplicate_rows: number | null
+  invalid_rows: number | null
+  error_summary: string | null
+}
+
+export interface DataRunsResponse {
+  items: DataRunItem[]
+}
+
 // Errors
 export interface ErrorDetail {
   field: string

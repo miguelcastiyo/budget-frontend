@@ -43,6 +43,7 @@ import type {
   EmailChangeVerifiedResponse,
   ConvertAccountToGoogleRequest,
   SettingsSummaryResponse,
+  DataRunsResponse,
   ErrorEnvelope,
 } from "./types"
 
@@ -412,6 +413,14 @@ class ApiClient {
   }
 
   // Import/Export
+  async getDataRuns(limit = 50): Promise<DataRunsResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+    })
+
+    return this.request<DataRunsResponse>(`/me/data-runs?${params.toString()}`)
+  }
+
   async exportTransactions(filters?: TransactionFilters): Promise<Blob> {
     const params = new URLSearchParams()
     if (filters) {
