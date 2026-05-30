@@ -25,6 +25,7 @@ import type {
   Tag,
   Card as CardType,
   Transaction,
+  TransactionSuggestion,
   CreateTransactionRequest,
   UpdateTransactionRequest,
 } from "@/lib/api/types"
@@ -83,6 +84,7 @@ export function AddTransactionSheet({
 
   const [isLoadingTaxonomy, setIsLoadingTaxonomy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([])
   const [isCreatingTag, setIsCreatingTag] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,6 +94,8 @@ export function AddTransactionSheet({
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
   const amountInputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const suggestionRequestRef = useRef(0)
+  const appliedSuggestionExpenseRef = useRef<string | null>(null)
 
   const parseTransactionDate = (dateStr: string): Date => {
     const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -209,12 +213,57 @@ export function AddTransactionSheet({
       setMakeRecurring(false)
       setRecurringBillingType("day_of_month")
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
+      setSuggestions([])
       setError(null)
       return
     }
 
     resetForm()
   }, [isEditMode, loadTaxonomy, open, transaction])
+
+  useEffect(() => {
+    if (!open || isEditMode) {
+      suggestionRequestRef.current += 1
+      setSuggestions([])
+      return
+    }
+
+    const query = expense.trim()
+    if (query.length < 2) {
+      suggestionRequestRef.current += 1
+      setSuggestions([])
+      return
+    }
+
+    const normalizedQuery = query.toLocaleLowerCase()
+    if (appliedSuggestionExpenseRef.current && appliedSuggestionExpenseRef.current !== normalizedQuery) {
+      appliedSuggestionExpenseRef.current = null
+    }
+
+    if (appliedSuggestionExpenseRef.current === normalizedQuery) {
+      suggestionRequestRef.current += 1
+      setSuggestions([])
+      return
+    }
+
+    const requestId = suggestionRequestRef.current + 1
+    suggestionRequestRef.current = requestId
+    const timeoutId = window.setTimeout(() => {
+      apiClient.getTransactionSuggestions(query, 5)
+        .then((response) => {
+          if (suggestionRequestRef.current === requestId) {
+            setSuggestions(response.items)
+          }
+        })
+        .catch(() => {
+          if (suggestionRequestRef.current === requestId) {
+            setSuggestions([])
+          }
+        })
+    }, 300)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [expense, isEditMode, open])
 
   const resetForm = () => {
     const now = new Date()
@@ -232,6 +281,8 @@ export function AddTransactionSheet({
     setNewCardName("")
     setShowMoreDetails(false)
     setMakeRecurring(false)
+    setSuggestions([])
+    appliedSuggestionExpenseRef.current = null
     applyRecurringDefaultsFromDate(now)
     setError(null)
   }
@@ -240,6 +291,20 @@ export function AddTransactionSheet({
     setDate(nextDate)
     if (makeRecurring) {
       applyRecurringDefaultsFromDate(nextDate)
+    }
+  }
+
+  const applySuggestion = (suggestion: TransactionSuggestion) => {
+    appliedSuggestionExpenseRef.current = suggestion.expense.trim().toLocaleLowerCase()
+    setExpense(suggestion.expense)
+    setTagId(suggestion.tag.id)
+    setCategory(suggestion.category)
+    setCardId(suggestion.card?.id ?? "")
+    setIsSplit(suggestion.is_split)
+    setSuggestions([])
+
+    if (suggestion.card || suggestion.is_split) {
+      setShowMoreDetails(true)
     }
   }
 
@@ -508,6 +573,22 @@ export function AddTransactionSheet({
     wants: { label: "Wants", color: "bg-wants" },
     savings_debts: { label: "Savings", color: "bg-savings" },
   } as const
+  const primarySuggestion = !isEditMode ? suggestions[0] : undefined
+  const primarySuggestionParts = primarySuggestion
+    ? [
+      primarySuggestion.tag.name,
+      categoryConfig[primarySuggestion.category].label,
+      primarySuggestion.card?.name,
+      primarySuggestion.is_split ? "Split" : null,
+    ].filter(Boolean)
+    : []
+  const expenseAutocompleteCompletion =
+    primarySuggestion &&
+    expense.length > 0 &&
+    primarySuggestion.expense.toLocaleLowerCase().startsWith(expense.toLocaleLowerCase()) &&
+    primarySuggestion.expense.length > expense.length
+      ? primarySuggestion.expense.slice(expense.length)
+      : ""
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig =
     !makeRecurring ||
@@ -605,14 +686,40 @@ export function AddTransactionSheet({
                     <Label htmlFor="expense" className="text-sm font-medium">
                       Description
                     </Label>
-                    <Input
-                      id="expense"
-                      placeholder="What did you spend on?"
-                      value={expense}
-                      onChange={(e) => setExpense(e.target.value)}
-                      className="h-12 rounded-xl border-border/60 focus:border-foreground/20"
-                      required
-                    />
+                    <div className="relative">
+                      {expenseAutocompleteCompletion && (
+                        <div
+                          className="pointer-events-none absolute inset-0 flex h-12 items-center overflow-hidden rounded-xl px-3 text-base md:text-sm"
+                          aria-hidden="true"
+                        >
+                          <span className="invisible whitespace-pre">{expense}</span>
+                          <span className="whitespace-pre text-muted-foreground/55">{expenseAutocompleteCompletion}</span>
+                        </div>
+                      )}
+                      <Input
+                        id="expense"
+                        placeholder="What did you spend on?"
+                        value={expense}
+                        onChange={(e) => setExpense(e.target.value)}
+                        className="relative h-12 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent"
+                        required
+                      />
+                    </div>
+                    {primarySuggestion && (
+                      <button
+                        type="button"
+                        onClick={() => applySuggestion(primarySuggestion)}
+                        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-muted-foreground">Use previous setup</p>
+                          <p className="truncate text-sm font-medium">{primarySuggestionParts.join(" · ")}</p>
+                        </div>
+                        <span className="inline-flex h-9 shrink-0 items-center rounded-lg bg-secondary px-3 text-sm font-medium text-secondary-foreground">
+                          Apply
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-2 sm:col-span-2">

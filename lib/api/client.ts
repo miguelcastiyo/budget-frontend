@@ -22,6 +22,7 @@ import type {
   Transaction,
   TransactionsPage,
   TransactionFilters,
+  TransactionSuggestionsResponse,
   CreateTransactionRequest,
   UpdateTransactionRequest,
   TagMetricsResponse,
@@ -365,6 +366,15 @@ class ApiClient {
     }
     const query = params.toString()
     return this.request<TransactionsPage>(`/me/transactions${query ? `?${query}` : ""}`)
+  }
+
+  async getTransactionSuggestions(q: string, limit = 5): Promise<TransactionSuggestionsResponse> {
+    const params = new URLSearchParams({
+      q,
+      limit: String(limit),
+    })
+
+    return this.request<TransactionSuggestionsResponse>(`/me/transactions/suggestions?${params.toString()}`)
   }
 
   async createTransaction(data: CreateTransactionRequest): Promise<Transaction> {

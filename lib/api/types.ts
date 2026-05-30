@@ -300,6 +300,21 @@ export interface TransactionFilters {
   sort?: SortOrder
 }
 
+export interface TransactionSuggestion {
+  expense: string
+  category: Category
+  tag: Tag
+  card: Card | null
+  is_split: boolean
+  confidence: "high" | "medium" | "low"
+  last_used_at: string
+  usage_count: number
+}
+
+export interface TransactionSuggestionsResponse {
+  items: TransactionSuggestion[]
+}
+
 // Metrics
 export interface TagMetricsItem {
   tag_id: string
