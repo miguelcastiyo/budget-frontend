@@ -687,23 +687,23 @@ export function AddTransactionSheet({
                       Description
                     </Label>
                     <div className="relative">
+                      <Input
+                        id="expense"
+                        placeholder="What did you spend on?"
+                        value={expense}
+                        onChange={(e) => setExpense(e.target.value)}
+                        className="relative z-10 h-12 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent"
+                        required
+                      />
                       {expenseAutocompleteCompletion && (
                         <div
-                          className="pointer-events-none absolute inset-0 flex h-12 items-center overflow-hidden rounded-xl px-3 text-base md:text-sm"
+                          className="pointer-events-none absolute inset-0 z-20 flex h-12 items-center overflow-hidden rounded-xl px-3 text-base md:text-sm"
                           aria-hidden="true"
                         >
                           <span className="invisible whitespace-pre">{expense}</span>
                           <span className="whitespace-pre text-muted-foreground/55">{expenseAutocompleteCompletion}</span>
                         </div>
                       )}
-                      <Input
-                        id="expense"
-                        placeholder="What did you spend on?"
-                        value={expense}
-                        onChange={(e) => setExpense(e.target.value)}
-                        className="relative h-12 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent"
-                        required
-                      />
                     </div>
                     {primarySuggestion && (
                       <button
