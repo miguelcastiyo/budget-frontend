@@ -74,6 +74,7 @@ export function AddTransactionSheet({
   const [recurringBillingDay, setRecurringBillingDay] = useState("1")
 
   const [tags, setTags] = useState<Tag[]>([])
+  const [quickPickTags, setQuickPickTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<CardType[]>([])
 
   const [showNewTag, setShowNewTag] = useState(false)
@@ -94,6 +95,8 @@ export function AddTransactionSheet({
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
   const amountInputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const tagChipRailRef = useRef<HTMLDivElement>(null)
+  const tagChipRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const suggestionRequestRef = useRef(0)
   const appliedSuggestionExpenseRef = useRef<string | null>(null)
 
@@ -168,12 +171,14 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const [tagsResponse, cardsResponse] = await Promise.all([
+      const [tagsResponse, cardsResponse, quickPickTagsResponse] = await Promise.all([
         apiClient.getTags(),
         apiClient.getCards(),
+        apiClient.getTagQuickPicks(5).catch(() => ({ items: [] })),
       ])
 
       setTags(tagsResponse.items)
+      setQuickPickTags(quickPickTagsResponse.items.length > 0 ? quickPickTagsResponse.items : tagsResponse.items.slice(0, 5))
       setCards(cardsResponse.items)
 
       setTagId((previous) => previous || tagsResponse.items[0]?.id || "")
@@ -318,6 +323,7 @@ export function AddTransactionSheet({
     try {
       const created = await apiClient.createTag({ name })
       setTags((prev) => [...prev, created])
+      setQuickPickTags((prev) => [created, ...prev.filter((tag) => tag.id !== created.id)].slice(0, 5))
       setTagId(created.id)
       setNewTagName("")
       setShowNewTag(false)
@@ -589,6 +595,30 @@ export function AddTransactionSheet({
     primarySuggestion.expense.length > expense.length
       ? primarySuggestion.expense.slice(expense.length)
       : ""
+  const selectedTag = tags.find((tag) => tag.id === tagId)
+  const displayedQuickPickTags = selectedTag && !quickPickTags.some((tag) => tag.id === selectedTag.id)
+    ? [...quickPickTags.slice(0, 5), selectedTag]
+    : quickPickTags.slice(0, 5)
+
+  useEffect(() => {
+    if (!tagId || showNewTag) {
+      return
+    }
+
+    const selectedChip = tagChipRefs.current[tagId]
+    if (!selectedChip) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      selectedChip.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      })
+    })
+  }, [displayedQuickPickTags, showNewTag, tagId])
+
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig =
     !makeRecurring ||
@@ -784,18 +814,46 @@ export function AddTransactionSheet({
                         </div>
                       </div>
                     ) : (
-                      <Select value={tagId} onValueChange={setTagId} required>
-                        <SelectTrigger className="h-12 rounded-xl border-border/60">
-                          <SelectValue placeholder={isLoadingTaxonomy ? "Loading tags..." : "Select a tag"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tags.map((tag) => (
-                            <SelectItem key={tag.id} value={tag.id}>
-                              {tag.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div>
+                        {displayedQuickPickTags.length > 0 ? (
+                          <div className="relative overflow-hidden">
+                            <div
+                              ref={tagChipRailRef}
+                              className="grid grid-flow-col gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                              style={{ gridAutoColumns: "calc((100% - 1.875rem) / 4.25)" }}
+                            >
+                              {displayedQuickPickTags.map((tag) => {
+                                const isSelected = tagId === tag.id
+
+                                return (
+                                <button
+                                  key={tag.id}
+                                  ref={(node) => {
+                                    tagChipRefs.current[tag.id] = node
+                                  }}
+                                  type="button"
+                                    aria-pressed={isSelected}
+                                    onClick={() => setTagId(tag.id)}
+                                    className={cn(
+                                      "h-9 min-w-0 cursor-pointer truncate rounded-full border px-2 text-sm font-medium transition-colors",
+                                      isSelected
+                                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                        : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                    )}
+                                  >
+                                    {tag.name}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background via-background/80 to-transparent" aria-hidden="true" />
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                            Create a tag to use it for this transaction.
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 

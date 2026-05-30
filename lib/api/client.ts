@@ -11,6 +11,7 @@ import type {
   PasswordResetConfirmRequest,
   PasswordResetConfirmedResponse,
   Tag,
+  TagQuickPicksResponse,
   Card,
   CreateNamedEntityRequest,
   RecurringExpensesResponse,
@@ -263,6 +264,14 @@ class ApiClient {
   // Tags
   async getTags(): Promise<{ items: Tag[] }> {
     return this.request<{ items: Tag[] }>("/me/tags")
+  }
+
+  async getTagQuickPicks(limit = 6): Promise<TagQuickPicksResponse> {
+    const params = new URLSearchParams({
+      limit: String(limit),
+    })
+
+    return this.request<TagQuickPicksResponse>(`/me/tags/quick-picks?${params.toString()}`)
   }
 
   async createTag(data: CreateNamedEntityRequest): Promise<Tag> {

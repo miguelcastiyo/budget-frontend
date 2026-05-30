@@ -117,6 +117,10 @@ export interface Tag {
   icon_key: string | null
 }
 
+export interface TagQuickPicksResponse {
+  items: Tag[]
+}
+
 export interface CreateNamedEntityRequest {
   name: string
   icon_key?: string | null
