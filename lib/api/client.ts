@@ -14,9 +14,10 @@ import type {
   TagQuickPicksResponse,
   Card,
   CreateNamedEntityRequest,
-  RecurringExpensesResponse,
-  CreateRecurringExpenseRequest,
-  UpdateRecurringExpenseRequest,
+	  RecurringExpensesResponse,
+	  RecurringExpense,
+	  CreateRecurringExpenseRequest,
+	  UpdateRecurringExpenseRequest,
   BudgetSettings,
   BudgetSettingsPercentInput,
   BudgetSettingsAmountInput,
@@ -319,29 +320,32 @@ class ApiClient {
     })
   }
 
-  // Recurring expenses
-  async getRecurringExpenses(month?: string): Promise<RecurringExpensesResponse> {
+	  // Recurring expenses
+	  async getRecurringExpenses(month?: string): Promise<RecurringExpensesResponse> {
     const params = new URLSearchParams()
     if (month) {
       params.set("month", month)
     }
     const query = params.toString()
     return this.request<RecurringExpensesResponse>(`/me/recurring-expenses${query ? `?${query}` : ""}`)
-  }
+	  }
 
-  async createRecurringExpense(data: CreateRecurringExpenseRequest): Promise<void> {
-    await this.request("/me/recurring-expenses", {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-  }
+	  async createRecurringExpense(data: CreateRecurringExpenseRequest): Promise<RecurringExpense> {
+	    return this.request<RecurringExpense>("/me/recurring-expenses", {
+	      method: "POST",
+	      body: JSON.stringify(data),
+	    })
+	  }
 
-  async updateRecurringExpense(recurringExpenseId: string, data: UpdateRecurringExpenseRequest): Promise<void> {
-    await this.request(`/me/recurring-expenses/${recurringExpenseId}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    })
-  }
+	  async updateRecurringExpense(
+	    recurringExpenseId: string,
+	    data: UpdateRecurringExpenseRequest
+	  ): Promise<RecurringExpense> {
+	    return this.request<RecurringExpense>(`/me/recurring-expenses/${recurringExpenseId}`, {
+	      method: "PATCH",
+	      body: JSON.stringify(data),
+	    })
+	  }
 
   async deleteRecurringExpense(recurringExpenseId: string): Promise<void> {
     await this.request(`/me/recurring-expenses/${recurringExpenseId}`, {
