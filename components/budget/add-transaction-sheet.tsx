@@ -41,8 +41,19 @@ import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
+import { getTagIcon } from "@/lib/tag-icons"
 
 const MAX_AMOUNT_DIGITS = 9
+const MAX_TAG_CHIP_LABEL_LENGTH = 10
+
+function compactTagLabel(name: string): string {
+  const normalized = name.trim().replace(/\s+/g, " ")
+  if (normalized.length <= MAX_TAG_CHIP_LABEL_LENGTH) {
+    return normalized
+  }
+
+  return normalized.split(" ")[0] || normalized
+}
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -819,24 +830,29 @@ export function AddTransactionSheet({
                             >
                               {displayedQuickPickTags.map((tag) => {
                                 const isSelected = tagId === tag.id
+                                const QuickPickIcon = getTagIcon(tag.name, tag.icon_key)
+                                const label = compactTagLabel(tag.name)
 
                                 return (
-                                <button
-                                  key={tag.id}
-                                  ref={(node) => {
-                                    tagChipRefs.current[tag.id] = node
-                                  }}
-                                  type="button"
+                                  <button
+                                    key={tag.id}
+                                    ref={(node) => {
+                                      tagChipRefs.current[tag.id] = node
+                                    }}
+                                    type="button"
                                     aria-pressed={isSelected}
+                                    aria-label={tag.name}
+                                    title={tag.name}
                                     onClick={() => setTagId(tag.id)}
                                     className={cn(
-                                      "h-9 min-w-0 cursor-pointer truncate rounded-full border px-2 text-sm font-medium transition-colors",
+                                      "inline-flex h-9 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-2 text-sm font-medium transition-colors",
                                       isSelected
                                         ? "border-primary bg-primary text-primary-foreground shadow-sm"
                                         : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                                     )}
                                   >
-                                    {tag.name}
+                                    <QuickPickIcon className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0 truncate">{label}</span>
                                   </button>
                                 )
                               })}
