@@ -105,11 +105,13 @@ export function AddTransactionSheet({
   const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
   const canCreateRecurringRule = !isEditMode || !transactionAlreadyRecurring
   const amountInputRef = useRef<HTMLInputElement>(null)
+  const expenseInputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const tagChipRailRef = useRef<HTMLDivElement>(null)
   const tagChipRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const suggestionRequestRef = useRef(0)
   const appliedSuggestionExpenseRef = useRef<string | null>(null)
+  const didAutoFocusOnOpenRef = useRef(false)
 
   const parseTransactionDate = (dateStr: string): Date => {
     const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -177,6 +179,18 @@ export function AddTransactionSheet({
     return input.selectionStart === 0 && input.selectionEnd === amount.length
   }
 
+  const focusAmountInput = () => {
+    window.requestAnimationFrame(() => {
+      amountInputRef.current?.focus()
+    })
+  }
+
+  const focusExpenseInput = () => {
+    window.requestAnimationFrame(() => {
+      expenseInputRef.current?.focus()
+    })
+  }
+
   const loadTaxonomy = useCallback(async () => {
     setIsLoadingTaxonomy(true)
     setError(null)
@@ -234,6 +248,24 @@ export function AddTransactionSheet({
 
     resetForm()
   }, [isEditMode, loadTaxonomy, open, transaction])
+
+  useEffect(() => {
+    if (!open) {
+      didAutoFocusOnOpenRef.current = false
+      return
+    }
+
+    if (didAutoFocusOnOpenRef.current || isEditMode || showNewTag || showNewCard) {
+      return
+    }
+
+    didAutoFocusOnOpenRef.current = true
+    const timeoutId = window.setTimeout(() => {
+      amountInputRef.current?.focus()
+    }, 200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isEditMode, open, showNewCard, showNewTag])
 
   useEffect(() => {
     if (!open || isEditMode) {
@@ -309,6 +341,7 @@ export function AddTransactionSheet({
   }
 
   const applySuggestion = (suggestion: TransactionSuggestion) => {
+    const shouldFocusAmount = amount.trim().length === 0
     appliedSuggestionExpenseRef.current = suggestion.expense.trim().toLocaleLowerCase()
     setExpense(suggestion.expense)
     setTagId(suggestion.tag.id)
@@ -317,6 +350,9 @@ export function AddTransactionSheet({
     setIsSplit(suggestion.is_split)
     setShowMoreDetails(false)
     setSuggestions([])
+    if (shouldFocusAmount) {
+      focusAmountInput()
+    }
   }
 
   const handleCreateTag = async () => {
@@ -431,6 +467,12 @@ export function AddTransactionSheet({
   }
 
   const handleAmountKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      focusExpenseInput()
+      return
+    }
+
     if (/^\d$/.test(event.key)) {
       event.preventDefault()
       appendAmountDigits(event.key)
@@ -655,6 +697,21 @@ export function AddTransactionSheet({
   const amountTextClassName = amountLength > 7
     ? "text-4xl sm:text-5xl md:text-5xl"
     : "text-5xl sm:text-6xl md:text-6xl"
+  const submitButtonLabel = (() => {
+    if (isSubmitting) {
+      return isEditMode ? "Saving..." : "Adding..."
+    }
+
+    if (!isEditMode && !normalizedAmount) {
+      return "Enter amount"
+    }
+
+    if (!isEditMode && !tagId) {
+      return "Choose tag"
+    }
+
+    return isEditMode ? "Save Changes" : "Add Transaction"
+  })()
   const swipeDismiss = useSwipeDismiss({
     open,
     onDismiss: () => onOpenChange(false),
@@ -740,10 +797,12 @@ export function AddTransactionSheet({
                     </Label>
                     <div className="relative">
                       <Input
+                        ref={expenseInputRef}
                         id="expense"
                         placeholder="What did you spend on?"
                         value={expense}
                         onChange={(e) => setExpense(e.target.value)}
+                        enterKeyHint={normalizedAmount && tagId ? "done" : "next"}
                         className="relative z-10 h-12 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent"
                         required
                       />
@@ -1164,7 +1223,7 @@ export function AddTransactionSheet({
               className="w-full h-12 rounded-xl text-base font-semibold"
               disabled={!amount || !expense || !tagId || isSubmitting || isLoadingTaxonomy || !hasValidRecurringConfig || (isEditMode && !hasEditChanges)}
             >
-              {isSubmitting ? (isEditMode ? "Saving..." : "Adding...") : (isEditMode ? "Save Changes" : "Add Transaction")}
+              {submitButtonLabel}
             </Button>
           </div>
         </form>
