@@ -594,10 +594,26 @@ export function AddTransactionSheet({
       primarySuggestion.is_split ? "Split" : null,
     ].filter(Boolean)
     : []
-  const expenseAutocompleteCompletion =
+  const primarySuggestionSetup = primarySuggestionParts.join(" · ")
+  const primarySuggestionIsPrefixMatch =
     primarySuggestion &&
     expense.length > 0 &&
-    primarySuggestion.expense.toLocaleLowerCase().startsWith(expense.toLocaleLowerCase()) &&
+    primarySuggestion.expense.toLocaleLowerCase().startsWith(expense.toLocaleLowerCase())
+  const primarySuggestionCompletesDescription =
+    primarySuggestion &&
+    expense.trim().length > 0 &&
+    primarySuggestion.expense.trim().toLocaleLowerCase() !== expense.trim().toLocaleLowerCase()
+  const primarySuggestionShowsCompletion =
+    primarySuggestionCompletesDescription && !primarySuggestionIsPrefixMatch
+  const primarySuggestionLabel = primarySuggestionShowsCompletion ? "Suggested match" : "Use previous setup"
+  const primarySuggestionTitle = primarySuggestionShowsCompletion
+    ? primarySuggestion?.expense
+    : primarySuggestionSetup
+  const primarySuggestionDescription = primarySuggestionShowsCompletion
+    ? `Will use ${primarySuggestionSetup}`
+    : null
+  const expenseAutocompleteCompletion =
+    primarySuggestionIsPrefixMatch &&
     primarySuggestion.expense.length > expense.length
       ? primarySuggestion.expense.slice(expense.length)
       : ""
@@ -745,11 +761,19 @@ export function AddTransactionSheet({
                       <button
                         type="button"
                         onClick={() => applySuggestion(primarySuggestion)}
-                        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        aria-label={primarySuggestionShowsCompletion ? `Use ${primarySuggestion.expense}` : "Use previous transaction setup"}
+                        className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-medium text-muted-foreground">Use previous setup</p>
-                          <p className="truncate text-sm font-medium">{primarySuggestionParts.join(" · ")}</p>
+                          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {primarySuggestionLabel}
+                          </p>
+                          <p className="truncate text-sm font-semibold leading-5">
+                            {primarySuggestionTitle}
+                          </p>
+                          {primarySuggestionDescription && (
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{primarySuggestionDescription}</p>
+                          )}
                         </div>
                         <span className="inline-flex h-9 shrink-0 items-center rounded-lg bg-secondary px-3 text-sm font-medium text-secondary-foreground">
                           Apply
