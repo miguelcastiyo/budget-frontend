@@ -5,15 +5,8 @@ import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import type { Tag } from "@/lib/api/types"
-import { ArrowLeft, Plus, Pencil, Trash2, X, Check } from "lucide-react"
+import { ArrowLeft, Plus, Pencil, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -27,6 +20,76 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
+import { cn } from "@/lib/utils"
+
+interface TagIconPickerProps {
+  tagName: string
+  value: string
+  onChange: (value: string) => void
+}
+
+function TagIconPicker({ tagName, value, onChange }: TagIconPickerProps) {
+  const selectedIconOption = TAG_ICON_OPTIONS.find((option) => option.key === value)
+  const AutoIcon = getTagIcon(tagName || "Tag", null)
+  const PreviewIcon = selectedIconOption?.icon ?? AutoIcon
+  const iconLabel = selectedIconOption?.label ?? "Auto"
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-medium text-muted-foreground">Icon</p>
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <PreviewIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{iconLabel}</span>
+        </span>
+      </div>
+      <div className="relative min-w-0 max-w-full overflow-hidden">
+        <div className="flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            aria-pressed={!value}
+            aria-label="Use automatic icon"
+            title="Auto icon"
+            onClick={() => onChange("")}
+            className={cn(
+              "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+              !value
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            )}
+          >
+            <AutoIcon className="h-4 w-4 shrink-0" />
+            Auto
+          </button>
+          {TAG_ICON_OPTIONS.map((option) => {
+            const Icon = option.icon
+            const isSelected = value === option.key
+
+            return (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={isSelected}
+                aria-label={`Use ${option.label} icon`}
+                title={option.label}
+                onClick={() => onChange(option.key)}
+                className={cn(
+                  "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
+                  isSelected
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            )
+          })}
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent" aria-hidden="true" />
+      </div>
+    </div>
+  )
+}
 
 export default function TagsSettingsPage() {
   const [tags, setTags] = useState<Tag[]>([])
@@ -44,6 +107,7 @@ export default function TagsSettingsPage() {
   const hasEditingTagChanges = editingTag
     ? editingName.trim() !== editingTag.name.trim() || (editingIconKey || "") !== (editingTag.icon_key ?? "")
     : false
+  const NewTagInputIcon = getTagIcon(newTagName || "Tag", newTagIconKey || null)
 
   useEffect(() => {
     const loadTags = async () => {
@@ -170,7 +234,11 @@ export default function TagsSettingsPage() {
             variant="ghost"
             size="icon"
             className="rounded-full"
-            onClick={() => setShowNewTag(true)}
+            onClick={() => {
+              setNewTagName("")
+              setNewTagIconKey("")
+              setShowNewTag(true)
+            }}
           >
             <Plus className="w-5 h-5" />
           </Button>
@@ -185,67 +253,65 @@ export default function TagsSettingsPage() {
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {showNewTag && (
-          <Card className="p-4 border-0 shadow-sm">
+          <Card className="min-w-0 overflow-hidden border-0 p-4 shadow-sm">
             <div className="space-y-3">
-              <Input
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                placeholder="New tag name"
-                className="h-10 rounded-xl"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleAddTag()
-                  if (e.key === "Escape") {
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium">Create tag</p>
+                  <p className="truncate text-xs text-muted-foreground">Choose a name and icon.</p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 shrink-0 rounded-full"
+                  onClick={() => {
                     setShowNewTag(false)
                     setNewTagName("")
                     setNewTagIconKey("")
-                  }
-                }}
-              />
-              <Select
-                value={newTagIconKey || "auto"}
-                onValueChange={(value) => setNewTagIconKey(value === "auto" ? "" : value)}
-              >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Auto icon" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto icon (from name)</SelectItem>
-                  {TAG_ICON_OPTIONS.map((option) => {
-                    const Icon = option.icon
-                    return (
-                      <SelectItem key={option.key} value={option.key}>
-                        <span className="inline-flex items-center gap-2">
-                          <Icon className="w-4 h-4" />
-                          {option.label}
-                        </span>
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-              <div className="flex justify-end gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="rounded-full"
-                onClick={() => void handleAddTag()}
-                disabled={!newTagName.trim() || isMutating}
-              >
-                <Check className="w-5 h-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="rounded-full"
-                onClick={() => {
-                  setShowNewTag(false)
-                  setNewTagName("")
-                  setNewTagIconKey("")
-                }}
-              >
-                <X className="w-5 h-5" />
-              </Button>
+                  }}
+                  aria-label="Cancel new tag"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="relative min-w-0">
+                <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  placeholder="Tag name"
+                  className="h-11 rounded-xl pl-10"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleAddTag()
+                    if (e.key === "Escape") {
+                      setShowNewTag(false)
+                      setNewTagName("")
+                      setNewTagIconKey("")
+                    }
+                  }}
+                />
+              </div>
+              <TagIconPicker tagName={newTagName} value={newTagIconKey} onChange={setNewTagIconKey} />
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <Button
+                  className="h-11 rounded-xl"
+                  onClick={() => void handleAddTag()}
+                  disabled={!newTagName.trim() || isMutating}
+                >
+                  {isMutating ? "Adding..." : "Add tag"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-11 rounded-xl px-4"
+                  onClick={() => {
+                    setShowNewTag(false)
+                    setNewTagName("")
+                    setNewTagIconKey("")
+                  }}
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
           </Card>
@@ -258,62 +324,63 @@ export default function TagsSettingsPage() {
 
           {tags.map((tag) => {
             const TagIcon = getTagIcon(tag.name, tag.icon_key)
+            const EditingInputIcon = getTagIcon(editingName || tag.name, editingIconKey || null)
 
             return (
-            <div key={tag.id} className="flex items-center gap-3 p-4">
+            <div
+              key={tag.id}
+              className={cn(
+                "p-4",
+                editingId === tag.id ? "space-y-3" : "flex items-center gap-3"
+              )}
+            >
               {editingId === tag.id ? (
                 <>
-                  <div className="flex-1 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">Edit tag</p>
+                      <p className="truncate text-xs text-muted-foreground">{tag.name}</p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 shrink-0 rounded-full"
+                      onClick={handleCancelEdit}
+                      aria-label="Cancel edit"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="relative min-w-0">
+                    <EditingInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
-                      className="h-10 rounded-xl"
+                      className="h-11 rounded-xl pl-10"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === "Enter") void handleSaveEdit()
                         if (e.key === "Escape") handleCancelEdit()
                       }}
                     />
-                    <Select
-                      value={editingIconKey || "auto"}
-                      onValueChange={(value) => setEditingIconKey(value === "auto" ? "" : value)}
-                    >
-                      <SelectTrigger className="h-10 rounded-xl">
-                        <SelectValue placeholder="Auto icon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto icon (from name)</SelectItem>
-                        {TAG_ICON_OPTIONS.map((option) => {
-                          const Icon = option.icon
-                          return (
-                            <SelectItem key={option.key} value={option.key}>
-                              <span className="inline-flex items-center gap-2">
-                                <Icon className="w-4 h-4" />
-                                {option.label}
-                              </span>
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full"
-                    onClick={() => void handleSaveEdit()}
-                    disabled={!editingName.trim() || isMutating || !hasEditingTagChanges}
-                  >
-                    <Check className="w-5 h-5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full"
-                    onClick={handleCancelEdit}
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
+                  <TagIconPicker tagName={editingName} value={editingIconKey} onChange={setEditingIconKey} />
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <Button
+                      className="h-11 rounded-xl"
+                      onClick={() => void handleSaveEdit()}
+                      disabled={!editingName.trim() || isMutating || !hasEditingTagChanges}
+                    >
+                      {isMutating ? "Saving..." : "Save tag"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="h-11 rounded-xl px-4"
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <>
