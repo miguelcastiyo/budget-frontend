@@ -180,8 +180,6 @@ export function AddTransactionSheet({
       setTags(tagsResponse.items)
       setQuickPickTags(quickPickTagsResponse.items.length > 0 ? quickPickTagsResponse.items : tagsResponse.items.slice(0, 5))
       setCards(cardsResponse.items)
-
-      setTagId((previous) => previous || tagsResponse.items[0]?.id || "")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -306,11 +304,8 @@ export function AddTransactionSheet({
     setCategory(suggestion.category)
     setCardId(suggestion.card?.id ?? "")
     setIsSplit(suggestion.is_split)
+    setShowMoreDetails(false)
     setSuggestions([])
-
-    if (suggestion.card || suggestion.is_split) {
-      setShowMoreDetails(true)
-    }
   }
 
   const handleCreateTag = async () => {
