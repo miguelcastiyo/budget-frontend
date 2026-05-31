@@ -56,6 +56,39 @@ const CSRF_STORAGE_KEY = "budget.csrf_token"
 class ApiClient {
   private csrfToken: string | null = null
 
+  private async apiErrorFromResponse(response: Response): Promise<ApiError> {
+    const requestId = response.headers.get("X-Request-ID") ?? undefined
+
+    let message = `Request failed with status ${response.status}`
+    let details: { field: string; message: string }[] | undefined
+    let code: ErrorEnvelope["error"]["code"] = "INTERNAL_ERROR"
+
+    try {
+      const error: ErrorEnvelope = await response.json()
+      message = error.error.message
+      details = error.error.details
+      code = error.error.code
+    } catch {
+      // Keep fallback message for non-JSON errors.
+    }
+
+    const apiError = new ApiError(
+      response.status,
+      {
+        code,
+        message,
+        details,
+      },
+      requestId
+    )
+    notifyGlobalApiError(apiError)
+    return apiError
+  }
+
+  private async throwApiError(response: Response): Promise<never> {
+    throw await this.apiErrorFromResponse(response)
+  }
+
   private readCsrfToken(): string | null {
     if (typeof window === "undefined") {
       return null
@@ -109,33 +142,12 @@ class ApiClient {
       headers,
       credentials: "include",
     })
-    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
       if (response.status === 401) {
         this.setCsrfToken(null)
       }
-
-      let message = `Request failed with status ${response.status}`
-      let details: { field: string; message: string }[] | undefined
-      let code: ErrorEnvelope["error"]["code"] = "INTERNAL_ERROR"
-
-      try {
-        const error: ErrorEnvelope = await response.json()
-        message = error.error.message
-        details = error.error.details
-        code = error.error.code
-      } catch {
-        // Keep fallback message for non-JSON errors.
-      }
-
-      const apiError = new ApiError(response.status, {
-        code,
-        message,
-        details,
-      }, requestId)
-      notifyGlobalApiError(apiError)
-      throw apiError
+      await this.throwApiError(response)
     }
 
     if (response.status === 204) {
@@ -458,29 +470,9 @@ class ApiClient {
       `${API_BASE}/me/transactions/export.csv${query ? `?${query}` : ""}`,
       { credentials: "include" }
     )
-    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
-      let message = `Request failed with status ${response.status}`
-      let details: { field: string; message: string }[] | undefined
-      let code: ErrorEnvelope["error"]["code"] = "INTERNAL_ERROR"
-
-      try {
-        const error: ErrorEnvelope = await response.json()
-        message = error.error.message
-        details = error.error.details
-        code = error.error.code
-      } catch {
-        // Keep fallback message for non-JSON errors.
-      }
-
-      const apiError = new ApiError(response.status, {
-        code,
-        message,
-        details,
-      }, requestId)
-      notifyGlobalApiError(apiError)
-      throw apiError
+      await this.throwApiError(response)
     }
 
     return response.blob()
@@ -504,13 +496,9 @@ class ApiClient {
       headers,
       credentials: "include",
     })
-    const requestId = response.headers.get("X-Request-ID") ?? undefined
 
     if (!response.ok) {
-      const error: ErrorEnvelope = await response.json()
-      const apiError = new ApiError(response.status, error.error, requestId)
-      notifyGlobalApiError(apiError)
-      throw apiError
+      await this.throwApiError(response)
     }
 
     return response.json()
