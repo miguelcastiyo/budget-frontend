@@ -5,6 +5,12 @@ import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import type { Tag } from "@/lib/api/types"
 import { ArrowLeft, Plus, Pencil, Trash2, X } from "lucide-react"
 import Link from "next/link"
@@ -21,6 +27,7 @@ import {
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 
 interface TagIconPickerProps {
   tagName: string
@@ -108,6 +115,7 @@ export default function TagsSettingsPage() {
     ? editingName.trim() !== editingTag.name.trim() || (editingIconKey || "") !== (editingTag.icon_key ?? "")
     : false
   const NewTagInputIcon = getTagIcon(newTagName || "Tag", newTagIconKey || null)
+  const EditingTagInputIcon = getTagIcon(editingName || editingTag?.name || "Tag", editingIconKey || null)
 
   useEffect(() => {
     const loadTags = async () => {
@@ -166,6 +174,12 @@ export default function TagsSettingsPage() {
     setEditingId(null)
     setEditingName("")
     setEditingIconKey("")
+  }
+
+  const closeNewTagDrawer = () => {
+    setShowNewTag(false)
+    setNewTagName("")
+    setNewTagIconKey("")
   }
 
   const handleAddTag = async () => {
@@ -252,71 +266,6 @@ export default function TagsSettingsPage() {
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        {showNewTag && (
-          <Card className="min-w-0 overflow-hidden border-0 p-4 shadow-sm">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium">Create tag</p>
-                  <p className="truncate text-xs text-muted-foreground">Choose a name and icon.</p>
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-9 w-9 shrink-0 rounded-full"
-                  onClick={() => {
-                    setShowNewTag(false)
-                    setNewTagName("")
-                    setNewTagIconKey("")
-                  }}
-                  aria-label="Cancel new tag"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="relative min-w-0">
-                <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  placeholder="Tag name"
-                  className="h-11 rounded-xl pl-10"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleAddTag()
-                    if (e.key === "Escape") {
-                      setShowNewTag(false)
-                      setNewTagName("")
-                      setNewTagIconKey("")
-                    }
-                  }}
-                />
-              </div>
-              <TagIconPicker tagName={newTagName} value={newTagIconKey} onChange={setNewTagIconKey} />
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <Button
-                  className="h-11 rounded-xl"
-                  onClick={() => void handleAddTag()}
-                  disabled={!newTagName.trim() || isMutating}
-                >
-                  {isMutating ? "Adding..." : "Add tag"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="h-11 rounded-xl px-4"
-                  onClick={() => {
-                    setShowNewTag(false)
-                    setNewTagName("")
-                    setNewTagIconKey("")
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
-
         <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
           {!isLoading && tags.length === 0 && (
             <div className="p-4 text-sm text-muted-foreground">No tags yet.</div>
@@ -324,92 +273,196 @@ export default function TagsSettingsPage() {
 
           {tags.map((tag) => {
             const TagIcon = getTagIcon(tag.name, tag.icon_key)
-            const EditingInputIcon = getTagIcon(editingName || tag.name, editingIconKey || null)
 
             return (
-            <div
-              key={tag.id}
-              className={cn(
-                "p-4",
-                editingId === tag.id ? "space-y-3" : "flex items-center gap-3"
-              )}
-            >
-              {editingId === tag.id ? (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">Edit tag</p>
-                      <p className="truncate text-xs text-muted-foreground">{tag.name}</p>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-9 w-9 shrink-0 rounded-full"
-                      onClick={handleCancelEdit}
-                      aria-label="Cancel edit"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <div className="relative min-w-0">
-                    <EditingInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      className="h-11 rounded-xl pl-10"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void handleSaveEdit()
-                        if (e.key === "Escape") handleCancelEdit()
-                      }}
-                    />
-                  </div>
-                  <TagIconPicker tagName={editingName} value={editingIconKey} onChange={setEditingIconKey} />
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <Button
-                      className="h-11 rounded-xl"
-                      onClick={() => void handleSaveEdit()}
-                      disabled={!editingName.trim() || isMutating || !hasEditingTagChanges}
-                    >
-                      {isMutating ? "Saving..." : "Save tag"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="h-11 rounded-xl px-4"
-                      onClick={handleCancelEdit}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                    <TagIcon className="w-4 h-4 text-foreground" />
-                  </div>
-                  <span className="flex-1 font-medium">{tag.name}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full"
-                    onClick={() => handleStartEdit(tag)}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full text-destructive hover:text-destructive"
-                    onClick={() => setDeleteTagId(tag.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </>
-              )}
-            </div>
+              <div key={tag.id} className="flex items-center gap-3 p-4">
+                <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                  <TagIcon className="w-4 h-4 text-foreground" />
+                </div>
+                <span className="flex-1 font-medium">{tag.name}</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full"
+                  onClick={() => handleStartEdit(tag)}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="rounded-full text-destructive hover:text-destructive"
+                  onClick={() => setDeleteTagId(tag.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
           )})}
         </Card>
       </main>
+
+      <Dialog
+        open={showNewTag}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowNewTag(true)
+          } else {
+            closeNewTagDrawer()
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
+            mobileDrawerDialogClassName
+          )}
+        >
+          <form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleAddTag()
+            }}
+          >
+            <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-5 sm:py-4">
+              <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-lg font-semibold">Create tag</DialogTitle>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">Choose a name and icon.</p>
+                </div>
+                <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </DialogClose>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="grid min-w-0 gap-4">
+                <div className="relative min-w-0">
+                  <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    placeholder="Tag name"
+                    className="h-12 rounded-xl pl-10"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        closeNewTagDrawer()
+                      }
+                    }}
+                  />
+                </div>
+                <TagIconPicker tagName={newTagName} value={newTagIconKey} onChange={setNewTagIconKey} />
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5 sm:pt-4">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-12 rounded-xl px-4"
+                  onClick={closeNewTagDrawer}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="h-12 rounded-xl text-base font-semibold"
+                  disabled={!newTagName.trim() || isMutating}
+                >
+                  {isMutating ? "Adding..." : "Add tag"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editingId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelEdit()
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className={cn(
+            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
+            mobileDrawerDialogClassName
+          )}
+        >
+          <form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void handleSaveEdit()
+            }}
+          >
+            <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-5 sm:py-4">
+              <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-lg font-semibold">Edit tag</DialogTitle>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {editingTag?.name ?? "Update name and icon"}
+                  </p>
+                </div>
+                <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </DialogClose>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="grid min-w-0 gap-4">
+                <div className="relative min-w-0">
+                  <EditingTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="h-12 rounded-xl pl-10"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        handleCancelEdit()
+                      }
+                    }}
+                  />
+                </div>
+                <TagIconPicker tagName={editingName} value={editingIconKey} onChange={setEditingIconKey} />
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5 sm:pt-4">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-12 rounded-xl px-4"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="h-12 rounded-xl text-base font-semibold"
+                  disabled={!editingName.trim() || isMutating || !hasEditingTagChanges}
+                >
+                  {isMutating ? "Saving..." : "Save tag"}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTagId} onOpenChange={(open) => !open && setDeleteTagId(null)}>
         <AlertDialogContent className="rounded-2xl">
