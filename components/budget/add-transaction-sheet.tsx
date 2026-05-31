@@ -35,13 +35,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon, ChevronDown, Plus, X, CreditCard, TagIcon } from "lucide-react"
+import { CalendarIcon, ChevronDown, Plus, X, CreditCard } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
-import { getTagIcon } from "@/lib/tag-icons"
+import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 
 const MAX_AMOUNT_DIGITS = 9
 const MAX_TAG_CHIP_LABEL_LENGTH = 10
@@ -90,6 +90,7 @@ export function AddTransactionSheet({
 
   const [showNewTag, setShowNewTag] = useState(false)
   const [newTagName, setNewTagName] = useState("")
+  const [newTagIconKey, setNewTagIconKey] = useState("")
   const [showNewCard, setShowNewCard] = useState(false)
   const [newCardName, setNewCardName] = useState("")
   const [showMoreDetails, setShowMoreDetails] = useState(false)
@@ -235,6 +236,7 @@ export function AddTransactionSheet({
       setCardId(transaction.card?.id ?? "")
       setShowNewTag(false)
       setNewTagName("")
+      setNewTagIconKey("")
       setShowNewCard(false)
       setNewCardName("")
       setShowMoreDetails(Boolean(transaction.card || transaction.is_split || transaction.recurring_expense_id != null))
@@ -323,6 +325,7 @@ export function AddTransactionSheet({
     setDate(now)
     setShowNewTag(false)
     setNewTagName("")
+    setNewTagIconKey("")
     setShowNewCard(false)
     setNewCardName("")
     setShowMoreDetails(false)
@@ -363,11 +366,15 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const created = await apiClient.createTag({ name })
+      const created = await apiClient.createTag({
+        name,
+        icon_key: newTagIconKey || null,
+      })
       setTags((prev) => [...prev, created])
       setQuickPickTags((prev) => [created, ...prev.filter((tag) => tag.id !== created.id)].slice(0, 5))
       setTagId(created.id)
       setNewTagName("")
+      setNewTagIconKey("")
       setShowNewTag(false)
     } catch (err) {
       if (err instanceof ApiError) {
@@ -663,6 +670,10 @@ export function AddTransactionSheet({
   const displayedQuickPickTags = selectedTag && !quickPickTags.some((tag) => tag.id === selectedTag.id)
     ? [...quickPickTags.slice(0, 5), selectedTag]
     : quickPickTags.slice(0, 5)
+  const selectedNewTagIconOption = TAG_ICON_OPTIONS.find((option) => option.key === newTagIconKey)
+  const AutoNewTagIcon = getTagIcon(newTagName || "Tag", null)
+  const NewTagPreviewIcon = selectedNewTagIconOption?.icon ?? AutoNewTagIcon
+  const newTagIconLabel = selectedNewTagIconOption?.label ?? "Auto"
 
   useEffect(() => {
     if (!tagId || showNewTag) {
@@ -847,7 +858,10 @@ export function AddTransactionSheet({
                       {!showNewTag && (
                         <button
                           type="button"
-                          onClick={() => setShowNewTag(true)}
+                          onClick={() => {
+                            setNewTagIconKey("")
+                            setShowNewTag(true)
+                          }}
                           className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -857,7 +871,7 @@ export function AddTransactionSheet({
                     </div>
 
                     {showNewTag ? (
-                      <div className="rounded-xl border border-border/60 bg-card p-3">
+                      <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card p-3">
                         <div className="flex items-center justify-between gap-3 pb-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium">Create tag</p>
@@ -869,6 +883,7 @@ export function AddTransactionSheet({
                             onClick={() => {
                               setShowNewTag(false)
                               setNewTagName("")
+                              setNewTagIconKey("")
                             }}
                             className="h-9 w-9 shrink-0 rounded-lg p-0"
                             aria-label="Cancel new tag"
@@ -876,9 +891,9 @@ export function AddTransactionSheet({
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <div className="grid min-w-0 gap-3">
                           <div className="relative min-w-0">
-                            <TagIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <NewTagPreviewIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                               placeholder="Tag name"
                               value={newTagName}
@@ -892,11 +907,64 @@ export function AddTransactionSheet({
                               }}
                             />
                           </div>
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <Label className="text-xs font-medium text-muted-foreground">Icon</Label>
+                              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                                <NewTagPreviewIcon className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{newTagIconLabel}</span>
+                              </span>
+                            </div>
+                            <div className="relative min-w-0 max-w-full overflow-hidden">
+                              <div className="flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <button
+                                  type="button"
+                                  aria-pressed={!newTagIconKey}
+                                  aria-label="Use automatic icon"
+                                  title="Auto icon"
+                                  onClick={() => setNewTagIconKey("")}
+                                  className={cn(
+                                    "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+                                    !newTagIconKey
+                                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                      : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                  )}
+                                >
+                                  <AutoNewTagIcon className="h-4 w-4 shrink-0" />
+                                  Auto
+                                </button>
+                                {TAG_ICON_OPTIONS.map((option) => {
+                                  const Icon = option.icon
+                                  const isSelected = newTagIconKey === option.key
+
+                                  return (
+                                    <button
+                                      key={option.key}
+                                      type="button"
+                                      aria-pressed={isSelected}
+                                      aria-label={`Use ${option.label} icon`}
+                                      title={option.label}
+                                      onClick={() => setNewTagIconKey(option.key)}
+                                      className={cn(
+                                        "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
+                                        isSelected
+                                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                          : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                      )}
+                                    >
+                                      <Icon className="h-4 w-4" />
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent" aria-hidden="true" />
+                            </div>
+                          </div>
                           <Button
                             type="button"
                             onClick={() => void handleCreateTag()}
                             disabled={!newTagName.trim() || isCreatingTag}
-                            className="h-12 rounded-xl px-4"
+                            className="h-12 w-full rounded-xl px-4"
                           >
                             {isCreatingTag ? "Adding..." : "Add tag"}
                           </Button>
