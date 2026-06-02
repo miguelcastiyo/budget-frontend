@@ -12,6 +12,23 @@ export const metadata: Metadata = {
   description: 'Track your spending with a clean, minimal budgeting app',
   applicationName: 'Budget',
   manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      {
+        url: '/brand-icon.png',
+        type: 'image/png',
+        sizes: '350x350',
+      },
+    ],
+    shortcut: ['/brand-icon.png'],
+    apple: [
+      {
+        url: '/brand-icon.png',
+        type: 'image/png',
+        sizes: '350x350',
+      },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
