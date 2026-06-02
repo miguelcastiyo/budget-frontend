@@ -348,7 +348,6 @@ export default function TagsSettingsPage() {
                     onChange={(e) => setNewTagName(e.target.value)}
                     placeholder="Tag name"
                     className="h-12 rounded-xl pl-10"
-                    autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         closeNewTagDrawer()
