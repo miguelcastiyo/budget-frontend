@@ -666,10 +666,11 @@ export function AddTransactionSheet({
     primarySuggestion.expense.length > expense.length
       ? primarySuggestion.expense.slice(expense.length)
       : ""
-  const selectedTag = tags.find((tag) => tag.id === tagId)
-  const displayedQuickPickTags = selectedTag && !quickPickTags.some((tag) => tag.id === selectedTag.id)
-    ? [...quickPickTags.slice(0, 5), selectedTag]
-    : quickPickTags.slice(0, 5)
+  const quickPickTagIds = new Set(quickPickTags.map((tag) => tag.id))
+  const displayedQuickPickTags = [
+    ...quickPickTags,
+    ...tags.filter((tag) => !quickPickTagIds.has(tag.id)),
+  ]
   const selectedNewTagIconOption = TAG_ICON_OPTIONS.find((option) => option.key === newTagIconKey)
   const AutoNewTagIcon = getTagIcon(newTagName || "Tag", null)
   const NewTagPreviewIcon = selectedNewTagIconOption?.icon ?? AutoNewTagIcon

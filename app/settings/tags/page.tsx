@@ -429,7 +429,6 @@ export default function TagsSettingsPage() {
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
                     className="h-12 rounded-xl pl-10"
-                    autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         handleCancelEdit()
