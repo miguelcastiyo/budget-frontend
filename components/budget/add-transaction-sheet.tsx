@@ -867,7 +867,7 @@ export function AddTransactionSheet({
                     )}
                   </div>
 
-                  <div className="space-y-2 sm:col-span-2">
+                  <div className="min-w-0 space-y-2 sm:col-span-2">
                     <div className="flex items-center justify-between">
                       <Label className="text-sm font-medium">Tag</Label>
                       {!showNewTag && (
