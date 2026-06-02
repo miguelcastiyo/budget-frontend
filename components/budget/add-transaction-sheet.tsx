@@ -817,7 +817,7 @@ export function AddTransactionSheet({
 
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2 sm:col-span-2">
+                  <div className="min-w-0 space-y-2 sm:col-span-2">
                     <Label htmlFor="expense" className="text-sm font-medium">
                       Description
                     </Label>
@@ -986,12 +986,12 @@ export function AddTransactionSheet({
                         </div>
                       </div>
                     ) : (
-                      <div>
+                      <div className="min-w-0">
                         {displayedQuickPickTags.length > 0 ? (
-                          <div className="relative overflow-hidden">
+                          <div className="relative min-w-0 overflow-hidden">
                             <div
                               ref={tagChipRailRef}
-                              className="grid grid-flow-col gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                              className="grid min-w-0 grid-flow-col gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                               style={tagChipRailStyle}
                             >
                               {displayedQuickPickTags.map((tag) => {
