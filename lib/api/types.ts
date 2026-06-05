@@ -447,6 +447,32 @@ export interface CsvImportErrorItem {
   message: string
 }
 
+export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" | "card" | "is_split"
+
+export type CsvImportMapping = Partial<Record<CsvImportField, string>>
+
+export interface CsvImportPreviewResponse {
+  mode: "preview"
+  headers: string[]
+  sample_rows: Record<string, string>[]
+  suggested_mapping: CsvImportMapping
+  total_rows: number
+  limits: {
+    max_bytes: number
+    max_rows: number
+    max_returned_errors: number
+  }
+}
+
+export interface CsvImportNewTag {
+  name: string
+  icon_key: string
+}
+
+export interface CsvImportNewCard {
+  name: string
+}
+
 export interface CsvImportResponse {
   status: "completed" | "partial" | "failed"
   message: string
@@ -459,6 +485,8 @@ export interface CsvImportResponse {
   errors_truncated: boolean
   max_returned_errors: number
   errors: CsvImportErrorItem[]
+  new_tags: CsvImportNewTag[]
+  new_cards: CsvImportNewCard[]
 }
 
 export type DataRunType = "import" | "export"

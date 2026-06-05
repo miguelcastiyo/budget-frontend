@@ -35,6 +35,8 @@ import type {
   CreateMasterApiKeyRequest,
   CreateMasterApiKeyResponse,
   CsvImportResponse,
+  CsvImportPreviewResponse,
+  CsvImportMapping,
   CreateInviteRequest,
   InviteResponse,
   InvitesResponse,
@@ -478,12 +480,27 @@ class ApiClient {
     return response.blob()
   }
 
-  async importTransactions(file: File, mode: "dry_run" | "commit"): Promise<CsvImportResponse> {
+  async previewImportTransactions(file: File): Promise<CsvImportPreviewResponse> {
+    return this.importTransactionsRequest<CsvImportPreviewResponse>(file, "preview")
+  }
+
+  async importTransactions(file: File, mode: "dry_run" | "commit", mapping: CsvImportMapping): Promise<CsvImportResponse> {
+    return this.importTransactionsRequest<CsvImportResponse>(file, mode, mapping)
+  }
+
+  private async importTransactionsRequest<T>(
+    file: File,
+    mode: "preview" | "dry_run" | "commit",
+    mapping?: CsvImportMapping
+  ): Promise<T> {
     this.ensureCsrfTokenLoaded()
 
     const formData = new FormData()
     formData.append("file", file)
     formData.append("mode", mode)
+    if (mapping) {
+      formData.append("mapping", JSON.stringify(mapping))
+    }
 
     const headers: HeadersInit = {}
     if (this.csrfToken) {
