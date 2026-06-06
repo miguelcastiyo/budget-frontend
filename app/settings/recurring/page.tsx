@@ -132,6 +132,19 @@ function normalizeRecurringForm(form: RecurringFormState) {
   }
 }
 
+function isValidRecurringAmount(value: string): boolean {
+  return asNumber(value) > 0
+}
+
+function isValidBillingDay(form: RecurringFormState): boolean {
+  if (form.billing_type === "last_day") {
+    return true
+  }
+
+  const day = Number.parseInt(form.billing_day || "", 10)
+  return Number.isInteger(day) && day >= 1 && day <= 31
+}
+
 function formatProjectedDate(date: string): string {
   const parsed = new Date(`${date}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) {
@@ -310,11 +323,18 @@ export default function RecurringSettingsPage() {
   }, [loadData])
 
   const tagOptions = useMemo(() => tags, [tags])
-  const activeRulesCount = useMemo(
+  const activeItemsCount = useMemo(
     () => data?.items.filter((item) => item.is_active).length ?? 0,
     [data?.items]
   )
-  const inactiveRulesCount = Math.max((data?.items_count ?? 0) - activeRulesCount, 0)
+  const inactiveItemsCount = Math.max((data?.items_count ?? 0) - activeItemsCount, 0)
+  const upcomingItems = useMemo(
+    () => [...(data?.items ?? [])]
+      .filter((item) => item.is_active)
+      .sort((first, second) => first.projected_date_for_month.localeCompare(second.projected_date_for_month))
+      .slice(0, 3),
+    [data?.items]
+  )
   const closeNewRecurringDialog = () => {
     setShowNew(false)
     setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
@@ -335,8 +355,8 @@ export default function RecurringSettingsPage() {
   })
 
   const handleCreate = async () => {
-    if (!newForm.expense.trim() || !newForm.tag_id) {
-      setError("Expense name and tag are required")
+    if (!newForm.expense.trim() || !newForm.tag_id || !isValidRecurringAmount(newForm.amount) || !isValidBillingDay(newForm)) {
+      setError("Add an expense name, amount, tag, and valid billing day")
       return
     }
 
@@ -371,7 +391,14 @@ export default function RecurringSettingsPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingId || !editingForm || !editingForm.expense.trim() || !editingForm.tag_id) {
+    if (
+      !editingId ||
+      !editingForm ||
+      !editingForm.expense.trim() ||
+      !editingForm.tag_id ||
+      !isValidRecurringAmount(editingForm.amount) ||
+      !isValidBillingDay(editingForm)
+    ) {
       return
     }
 
@@ -432,10 +459,15 @@ export default function RecurringSettingsPage() {
     }
   }
 
+  const startEdit = (item: RecurringExpense) => {
+    setEditingId(item.id)
+    setEditingForm(formFromItem(item))
+  }
+
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
-        <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4 lg:max-w-6xl lg:px-8">
+        <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3 lg:max-w-6xl lg:px-8 lg:py-4">
           <Link href="/settings">
             <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
               <ArrowLeft className="w-5 h-5" />
@@ -444,28 +476,28 @@ export default function RecurringSettingsPage() {
           <h1 className="text-xl font-bold flex-1">Recurring</h1>
           <Button
             variant="ghost"
-            size="icon"
-            className="rounded-full"
+            className="h-9 rounded-full px-3 lg:size-9 lg:px-0"
             aria-label="Add recurring expense"
             onClick={() => setShowNew(true)}
           >
             <Plus className="w-5 h-5" />
+            <span className="text-sm lg:sr-only">Add</span>
           </Button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-5 pt-5 lg:max-w-6xl lg:px-8 lg:pt-8">
+      <main className="mx-auto max-w-lg px-4 pt-3 lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            Automatically add monthly bills so committed spending is included upfront.
+            Monthly bills are added upfront so your budget reflects committed spending.
           </p>
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className="mt-4 grid gap-4 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
-          <div className="space-y-4">
-            <Card className="border-0 p-4 shadow-sm sm:p-5">
+        <div className="mt-3 grid gap-3 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+          <div className="space-y-3 lg:space-y-4">
+            <Card className="border-0 p-3 shadow-sm sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Label htmlFor="recurring-month" className="text-sm font-medium">Month</Label>
                 <MonthPicker
@@ -476,27 +508,32 @@ export default function RecurringSettingsPage() {
                   className="w-full sm:w-[190px]"
                 />
               </div>
-              <div className="mt-4 flex items-end justify-between gap-4">
+              <div className="mt-3 flex items-end justify-between gap-4 sm:mt-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Committed total</p>
-                  <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCurrency(data?.committed_total ?? "0.00")}</p>
+                  <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{formatCurrency(data?.committed_total ?? "0.00")}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-medium text-muted-foreground">Rules</p>
+                  <p className="text-xs font-medium text-muted-foreground">Recurring items</p>
                   <p className="mt-1 text-xl font-semibold">{data?.items_count ?? 0}</p>
                 </div>
               </div>
             </Card>
 
+            <Button className="h-10 w-full rounded-xl lg:hidden" onClick={() => setShowNew(true)}>
+              <Plus className="h-4 w-4" />
+              Add recurring expense
+            </Button>
+
             <Card className="overflow-hidden border-0 shadow-sm">
-              <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
+              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
                 <div>
-                  <h2 className="text-sm font-semibold">Recurring rules</h2>
+                  <h2 className="text-sm font-semibold">Recurring items</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{formatAddedMonth(month)}</p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
-                  <p>{activeRulesCount} Active</p>
-                  {inactiveRulesCount > 0 && <p>{inactiveRulesCount} Inactive</p>}
+                  <p>{activeItemsCount} Active</p>
+                  {inactiveItemsCount > 0 && <p>{inactiveItemsCount} Inactive</p>}
                 </div>
               </div>
 
@@ -511,8 +548,21 @@ export default function RecurringSettingsPage() {
                   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
                   return (
-                    <div key={item.id} className="group flex gap-3 px-4 py-3 transition-colors hover:bg-accent/30 sm:px-5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+                    <div
+                      key={item.id}
+                      role="button"
+                      tabIndex={0}
+                      className="group flex cursor-pointer gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-5 sm:py-3"
+                      aria-label={`Edit ${item.expense}`}
+                      onClick={() => startEdit(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          startEdit(item)
+                        }
+                      }}
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary sm:h-9 sm:w-9">
                         <TagIcon className="h-4 w-4 text-foreground" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -536,41 +586,39 @@ export default function RecurringSettingsPage() {
                             <p className="truncate">
                               {formatBillingSchedule(item)} · Next: {formatProjectedDate(item.projected_date_for_month)}
                             </p>
-                            {item.generated_for_month && (
-                              <p className="mt-0.5 text-success">Added for {formatAddedMonth(month)}</p>
-                            )}
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="-mr-1 -mt-1 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-                                aria-label={`Actions for ${item.expense}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="rounded-xl">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingId(item.id)
-                                  setEditingForm(formFromItem(item))
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onClick={() => setDeleteId(item.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div
+                            // Keep secondary actions from also triggering the row's edit shortcut.
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="-mr-1 -mt-1 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                                  aria-label={`Actions for ${item.expense}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="rounded-xl">
+                                <DropdownMenuItem onClick={() => startEdit(item)}>
+                                  <Pencil className="h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => setDeleteId(item.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -587,7 +635,7 @@ export default function RecurringSettingsPage() {
               </div>
               <h2 className="mt-4 text-sm font-semibold">Monthly commitments</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use recurring rules for bills you expect every month. They are included upfront for the selected month.
+                Use recurring items for bills you expect every month. They are included upfront for the selected month.
               </p>
               <Button className="mt-5 w-full rounded-xl" onClick={() => setShowNew(true)}>
                 <Plus className="h-4 w-4" />
@@ -596,19 +644,18 @@ export default function RecurringSettingsPage() {
             </Card>
 
             <Card className="border-0 p-5 shadow-sm">
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Committed total</span>
-                  <span className="font-medium">{formatCurrency(data?.committed_total ?? "0.00")}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Active rules</span>
-                  <span className="font-medium">{activeRulesCount}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Selected month</span>
-                  <span className="font-medium">{formatAddedMonth(month)}</span>
-                </div>
+              <h2 className="text-sm font-semibold">Upcoming this month</h2>
+              <div className="mt-4 space-y-3">
+                {upcomingItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No active recurring items for {formatAddedMonth(month)}.</p>
+                )}
+                {upcomingItems.map((item) => (
+                  <div key={item.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 text-sm">
+                    <span className="text-muted-foreground">{formatProjectedDate(item.projected_date_for_month)}</span>
+                    <span className="truncate font-medium">{item.expense}</span>
+                    <span className="font-medium">{formatCurrency(item.amount)}</span>
+                  </div>
+                ))}
               </div>
             </Card>
           </aside>
@@ -743,9 +790,29 @@ function RecurringForm({
   onCancel,
   onSave,
 }: RecurringFormProps) {
+  const [touched, setTouched] = useState({
+    amount: false,
+    expense: false,
+    billing_day: false,
+  })
+  const hasAmount = form.amount.trim() !== ""
+  const hasExpense = form.expense.trim() !== ""
+  const amountIsValid = isValidRecurringAmount(form.amount)
+  const billingDayIsValid = isValidBillingDay(form)
+  const canSubmit = Boolean(canSave && hasExpense && form.tag_id && amountIsValid && billingDayIsValid)
+  const disabledReason = !hasExpense
+    ? "Expense name is required."
+    : !amountIsValid
+      ? "Amount must be greater than $0."
+      : !billingDayIsValid
+        ? "Billing day must be 1-31."
+        : !canSave
+          ? "Make a change to save."
+          : null
+
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 space-y-5 px-5 py-5 sm:px-6">
+      <div className="flex-1 space-y-5 px-5 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5">
         <FormSection title="Expense">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -758,10 +825,15 @@ function RecurringForm({
                   min="0"
                   value={form.amount}
                   onChange={(e) => onChange({ ...form, amount: e.target.value })}
+                  onBlur={() => setTouched((previous) => ({ ...previous, amount: true }))}
                   placeholder="0.00"
+                  aria-invalid={touched.amount && !amountIsValid}
                   className="h-12 border-0 bg-transparent px-2 text-lg font-semibold focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
+              {(touched.amount || (hasAmount && !amountIsValid)) && !amountIsValid && (
+                <p className="text-xs text-destructive">Amount must be greater than $0.</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -769,9 +841,14 @@ function RecurringForm({
               <Input
                 value={form.expense}
                 onChange={(e) => onChange({ ...form, expense: e.target.value })}
+                onBlur={() => setTouched((previous) => ({ ...previous, expense: true }))}
                 placeholder="Rent"
+                aria-invalid={touched.expense && !hasExpense}
                 className="h-12 rounded-xl sm:h-10"
               />
+              {touched.expense && !hasExpense && (
+                <p className="text-xs text-destructive">Expense name is required.</p>
+              )}
             </div>
           </div>
 
@@ -860,10 +937,15 @@ function RecurringForm({
                 max="31"
                 value={form.billing_type === "last_day" ? "" : form.billing_day}
                 onChange={(e) => onChange({ ...form, billing_day: e.target.value })}
+                onBlur={() => setTouched((previous) => ({ ...previous, billing_day: true }))}
                 disabled={form.billing_type === "last_day"}
                 placeholder={form.billing_type === "last_day" ? "Auto" : "1-31"}
+                aria-invalid={touched.billing_day && !billingDayIsValid}
                 className="h-10 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
+              {(touched.billing_day || !billingDayIsValid) && !billingDayIsValid && (
+                <p className="text-xs text-destructive">Billing day must be 1-31.</p>
+              )}
             </div>
           </div>
 
@@ -904,7 +986,12 @@ function RecurringForm({
         </FormSection>
       </div>
 
-      <div className="sticky bottom-0 flex shrink-0 justify-end gap-2 border-t border-border/50 bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
+      {/* Extra bottom padding keeps the sticky tray footer clear of the iOS home indicator and software keyboard scroll area. */}
+      <div className="sticky bottom-0 shrink-0 border-t border-border/50 bg-background/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur sm:px-6 sm:pb-4">
+        {disabledReason && (
+          <p className="mb-2 text-right text-xs text-muted-foreground">{disabledReason}</p>
+        )}
+        <div className="flex justify-end gap-2">
         <Button
           variant="ghost"
           className="rounded-xl"
@@ -913,12 +1000,13 @@ function RecurringForm({
           Cancel
         </Button>
         <Button
-          className="rounded-xl"
+          className="rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           onClick={onSave}
-          disabled={isMutating || !form.expense.trim() || !form.tag_id || !canSave}
+          disabled={isMutating || !canSubmit}
         >
           {isMutating ? "Saving..." : saveLabel}
         </Button>
+        </div>
       </div>
     </div>
   )
