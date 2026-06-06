@@ -12,9 +12,10 @@ import {
 interface MonthSelectorProps {
   currentMonth: string // Format: "2024-03"
   onChange: (month: string) => void
+  allowFuture?: boolean
 }
 
-export function MonthSelector({ currentMonth, onChange }: MonthSelectorProps) {
+export function MonthSelector({ currentMonth, onChange, allowFuture = false }: MonthSelectorProps) {
   const isCurrentMonth = currentMonth === getCurrentMonthKey()
   const monthLabel = formatMonthLabel(currentMonth) ?? currentMonth
 
@@ -39,7 +40,7 @@ export function MonthSelector({ currentMonth, onChange }: MonthSelectorProps) {
         size="icon"
         className="h-9 w-9 rounded-full"
         onClick={() => onChange(getNextMonthKey(currentMonth))}
-        disabled={isCurrentMonth}
+        disabled={!allowFuture && isCurrentMonth}
       >
         <ChevronRight className="h-5 w-5" />
         <span className="sr-only">Next month</span>

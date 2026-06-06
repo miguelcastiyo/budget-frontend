@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
+import { MonthSelector } from "@/components/budget/month-selector"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +17,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { BudgetSettings } from "@/lib/api/types"
+import type { BudgetSettings, BudgetSettingsResolvedResponse } from "@/lib/api/types"
+import { formatMonthLabel, getCurrentMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
@@ -43,6 +45,8 @@ import {
 export default function BudgetSettingsPage() {
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey())
+  const [budgetResolution, setBudgetResolution] = useState<BudgetSettingsResolvedResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,9 +62,14 @@ export default function BudgetSettingsPage() {
 
   useEffect(() => {
     const loadBudgetSettings = async () => {
+      setIsLoading(true)
+      setError(null)
+      setSuccess(null)
+      setBudgetResolution(null)
       try {
-        const data = await apiClient.getBudgetSettings()
-        hydrateForm(data)
+        const data = await apiClient.getBudgetSettings(selectedMonth)
+        setBudgetResolution(data)
+        hydrateForm(data.settings)
       } catch (err) {
         setError(err instanceof ApiError ? err.error.message : "Unable to load budget settings")
       } finally {
@@ -69,7 +78,7 @@ export default function BudgetSettingsPage() {
     }
 
     void loadBudgetSettings()
-  }, [])
+  }, [selectedMonth])
 
   const hydrateForm = (settings: BudgetSettings) => {
     const hydratedIncome = hydrateIncomeForm(settings)
@@ -87,17 +96,43 @@ export default function BudgetSettingsPage() {
     [incomeForm, allocationForm]
   )
   const hasBudgetChanges = loadedPayloadKey !== null && currentPayloadKey !== loadedPayloadKey
-  const canSaveBudget = !isLoading && !isSaving && hasValidIncome && hasValidAllocation && hasBudgetChanges
+  const canCreateInheritedVersion = budgetResolution !== null && !budgetResolution.is_exact_match
+  const selectedMonthLabel = formatMonthLabel(selectedMonth) ?? selectedMonth
+  const resolvedMonthLabel = budgetResolution?.resolved_effective_month
+    ? formatMonthLabel(budgetResolution.resolved_effective_month) ?? budgetResolution.resolved_effective_month
+    : null
+  const canSaveBudget = !isLoading && !isSaving && hasValidIncome && hasValidAllocation && (hasBudgetChanges || canCreateInheritedVersion)
   const saveLabel = isSaving
     ? "Saving..."
     : !hasValidIncome || !hasValidAllocation
       ? "Fix issues before saving"
-      : hasBudgetChanges
-        ? "Save changes"
+      : canCreateInheritedVersion
+        ? `Save Budget Starting ${selectedMonthLabel}`
+        : hasBudgetChanges
+          ? `Update ${selectedMonthLabel} Budget`
         : "Saved"
   const headerSubtitle = isLoading
     ? "Loading settings"
-    : `${formatCurrency(income)}/month · Used by dashboard targets`
+    : `${formatCurrency(income)}/month · ${selectedMonthLabel}`
+  const budgetStatusCopy = isLoading && budgetResolution === null
+    ? {
+        current: `Loading budget for ${selectedMonthLabel}.`,
+        consequence: "Targets will update after this month loads.",
+      }
+    : budgetResolution?.resolved_effective_month
+      ? budgetResolution.is_exact_match
+        ? {
+            current: `Editing your ${selectedMonthLabel} budget.`,
+            consequence: `Changes apply from ${selectedMonthLabel} forward until another budget starts.`,
+          }
+        : {
+            current: `Using your ${resolvedMonthLabel} budget.`,
+            consequence: `Saving changes will create a new budget starting ${selectedMonthLabel}.`,
+          }
+      : {
+          current: `No saved budget applies to ${selectedMonthLabel} yet.`,
+          consequence: `Saving will create a new budget starting ${selectedMonthLabel}.`,
+        }
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -105,9 +140,18 @@ export default function BudgetSettingsPage() {
     setSuccess(null)
 
     try {
-      const response = await apiClient.updateBudgetSettings(budgetSettingsPayload(incomeForm, allocationForm))
+      const response = await apiClient.updateBudgetSettings({
+        effective_month: selectedMonth,
+        ...budgetSettingsPayload(incomeForm, allocationForm),
+      })
 
       hydrateForm(response)
+      setBudgetResolution({
+        requested_month: selectedMonth,
+        resolved_effective_month: selectedMonth,
+        is_exact_match: true,
+        settings: response,
+      })
       setSuccess("Budget saved")
       setShowBudgetEditor(false)
     } catch (err) {
@@ -133,13 +177,11 @@ export default function BudgetSettingsPage() {
   )
 
   const budgetEditor = (idPrefix: string, showInlineSave = true) => (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
-        <div className="mb-5">
-          <h2 className="font-semibold">Budget basis</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Set the monthly amount your dashboard and insights should use.
-          </p>
+        <div className="mb-4 sm:mb-5">
+          <h2 className="font-semibold">Budget for {selectedMonthLabel}</h2>
+          <BudgetStatusCopy copy={budgetStatusCopy} className="mt-1" />
         </div>
         <IncomeBreakdownForm
           value={incomeForm}
@@ -150,7 +192,7 @@ export default function BudgetSettingsPage() {
       </section>
 
       <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
-        <div className="mb-5">
+        <div className="mb-4 sm:mb-5">
           <h2 className="font-semibold">Allocation</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Split your monthly budget into category targets.
@@ -185,7 +227,7 @@ export default function BudgetSettingsPage() {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
-        <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4 lg:max-w-6xl lg:px-8">
+        <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:max-w-6xl lg:px-8">
           <Link href="/settings">
             <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
               <ArrowLeft className="h-5 w-5" />
@@ -200,12 +242,18 @@ export default function BudgetSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg space-y-4 px-5 pt-5 lg:max-w-6xl lg:px-8 lg:pt-8">
+      {/* Extra mobile bottom padding keeps the final card scrollable above the fixed nav and iOS home indicator. */}
+      <main className="mx-auto max-w-lg space-y-3 px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-3 sm:space-y-4 sm:px-5 sm:pt-5 lg:max-w-6xl lg:px-8 lg:pb-0 lg:pt-8">
         {error && <p className="text-sm text-destructive">{error}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
 
+        <section className="rounded-2xl border border-border/60 bg-card px-3 py-3 shadow-sm sm:p-5">
+          <MonthSelector currentMonth={selectedMonth} onChange={setSelectedMonth} allowFuture />
+          <BudgetStatusCopy copy={budgetStatusCopy} className="mx-auto mt-2 max-w-sm text-center sm:mt-3" />
+        </section>
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <BudgetSummaryCard
               income={income}
               isLoading={isLoading}
@@ -273,6 +321,21 @@ export default function BudgetSettingsPage() {
   )
 }
 
+function BudgetStatusCopy({
+  copy,
+  className,
+}: {
+  copy: { current: string; consequence: string }
+  className?: string
+}) {
+  return (
+    <div className={cn("space-y-0.5 text-sm leading-5 text-muted-foreground", className)}>
+      <p className="font-medium text-foreground/85">{copy.current}</p>
+      <p>{copy.consequence}</p>
+    </div>
+  )
+}
+
 function BudgetSummaryCard({
   income,
   isLoading,
@@ -283,11 +346,11 @@ function BudgetSummaryCard({
   onEdit: () => void
 }) {
   return (
-    <Card className="border-0 p-5 shadow-sm">
+    <Card className="border-0 p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">Monthly budget basis</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight">
+          <p className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
             {isLoading ? "--" : formatCurrency(income)}
             {!isLoading && <span className="text-base font-medium text-muted-foreground"> / month</span>}
           </p>
@@ -316,8 +379,8 @@ function BudgetAllocationCard({
   income: number
 }) {
   return (
-    <Card className="border-0 p-5 shadow-sm">
-      <div className="mb-4">
+    <Card className="border-0 p-4 shadow-sm sm:p-5">
+      <div className="mb-3 sm:mb-4">
         <h2 className="font-semibold">Budget allocation</h2>
         <p className="mt-1 text-sm text-muted-foreground">Category targets for the selected budget basis.</p>
       </div>
@@ -331,7 +394,7 @@ function BudgetUsageCard() {
     <Card className="border-0 p-5 shadow-sm">
       <h2 className="text-sm font-semibold">How this budget is used</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Your monthly budget powers dashboard targets, spending progress, and insights. Update it when your take-home income or budgeting approach changes.
+        Your monthly budget powers dashboard targets, spending progress, and insights. Changes apply from the selected month forward until another budget starts.
       </p>
     </Card>
   )
@@ -429,7 +492,7 @@ function BudgetAllocationSummary({
   const barTotal = segments.reduce((sum, segment) => sum + segment.value, 0)
 
   return (
-    <div className="mt-4 rounded-2xl border border-border/70 bg-muted/30 p-3">
+    <div className="mt-3 rounded-2xl border border-border/70 bg-muted/30 p-3 sm:mt-4">
       <div className="flex h-3 overflow-hidden rounded-full bg-muted">
         {segments.map((segment) => (
           <div
@@ -439,12 +502,17 @@ function BudgetAllocationSummary({
           />
         ))}
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+      <div className="mt-3 space-y-1.5 sm:grid sm:grid-cols-3 sm:gap-2 sm:space-y-0 sm:text-center">
         {segments.map((segment) => (
-          <div key={segment.label} className="min-w-0 rounded-xl bg-background/60 p-2">
-            <p className="truncate text-[11px] text-muted-foreground">{segment.label}</p>
-            <p className="mt-1 text-sm font-semibold">{segment.target}</p>
-            <p className="text-[11px] text-muted-foreground">target</p>
+          <div key={segment.label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-background/60 px-3 py-2 sm:block sm:p-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs text-muted-foreground sm:text-[11px]">{segment.label}</p>
+              <p className="text-[11px] text-muted-foreground sm:hidden">target</p>
+            </div>
+            <div className="shrink-0 text-right sm:text-center">
+              <p className="text-sm font-semibold">{segment.target}</p>
+              <p className="hidden text-[11px] text-muted-foreground sm:block">target</p>
+            </div>
           </div>
         ))}
       </div>

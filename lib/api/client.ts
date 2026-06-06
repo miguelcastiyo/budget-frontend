@@ -19,6 +19,7 @@ import type {
 	  CreateRecurringExpenseRequest,
 	  UpdateRecurringExpenseRequest,
   BudgetSettings,
+  BudgetSettingsResolvedResponse,
   BudgetSettingsPercentInput,
   BudgetSettingsAmountInput,
   Transaction,
@@ -373,7 +374,13 @@ class ApiClient {
   }
 
   // Budget Settings
-  async getBudgetSettings(): Promise<BudgetSettings> {
+  async getBudgetSettings(): Promise<BudgetSettings>
+  async getBudgetSettings(month: string): Promise<BudgetSettingsResolvedResponse>
+  async getBudgetSettings(month?: string): Promise<BudgetSettings | BudgetSettingsResolvedResponse> {
+    if (month) {
+      return this.request<BudgetSettingsResolvedResponse>(`/me/budget-settings?month=${encodeURIComponent(month)}`)
+    }
+
     return this.request<BudgetSettings>("/me/budget-settings")
   }
 

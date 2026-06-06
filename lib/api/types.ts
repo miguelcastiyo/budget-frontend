@@ -208,7 +208,15 @@ export interface BudgetSettings {
   savings_debts_amount?: string
 }
 
+export interface BudgetSettingsResolvedResponse {
+  requested_month: string
+  resolved_effective_month: string | null
+  is_exact_match: boolean
+  settings: BudgetSettings
+}
+
 export interface BudgetSettingsIncomeInput {
+  effective_month?: string
   monthly_income: string
   income_source_type?: IncomeSourceType
   primary_monthly_income?: string | null
