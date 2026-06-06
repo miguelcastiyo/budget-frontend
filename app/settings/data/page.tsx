@@ -171,15 +171,15 @@ function activityStatusLabel(item: DataRunItem): string {
 }
 
 function statusClassName(status: DataRunStatus): string {
-  if (status === "completed") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-  if (status === "partial") return "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-  if (status === "started") return "bg-blue-500/10 text-blue-700 dark:text-blue-300"
+  if (status === "completed") return "bg-success/10 text-success"
+  if (status === "partial") return "bg-warning/10 text-warning"
+  if (status === "started") return "bg-primary/10 text-primary"
   return "bg-destructive/10 text-destructive"
 }
 
 function activityStatusClassName(item: DataRunItem): string {
   if (item.type === "import" && item.rolled_back_at) {
-    return "bg-slate-500/10 text-slate-700 dark:text-slate-300"
+    return "bg-muted text-muted-foreground"
   }
 
   return statusClassName(item.status)
@@ -201,7 +201,7 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
         {result.status === "failed" ? (
           <XCircle className="mt-0.5 size-5 text-destructive" />
         ) : (
-          <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
+          <CheckCircle2 className="mt-0.5 size-5 text-success" />
         )}
         <div className="min-w-0 flex-1">
           <p className="font-medium">{result.message}</p>

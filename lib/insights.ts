@@ -28,25 +28,23 @@ export const categoryColors: Record<Category, string> = {
 }
 
 const tagPalette = [
-  "#1D4ED8",
-  "#B45309",
-  "#0F766E",
-  "#BE123C",
-  "#6D28D9",
-  "#166534",
-  "#C2410C",
-  "#0E7490",
-  "#4C1D95",
-  "#374151",
-  "#9F1239",
-  "#365314",
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "color-mix(in srgb, var(--color-chart-1) 72%, var(--color-foreground))",
+  "color-mix(in srgb, var(--color-chart-2) 72%, var(--color-foreground))",
+  "color-mix(in srgb, var(--color-chart-3) 72%, var(--color-foreground))",
+  "color-mix(in srgb, var(--color-chart-4) 72%, var(--color-foreground))",
+  "color-mix(in srgb, var(--color-chart-5) 72%, var(--color-foreground))",
 ]
 
 export const tooltipContentStyle = {
   borderRadius: 12,
   border: "1px solid var(--color-border)",
   backgroundColor: "var(--color-background)",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+  boxShadow: "0 8px 20px color-mix(in srgb, var(--color-foreground) 10%, transparent)",
   padding: "8px 10px",
 }
 
@@ -139,10 +137,9 @@ export function tagColor(index: number): string {
     return tagPalette[index]
   }
 
-  const hue = (index * 47) % 360
-  const saturation = 72
-  const lightness = index % 2 === 0 ? 38 : 46
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  const chartIndex = (index % 5) + 1
+  const mix = 58 + (index % 4) * 8
+  return `color-mix(in srgb, var(--color-chart-${chartIndex}) ${mix}%, var(--color-foreground))`
 }
 
 export function dayLabel(day: InsightsDayOfWeekSpendItem["day"]): string {

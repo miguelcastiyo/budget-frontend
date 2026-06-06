@@ -641,9 +641,9 @@ export function AddTransactionSheet({
   }
 
   const categoryConfig = {
-    needs: { label: "Needs", color: "bg-needs" },
-    wants: { label: "Wants", color: "bg-wants" },
-    savings_debts: { label: "Savings", color: "bg-savings" },
+    needs: { label: "Needs", selectedClassName: "bg-needs/15" },
+    wants: { label: "Wants", selectedClassName: "bg-wants/15" },
+    savings_debts: { label: "Savings", selectedClassName: "bg-savings/15" },
   } as const
   const primarySuggestion = !isEditMode ? suggestions[0] : undefined
   const primarySuggestionParts = primarySuggestion
@@ -1049,7 +1049,7 @@ export function AddTransactionSheet({
                             className={cn(
                               "relative h-11 cursor-pointer rounded-xl text-sm font-medium transition-all duration-200 sm:h-12",
                               isSelected
-                                ? `${config.color} text-white shadow-sm`
+                                ? `border-primary ${config.selectedClassName} text-foreground shadow-sm`
                                 : "bg-muted/60 text-foreground hover:bg-muted"
                             )}
                           >

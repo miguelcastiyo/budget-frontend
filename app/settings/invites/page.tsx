@@ -92,12 +92,12 @@ function statusIcon(status: InviteResponse["status"]) {
 
 function statusClassName(status: InviteResponse["status"]): string {
   if (status === "accepted") {
-    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+    return "border-success/25 bg-success/10 text-success"
   }
   if (status === "expired" || status === "revoked") {
     return "border-muted bg-muted text-muted-foreground"
   }
-  return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+  return "border-warning/25 bg-warning/10 text-warning"
 }
 
 export default function InvitesSettingsPage() {

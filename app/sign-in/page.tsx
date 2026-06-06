@@ -99,11 +99,11 @@ function SignInPageContent() {
 
   return (
     <div className="auth-light min-h-[100svh] bg-background text-foreground">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.04),transparent_28%),linear-gradient(to_bottom,rgba(15,23,42,0.015),transparent_30%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(111,128,100,0.08),transparent_28%),linear-gradient(to_bottom,rgba(184,141,74,0.035),transparent_30%)]" />
 
       <main className="mx-auto flex min-h-[100svh] max-w-6xl flex-col items-center justify-start px-4 pt-10 pb-6 sm:px-5 sm:pt-14 sm:pb-10 lg:px-8 lg:pt-20 lg:pb-16">
         <div className="w-full max-w-md">
-          <Card className="gap-0 rounded-[1.5rem] border-border/70 bg-card/95 py-0 shadow-lg shadow-black/5 sm:rounded-[1.75rem]">
+          <Card className="gap-0 rounded-[1.5rem] border-border/70 bg-card/95 py-0 shadow-lg sm:rounded-[1.75rem]">
             <div className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
               <div className="flex justify-center pt-2 pb-2 sm:pt-3 sm:pb-3">
                 <Image

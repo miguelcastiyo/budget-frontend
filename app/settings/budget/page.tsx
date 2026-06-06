@@ -153,7 +153,7 @@ export default function BudgetSettingsPage() {
 
       <main className="mx-auto max-w-lg space-y-6 px-5 pt-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {success && <p className="text-sm text-green-600">{success}</p>}
+        {success && <p className="text-sm text-success">{success}</p>}
 
         <Card className="border-0 p-5 shadow-sm sm:hidden">
           <p className="text-sm text-muted-foreground">Monthly income</p>

@@ -45,8 +45,8 @@ function statusLabel(status: MasterApiKeyMetadata["status"]): string {
 }
 
 function statusClassName(status: MasterApiKeyMetadata["status"]): string {
-  if (status === "active") return "bg-green-500/10 text-green-700"
-  if (status === "expired") return "bg-amber-500/10 text-amber-700"
+  if (status === "active") return "bg-success/10 text-success"
+  if (status === "expired") return "bg-warning/10 text-warning"
   return "bg-muted text-muted-foreground"
 }
 
@@ -193,7 +193,7 @@ export default function ApiKeysSettingsPage() {
                       <span>Last used {formatDate(key.last_used_at)}</span>
                     </div>
                     {key.expires_at ? (
-                      <p className="text-xs text-amber-600 mt-1">
+                      <p className="text-xs text-warning mt-1">
                         Expires {formatDate(key.expires_at)}
                       </p>
                     ) : (
@@ -300,7 +300,7 @@ export default function ApiKeysSettingsPage() {
                 className="rounded-full flex-shrink-0"
                 onClick={() => void handleCopyKey()}
               >
-                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
               </Button>
             </div>
           </div>

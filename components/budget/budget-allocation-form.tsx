@@ -78,7 +78,7 @@ export function BudgetAllocationForm({
 
         <div className={cn(
           "p-3 rounded-xl text-center text-sm",
-          isPercentValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
+          isPercentValid ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
         )}>
           Total: {percentTotal.toFixed(0)}%
           {!isPercentValid && " (must equal 100%)"}
@@ -116,7 +116,7 @@ export function BudgetAllocationForm({
 
         <div className={cn(
           "p-3 rounded-xl text-center text-sm",
-          isAmountValid ? "bg-green-500/10 text-green-600" : "bg-destructive/10 text-destructive"
+          isAmountValid ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
         )}>
           Total: {formatCurrency(amountTotal)}
           {!isAmountValid && (

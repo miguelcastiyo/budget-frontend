@@ -332,7 +332,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             <Mail className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm">Signed in with {profile?.auth_provider === "google" ? "Google" : "Email"}</span>
             {profile?.email_verified && (
-              <span className="ml-auto flex items-center gap-1 text-sm text-green-600">
+              <span className="ml-auto flex items-center gap-1 text-sm text-success">
                 <Check className="h-4 w-4" />
                 Verified
               </span>
@@ -395,7 +395,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
+          {success && <p className="text-sm text-success">{success}</p>}
         </div>
 
         <DialogFooter className="shrink-0 border-t border-border/50 bg-background/95 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-6 sm:pt-4">

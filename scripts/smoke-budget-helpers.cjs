@@ -156,8 +156,8 @@ assertEqual(insights.formatMonthAxisLabel("2026-05", false), "May", "month axis 
 assertEqual(insights.formatMonthAxisLabel("2026-05", true), "May 26", "month axis label includes short year")
 assertEqual(insights.formatMonthAxisLabel("not-a-month", true), "not-a-month", "month axis label falls back for invalid values")
 assertEqual(insights.formatMonthTooltipLabel("2026-05"), "May 2026", "month tooltip label renders full month")
-assertEqual(insights.tagColor(0), "#1D4ED8", "tag color uses fixed palette first")
-assertEqual(insights.tagColor(20), "hsl(220, 72%, 38%)", "tag color generates deterministic overflow colors")
+assertEqual(insights.tagColor(0), "var(--color-chart-1)", "tag color uses theme chart palette first")
+assertEqual(insights.tagColor(20), "color-mix(in srgb, var(--color-chart-1) 58%, var(--color-foreground))", "tag color generates deterministic overflow colors")
 assertEqual(insights.dayLabel("Monday"), "MON", "day label abbreviates day names")
 
 console.log("Frontend helper tests passed")

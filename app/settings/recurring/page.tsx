@@ -471,7 +471,7 @@ export default function RecurringSettingsPage() {
                       {item.is_active ? "Active" : "Paused"}
                     </p>
                     {item.generated_for_month && (
-                      <p className="text-[11px] text-green-600">Added for {month}</p>
+                      <p className="text-[11px] text-success">Added for {month}</p>
                     )}
                   </div>
                 </div>
