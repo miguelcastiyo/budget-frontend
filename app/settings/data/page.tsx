@@ -44,9 +44,9 @@ type HeaderImportField = Exclude<CsvImportField, "category">
 const HEADER_IMPORT_FIELDS: Array<{ key: HeaderImportField; label: string; required: boolean; hint: string }> = [
   { key: "date", label: "Date", required: true, hint: "Transaction date" },
   { key: "expense", label: "Expense", required: true, hint: "Merchant or description" },
-  { key: "amount", label: "Amount", required: true, hint: "Positive amount" },
-  { key: "tag", label: "Tag", required: true, hint: "Creates missing tags on import" },
-  { key: "card", label: "Card", required: false, hint: "Creates missing cards on import" },
+  { key: "amount", label: "Amount", required: true, hint: "Positive transaction amount" },
+  { key: "tag", label: "Spending tag", required: true, hint: "Creates or matches spending tags" },
+  { key: "card", label: "Card", required: false, hint: "Creates or matches cards" },
   { key: "is_split", label: "Split", required: false, hint: "Optional true/false flag" },
 ]
 
@@ -55,7 +55,7 @@ const NONE_VALUE = "__none"
 const CATEGORY_OPTIONS: Array<{ value: Category; label: string }> = [
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
-  { value: "savings_debts", label: "Savings" },
+  { value: "savings_debts", label: "Savings & Debts" },
 ]
 
 const CATEGORY_SOURCE_HINTS = ["bank_category_guess", "category", "budget_category", "type", "label", "tag", "tags"]
@@ -187,6 +187,28 @@ function activityStatusClassName(item: DataRunItem): string {
   return statusClassName(item.status)
 }
 
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`
+}
+
+function plannedImportCount(result: CsvImportResponse): number {
+  if (result.imported_rows > 0) {
+    return result.imported_rows
+  }
+
+  return Math.max(result.valid_rows - result.duplicate_rows - result.skipped_rows, 0)
+}
+
+function reviewSummarySentence(result: CsvImportResponse): string {
+  return `${pluralize(result.total_rows, "row")} checked. ${plannedImportCount(result).toLocaleString()} will be imported. ${pluralize(result.duplicate_rows, "duplicate")} will be skipped.`
+}
+
+function completeSummarySentence(result: CsvImportResponse): string {
+  const duplicateText = result.duplicate_rows > 0 ? ` Skipped ${pluralize(result.duplicate_rows, "duplicate")}.` : ""
+  const invalidText = result.invalid_rows > 0 ? ` Skipped ${pluralize(result.invalid_rows, "invalid row")}.` : ""
+  return `Imported ${pluralize(result.imported_rows, "row")}.${duplicateText}${invalidText}`
+}
+
 function importRunIdFromDataRun(item: DataRunItem): string | null {
   if (item.type !== "import" || !item.id.startsWith("import_")) {
     return null
@@ -196,7 +218,9 @@ function importRunIdFromDataRun(item: DataRunItem): string | null {
   return /^\d+$/.test(id) ? id : null
 }
 
-function ResultSummary({ result }: { result: CsvImportResponse }) {
+function ResultSummary({ result, mode }: { result: CsvImportResponse; mode: "review" | "complete" }) {
+  const summarySentence = mode === "review" ? reviewSummarySentence(result) : completeSummarySentence(result)
+
   return (
     <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
       <div className="flex items-start gap-3">
@@ -206,18 +230,21 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
           <CheckCircle2 className="mt-0.5 size-5 text-success" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="font-medium">{result.message}</p>
+          <p className="font-medium">{summarySentence}</p>
+          {mode === "review" && (
+            <p className="mt-1 text-sm text-muted-foreground">Nothing is written until you confirm the import.</p>
+          )}
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-6">
-            <Stat label="Rows" value={result.total_rows} />
-            <Stat label="Valid" value={result.valid_rows} />
-            <Stat label="Imported" value={result.imported_rows} />
+            <Stat label="Rows checked" value={result.total_rows} />
+            <Stat label="Valid rows" value={result.valid_rows} />
+            <Stat label={mode === "review" ? "Will import" : "Imported"} value={mode === "review" ? plannedImportCount(result) : result.imported_rows} />
             <Stat label="Duplicates" value={result.duplicate_rows} />
             <Stat label="Skipped" value={result.skipped_rows} />
             <Stat label="Invalid" value={result.invalid_rows} />
           </div>
           {result.skipped_blank_amount_rows > 0 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              {result.skipped_blank_amount_rows} row(s) had no value in the mapped amount column and were skipped.
+              {pluralize(result.skipped_blank_amount_rows, "row")} had no value in the mapped amount column and were skipped.
             </p>
           )}
           {result.errors.length > 0 && (
@@ -229,7 +256,7 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
               ))}
               {(result.errors_truncated || result.errors.length > 8) && (
                 <p className="pt-1 text-[11px] text-muted-foreground">
-                  Showing the first {Math.min(8, result.errors.length)} error(s).
+                  Showing the first {pluralize(Math.min(8, result.errors.length), "error")}.
                 </p>
               )}
             </div>
@@ -240,7 +267,7 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
                 <div className="rounded-lg border border-border/70 bg-background/70 p-3">
                   <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <Tags className="size-3.5" />
-                    New Tags
+                    New tags to be created
                   </div>
                   <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
                     {result.new_tags.map((tag) => {
@@ -259,7 +286,7 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
                 <div className="rounded-lg border border-border/70 bg-background/70 p-3">
                   <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <CreditCard className="size-3.5" />
-                    New Cards
+                    New cards to be created
                   </div>
                   <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
                     {result.new_cards.map((card) => (
@@ -289,21 +316,22 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 }
 
 function ImportStepper({ stepIndex }: { stepIndex: number }) {
-  const steps = ["Upload", "Map", "Dates", "Categories", "Tags", "Review", "Import"]
+  const steps = ["Upload", "Map", "Dates", "Groups", "Tags", "Review", "Import"]
+  const fullSteps = ["Upload", "Map columns", "Set missing years", "Budget groups", "Spending tags", "Review", "Import"]
   const progress = ((stepIndex + 1) / steps.length) * 100
 
   return (
     <>
       <div className="space-y-2 sm:hidden">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-medium">{steps[stepIndex]}</span>
-          <span className="text-muted-foreground">{stepIndex + 1} / {steps.length}</span>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="font-medium text-muted-foreground">Step {stepIndex + 1} of {steps.length}</span>
+          <span className="truncate font-semibold">{fullSteps[stepIndex]}</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={stepIndex + 1} aria-label={`Import step ${stepIndex + 1} of ${steps.length}: ${fullSteps[stepIndex]}`}>
           <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
         </div>
       </div>
-      <div className="hidden grid-cols-7 rounded-xl border border-border/70 bg-muted/20 p-1 sm:grid">
+      <div className="hidden grid-cols-7 rounded-xl border border-border/70 bg-muted/20 p-1 sm:grid" aria-label={`Import step ${stepIndex + 1} of ${steps.length}: ${fullSteps[stepIndex]}`}>
         {steps.map((label, index) => (
           <div
             key={label}
@@ -411,7 +439,7 @@ function FilePicker({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="text-xs text-muted-foreground">
-              {(file.size / 1024).toFixed(1)} KB - {preview.total_rows} row(s)
+              {(file.size / 1024).toFixed(1)} KB - {pluralize(preview.total_rows, "row")}
             </p>
           </div>
           <Button type="button" variant="ghost" size="sm" className="h-9 shrink-0 rounded-lg px-3" onClick={onReset} disabled={isBusy}>
@@ -463,6 +491,7 @@ function FilePicker({
           <Upload className="mx-auto size-8 text-muted-foreground" />
           <p className="font-medium">Choose CSV file</p>
           <p className="text-sm text-muted-foreground">CSV files only</p>
+          <p className="mx-auto max-w-xs text-xs text-muted-foreground">No data is written until you review and confirm the import.</p>
         </div>
       )}
     </button>
@@ -541,22 +570,22 @@ function CategorySetup({
     <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label className="text-sm">Category setup</Label>
+          <Label className="text-sm">Budget group setup</Label>
           <Select value={mode} onValueChange={(next) => onModeChange(next as CategorySetupMode)}>
             <SelectTrigger className="h-10 rounded-lg border-border/70">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="value_map">Map source values</SelectItem>
-              <SelectItem value="default">Use one category</SelectItem>
-              <SelectItem value="exact_column">CSV has Budget categories</SelectItem>
+              <SelectItem value="value_map">Map imported labels</SelectItem>
+              <SelectItem value="default">Use one budget group</SelectItem>
+              <SelectItem value="exact_column">CSV has Budget groups</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {mode === "default" ? (
           <div className="space-y-1.5">
-            <Label className="text-sm">Default category</Label>
+            <Label className="text-sm">Default budget group</Label>
             <Select value={defaultCategory} onValueChange={(next) => onDefaultCategoryChange(next as Category)}>
               <SelectTrigger className="h-10 rounded-lg border-border/70">
                 <SelectValue />
@@ -594,7 +623,7 @@ function CategorySetup({
         <div className="space-y-2">
           {profile?.unique_values_truncated ? (
             <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
-              This source has more than 100 unique values. Choose a smaller category column or use one default category.
+              This source has more than 100 unique values. Choose a smaller label column or use one default budget group.
             </p>
           ) : values.length > 0 ? (
             <div className="max-h-[calc(100dvh-22rem)] space-y-2 overflow-y-auto pr-1 sm:max-h-[28rem]">
@@ -602,7 +631,7 @@ function CategorySetup({
                 <div key={item.value} className="grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(10rem,1fr)_minmax(18rem,22rem)] md:items-center">
                   <div className="min-w-0">
                     <p className="break-words text-sm font-medium">{item.value}</p>
-                    <p className="text-xs text-muted-foreground">{item.count} row(s)</p>
+                    <p className="text-xs text-muted-foreground">{pluralize(item.count, "row")}</p>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5">
                     {CATEGORY_OPTIONS.map((option) => (
@@ -626,7 +655,7 @@ function CategorySetup({
             </div>
           ) : (
             <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
-              Choose a source column with category-like values.
+              Choose a source column with labels you can map into budget groups.
             </p>
           )}
         </div>
@@ -634,7 +663,7 @@ function CategorySetup({
 
       {mode === "exact_column" && (
         <p className="text-xs text-muted-foreground">
-          Use this only when the selected column already contains needs, wants, or savings_debts.
+          Use this only when the selected column already contains Needs, Wants, or Savings & Debts.
         </p>
       )}
     </div>
@@ -651,13 +680,14 @@ function DateSetup({
   onYearChange: (year: string) => void
 }) {
   const examples = profile?.yearless_examples ?? []
+  const yearlessCount = profile?.yearless_date_count ?? 0
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
         <div>
           <Label className="text-sm">Year for dates without a year</Label>
           <p className="mt-1 text-xs text-muted-foreground">
-            {profile?.yearless_date_count ?? 0} row(s) need a year before validation.
+            {pluralize(yearlessCount, "row")} {yearlessCount === 1 ? "needs" : "need"} a year before validation.
           </p>
         </div>
         <Select value={selectedYear} onValueChange={onYearChange}>
@@ -723,7 +753,7 @@ function TagSetup({
               <div key={item.value} className="grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(10rem,1fr)_minmax(18rem,24rem)] md:items-center">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-medium">{item.value}</p>
-                  <p className="text-xs text-muted-foreground">{item.count} row(s)</p>
+                  <p className="text-xs text-muted-foreground">{pluralize(item.count, "row")}</p>
                 </div>
                 <div className="grid gap-2">
                   <Select
@@ -1394,10 +1424,28 @@ export default function DataSettingsPage() {
 
       <main className="mx-auto max-w-lg space-y-5 px-4 pt-5 sm:px-5 lg:max-w-6xl lg:px-8">
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-stretch">
-          <Card className="border-0 p-4 shadow-sm sm:p-5 lg:flex lg:items-center">
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <PanelHeader icon={Upload} title="Import CSV" description="Start a guided import to map columns, categories, and review validation." />
-              <Button type="button" className="h-11 rounded-lg sm:w-auto" onClick={openImportDialog}>
+          <Card className="border-0 p-4 shadow-sm sm:p-5">
+            <div className="flex h-full flex-col gap-5">
+              <div className="flex items-start justify-between gap-4">
+                <PanelHeader icon={Upload} title="Import CSV" description="Bring in transactions from your bank or spreadsheet." />
+              </div>
+
+              <div className="grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                {[
+                  "Upload your file",
+                  "Map columns",
+                  "Review before importing",
+                ].map((label, index) => (
+                  <div key={label} className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-background text-xs font-semibold text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <span className="text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button type="button" className="mt-auto h-11 w-full rounded-lg" onClick={openImportDialog}>
                 <Upload className="size-4" />
                 Import CSV
               </Button>
@@ -1585,7 +1633,7 @@ export default function DataSettingsPage() {
         <DialogContent
           {...importDialogSwipeDismiss}
           className={cn(
-            "!flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl",
+            "!flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:max-h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl",
             mobileDrawerDialogClassName
           )}
           showCloseButton={!isPreviewing && !isValidating && !isImporting}
@@ -1599,8 +1647,8 @@ export default function DataSettingsPage() {
                   {importStep === "upload" && "Choose the CSV file to preview before anything is imported."}
                   {importStep === "map" && "Match CSV headers to Budget fields."}
                   {importStep === "dates" && "Choose a year for dates that do not include one."}
-                  {importStep === "categories" && "Translate external labels into Budget categories."}
-                  {importStep === "tags" && "Review imported tags before validation."}
+                  {importStep === "categories" && "Map imported labels into Needs, Wants, or Savings & Debts."}
+                  {importStep === "tags" && "Match imported labels to existing tags or create new ones."}
                   {importStep === "review" && "Review validation results before importing."}
                   {importStep === "done" && "Import complete."}
                 </DialogDescription>
@@ -1609,7 +1657,7 @@ export default function DataSettingsPage() {
             </div>
           </DialogHeader>
 
-          <div ref={importDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div ref={importDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-28 sm:p-5 sm:pb-28">
             <div className="mx-auto max-w-4xl space-y-4">
               {importError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -1630,7 +1678,7 @@ export default function DataSettingsPage() {
                   />
                   {importPreview && (
                     <div className="rounded-xl border border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
-                      {importPreview.headers.length} column(s) detected across {importPreview.total_rows} row(s).
+                      {pluralize(importPreview.headers.length, "column")} detected across {pluralize(importPreview.total_rows, "row")}. Nothing has been imported yet.
                     </div>
                   )}
                 </div>
@@ -1640,8 +1688,8 @@ export default function DataSettingsPage() {
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                   <div className="space-y-3">
                     <div>
-                      <h3 className="text-sm font-semibold">Map headers</h3>
-                      <p className="text-xs text-muted-foreground">{importPreview.headers.length} column(s) detected.</p>
+                      <h3 className="text-sm font-semibold">Map columns</h3>
+                      <p className="text-xs text-muted-foreground">Match CSV columns to Budget fields. {pluralize(importPreview.headers.length, "column")} detected.</p>
                     </div>
                     <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} />
                     {!requiredMappingComplete && (
@@ -1667,8 +1715,8 @@ export default function DataSettingsPage() {
               {importStep === "dates" && importPreview && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-semibold">Set dates</h3>
-                    <p className="text-xs text-muted-foreground">Dates without a year need one shared year for this import.</p>
+                    <h3 className="text-sm font-semibold">Set missing years</h3>
+                    <p className="text-xs text-muted-foreground">Some dates do not include a year. Choose the year to apply before validation.</p>
                   </div>
                   <DateSetup profile={dateProfile} selectedYear={dateYear} onYearChange={handleDateYearChange} />
                 </div>
@@ -1677,8 +1725,8 @@ export default function DataSettingsPage() {
               {importStep === "categories" && importPreview && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-semibold">Set categories</h3>
-                    <p className="text-xs text-muted-foreground">Budget categories stay fixed. Map bank labels into Needs, Wants, or Savings.</p>
+                    <h3 className="text-sm font-semibold">Budget group setup</h3>
+                    <p className="text-xs text-muted-foreground">Map imported labels into Needs, Wants, or Savings & Debts.</p>
                   </div>
                   <CategorySetup
                     preview={importPreview}
@@ -1692,11 +1740,11 @@ export default function DataSettingsPage() {
                     onDefaultCategoryChange={handleDefaultCategoryChange}
                   />
                   {!categorySetupComplete && (
-                    <p className="text-xs text-destructive">Finish category setup before validation.</p>
+                    <p className="text-xs text-destructive">Finish budget group setup before validation.</p>
                   )}
                   {amountProfile && amountProfile.blank_count > 0 && amountStrategy.blank_mapped_amount === "skip" && (
                     <div className="rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
-                      {amountProfile.blank_count} row(s) have a blank value in {importMapping.amount}. Those rows will be skipped instead of treated as errors.
+                      {pluralize(amountProfile.blank_count, "row")} have a blank value in {importMapping.amount}. Those rows will be skipped instead of treated as errors.
                     </div>
                   )}
                 </div>
@@ -1705,8 +1753,8 @@ export default function DataSettingsPage() {
               {importStep === "tags" && importPreview && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-semibold">Review tags</h3>
-                    <p className="text-xs text-muted-foreground">Map imported tag values to existing tags or create new ones.</p>
+                    <h3 className="text-sm font-semibold">Spending tags</h3>
+                    <p className="text-xs text-muted-foreground">Match imported labels to existing tags or create new ones.</p>
                   </div>
                   <TagSetup
                     preview={importPreview}
@@ -1716,7 +1764,7 @@ export default function DataSettingsPage() {
                     onChange={handleTagValueChange}
                   />
                   {!tagSetupComplete && (
-                    <p className="text-xs text-destructive">Review every imported tag value before validation.</p>
+                    <p className="text-xs text-destructive">Review every spending tag before validation.</p>
                   )}
                 </div>
               )}
@@ -1724,14 +1772,14 @@ export default function DataSettingsPage() {
               {importStep === "review" && (
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-semibold">Review import</h3>
-                    <p className="text-xs text-muted-foreground">Only valid, non-duplicate rows will be imported.</p>
+                    <h3 className="text-sm font-semibold">Review before importing</h3>
+                    <p className="text-xs text-muted-foreground">Nothing is written yet. Only valid, non-duplicate rows will be imported.</p>
                   </div>
                   {validationResult ? (
-                    <ResultSummary result={validationResult} />
+                    <ResultSummary result={validationResult} mode="review" />
                   ) : (
                     <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
-                      Validate the import to see row counts and planned new tags or cards.
+                      Validate the import to see what will be imported, skipped, or created.
                     </div>
                   )}
                   {importPreview && (
@@ -1748,7 +1796,7 @@ export default function DataSettingsPage() {
                     <h3 className="text-sm font-semibold">Import complete</h3>
                     <p className="text-xs text-muted-foreground">Recent Activity has been refreshed.</p>
                   </div>
-                  {commitResult && <ResultSummary result={commitResult} />}
+                  {commitResult && <ResultSummary result={commitResult} mode="complete" />}
                 </div>
               )}
             </div>
@@ -1767,21 +1815,21 @@ export default function DataSettingsPage() {
               </Button>
               <p className="hidden text-xs text-muted-foreground sm:block">
                 {importStep === "upload" && "No data is written during preview."}
-                {importStep === "map" && (needsDateSetup ? "Date setup comes next." : "Category setup comes next.")}
+                {importStep === "map" && (needsDateSetup ? "Date setup comes next." : "Budget group setup comes next.")}
                 {importStep === "dates" && "The selected year applies only to dates missing a year."}
-                {importStep === "categories" && "Tag review comes next."}
-                {importStep === "tags" && "Validation checks rows without writing."}
+                {importStep === "categories" && "Spending tag review comes next."}
+                {importStep === "tags" && "Validation checks your CSV without writing data."}
                 {importStep === "review" && "Import writes valid rows only."}
                 {importStep === "done" && "You can start another import or close this dialog."}
               </p>
               <div className="grid gap-2 sm:flex sm:justify-end">
                 {importStep === "done" ? (
                   <>
-                    <Button type="button" variant="secondary" className="h-11 rounded-lg" onClick={resetImportState}>
-                      Import Another CSV
-                    </Button>
                     <Button type="button" className="h-11 rounded-lg" onClick={closeImportDialog}>
                       Done
+                    </Button>
+                    <Button type="button" variant="secondary" className="h-11 rounded-lg" onClick={resetImportState}>
+                      Import another CSV
                     </Button>
                   </>
                 ) : importStep === "review" ? (
@@ -1797,7 +1845,7 @@ export default function DataSettingsPage() {
                         Importing
                       </>
                     ) : (
-                      "Import Valid Rows"
+                      validationResult ? `Import ${plannedImportCount(validationResult).toLocaleString()} rows` : "Import valid rows"
                     )}
                   </Button>
                 ) : importStep === "tags" ? (
