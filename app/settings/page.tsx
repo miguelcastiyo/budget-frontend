@@ -208,7 +208,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
 
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-2 pt-standalone-safe-top lg:pt-6 space-y-6">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-standalone-safe-top space-y-6">
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <Card className="relative p-5 lg:p-6 border-0 shadow-sm">

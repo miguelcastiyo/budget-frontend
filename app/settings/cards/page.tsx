@@ -155,7 +155,7 @@ export default function CardsSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-5 pt-4 space-y-4">
+      <main className="max-w-lg mx-auto px-5 pt-5 space-y-4">
         <p className="text-sm text-muted-foreground">
           Add your credit and debit cards to track which card you used for each transaction.
         </p>

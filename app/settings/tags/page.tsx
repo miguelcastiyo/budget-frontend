@@ -259,7 +259,7 @@ export default function TagsSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-5 pt-4 space-y-4">
+      <main className="max-w-lg mx-auto px-5 pt-5 space-y-4">
         <p className="text-sm text-muted-foreground">
           Tags help you categorize your transactions. You can also create new tags when adding a transaction.
         </p>

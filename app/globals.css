@@ -190,7 +190,7 @@
   }
 
   .pt-standalone-safe-top {
-    padding-top: 0;
+    padding-top: 1.25rem;
   }
 
   @media (min-width: 64rem) {
@@ -203,13 +203,13 @@
     }
 
     .pt-standalone-safe-top {
-      padding-top: 0;
+      padding-top: 1.5rem;
     }
   }
 }
 
 @media (display-mode: standalone) {
   .pt-standalone-safe-top {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 }

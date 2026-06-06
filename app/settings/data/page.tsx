@@ -1359,7 +1359,7 @@ export default function DataSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-lg gap-5 px-4 pt-4 sm:px-5 lg:max-w-7xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:px-8">
+      <main className="mx-auto grid max-w-lg gap-5 px-4 pt-5 sm:px-5 lg:max-w-7xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:px-8">
         <section className="space-y-4">
           <Card className="border-0 p-4 shadow-sm sm:p-5">
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

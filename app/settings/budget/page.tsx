@@ -151,7 +151,7 @@ export default function BudgetSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg space-y-6 px-5 pt-4">
+      <main className="mx-auto max-w-lg space-y-6 px-5 pt-5">
         {error && <p className="text-sm text-destructive">{error}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
 

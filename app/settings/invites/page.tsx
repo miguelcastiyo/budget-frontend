@@ -271,7 +271,7 @@ export default function InvitesSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-5 pt-4 space-y-4">
+      <main className="mx-auto max-w-lg px-5 pt-5 space-y-4">
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {!isAuthLoading && !isOwner ? (
