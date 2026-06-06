@@ -193,6 +193,16 @@
     padding-top: 1.25rem;
   }
 
+  .pt-auth-safe-top {
+    padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
+  }
+
+  @media (min-width: 40rem) {
+    .pt-auth-safe-top {
+      padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+    }
+  }
+
   @media (min-width: 64rem) {
     .pb-mobile-nav {
       padding-bottom: 2rem;
@@ -204,6 +214,10 @@
 
     .pt-standalone-safe-top {
       padding-top: 1.5rem;
+    }
+
+    .pt-auth-safe-top {
+      padding-top: calc(5rem + env(safe-area-inset-top, 0px));
     }
   }
 }
