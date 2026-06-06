@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { ArrowLeft, CalendarIcon, Pencil, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, CalendarIcon, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -130,7 +137,20 @@ function formatProjectedDate(date: string): string {
   if (Number.isNaN(parsed.getTime())) {
     return date
   }
-  return parsed.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+function formatAddedMonth(month: string): string {
+  const parsed = parseMonthValue(month)
+  return parsed ? format(parsed, "MMMM yyyy") : month
+}
+
+function formatBillingSchedule(item: RecurringExpense): string {
+  if (item.billing_type === "last_day") {
+    return "Last day monthly"
+  }
+
+  return `Day ${item.billing_day} monthly`
 }
 
 function parseMonthValue(month: string): Date | null {
@@ -199,7 +219,7 @@ function MonthPicker({
             <span className="truncate">{displayLabel}</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
+        <PopoverContent className="w-auto p-0" align="end" avoidCollisions>
           <AppCalendar
             mode="single"
             selected={selectedMonth ?? undefined}
@@ -290,6 +310,11 @@ export default function RecurringSettingsPage() {
   }, [loadData])
 
   const tagOptions = useMemo(() => tags, [tags])
+  const activeRulesCount = useMemo(
+    () => data?.items.filter((item) => item.is_active).length ?? 0,
+    [data?.items]
+  )
+  const inactiveRulesCount = Math.max((data?.items_count ?? 0) - activeRulesCount, 0)
   const closeNewRecurringDialog = () => {
     setShowNew(false)
     setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
@@ -410,9 +435,9 @@ export default function RecurringSettingsPage() {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
-        <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-4">
+        <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4 lg:max-w-6xl lg:px-8">
           <Link href="/settings">
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
@@ -421,6 +446,7 @@ export default function RecurringSettingsPage() {
             variant="ghost"
             size="icon"
             className="rounded-full"
+            aria-label="Add recurring expense"
             onClick={() => setShowNew(true)}
           >
             <Plus className="w-5 h-5" />
@@ -428,100 +454,165 @@ export default function RecurringSettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-5 pt-5 space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Recurring expenses are auto-added once per month so your dashboard includes committed spend early.
-        </p>
+      <main className="mx-auto max-w-lg px-5 pt-5 lg:max-w-6xl lg:px-8 lg:pt-8">
+        <div className="max-w-2xl">
+          <p className="text-sm text-muted-foreground">
+            Automatically add monthly bills so committed spending is included upfront.
+          </p>
+        </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Card className="p-4 border-0 shadow-sm space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="recurring-month" className="text-sm font-medium">Month</Label>
-            <MonthPicker
-              id="recurring-month"
-              value={month}
-              onChange={setMonth}
-              placeholder="Select month"
-              className="w-[180px]"
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Committed Total</p>
-              <p className="text-2xl font-semibold">{formatCurrency(data?.committed_total ?? "0.00")}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Rules</p>
-              <p className="text-lg font-semibold">{data?.items_count ?? 0}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
-          {!isLoading && (data?.items.length ?? 0) === 0 && (
-            <div className="p-4 text-sm text-muted-foreground">No recurring expenses yet.</div>
-          )}
-
-          {data?.items.map((item) => {
-            const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
-
-            return (
-              <div key={item.id} className="p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                    <TagIcon className="w-4 h-4 text-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.expense}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {item.tag.name}
-                      {item.card ? ` · ${item.card.name}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.billing_type === "last_day"
-                        ? "Bills on the last day of the month"
-                        : `Bills on day ${item.billing_day} of each month`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Next in {month}: {formatProjectedDate(item.projected_date_for_month)}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0 ml-2">
-                    <p className="font-semibold">{formatCurrency(item.amount)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.is_active ? "Active" : "Paused"}
-                    </p>
-                    {item.generated_for_month && (
-                      <p className="text-[11px] text-success">Added for {month}</p>
-                    )}
-                  </div>
+        <div className="mt-4 grid gap-4 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+          <div className="space-y-4">
+            <Card className="border-0 p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Label htmlFor="recurring-month" className="text-sm font-medium">Month</Label>
+                <MonthPicker
+                  id="recurring-month"
+                  value={month}
+                  onChange={setMonth}
+                  placeholder="Select month"
+                  className="w-full sm:w-[190px]"
+                />
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Committed total</p>
+                  <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCurrency(data?.committed_total ?? "0.00")}</p>
                 </div>
-                <div className="flex justify-end gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full"
-                    onClick={() => {
-                      setEditingId(item.id)
-                      setEditingForm(formFromItem(item))
-                    }}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="rounded-full text-destructive hover:text-destructive"
-                    onClick={() => setDeleteId(item.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                <div className="text-right">
+                  <p className="text-xs font-medium text-muted-foreground">Rules</p>
+                  <p className="mt-1 text-xl font-semibold">{data?.items_count ?? 0}</p>
                 </div>
               </div>
-            )
-          })}
-        </Card>
+            </Card>
+
+            <Card className="overflow-hidden border-0 shadow-sm">
+              <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-5">
+                <div>
+                  <h2 className="text-sm font-semibold">Recurring rules</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{formatAddedMonth(month)}</p>
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  <p>{activeRulesCount} Active</p>
+                  {inactiveRulesCount > 0 && <p>{inactiveRulesCount} Inactive</p>}
+                </div>
+              </div>
+
+              {!isLoading && (data?.items.length ?? 0) === 0 && (
+                <div className="p-4 text-sm text-muted-foreground sm:p-5">
+                  No recurring expenses yet.
+                </div>
+              )}
+
+              <div className="divide-y divide-border/60">
+                {data?.items.map((item) => {
+                  const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+
+                  return (
+                    <div key={item.id} className="group flex gap-3 px-4 py-3 transition-colors hover:bg-accent/30 sm:px-5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+                        <TagIcon className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{item.expense}</p>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {item.tag.name}
+                              {item.card ? ` · ${item.card.name}` : ""}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold">{formatCurrency(item.amount)}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {item.is_active ? "Active" : "Inactive"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-start justify-between gap-3">
+                          <div className="min-w-0 text-xs text-muted-foreground">
+                            <p className="truncate">
+                              {formatBillingSchedule(item)} · Next: {formatProjectedDate(item.projected_date_for_month)}
+                            </p>
+                            {item.generated_for_month && (
+                              <p className="mt-0.5 text-success">Added for {formatAddedMonth(month)}</p>
+                            )}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="-mr-1 -mt-1 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                                aria-label={`Actions for ${item.expense}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="rounded-xl">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingId(item.id)
+                                  setEditingForm(formFromItem(item))
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setDeleteId(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          </div>
+
+          <aside className="hidden space-y-4 lg:block">
+            <Card className="border-0 p-5 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                <Repeat className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <h2 className="mt-4 text-sm font-semibold">Monthly commitments</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Use recurring rules for bills you expect every month. They are included upfront for the selected month.
+              </p>
+              <Button className="mt-5 w-full rounded-xl" onClick={() => setShowNew(true)}>
+                <Plus className="h-4 w-4" />
+                Add recurring expense
+              </Button>
+            </Card>
+
+            <Card className="border-0 p-5 shadow-sm">
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Committed total</span>
+                  <span className="font-medium">{formatCurrency(data?.committed_total ?? "0.00")}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Active rules</span>
+                  <span className="font-medium">{activeRulesCount}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Selected month</span>
+                  <span className="font-medium">{formatAddedMonth(month)}</span>
+                </div>
+              </div>
+            </Card>
+          </aside>
+        </div>
       </main>
 
       <Dialog
@@ -537,15 +628,15 @@ export default function RecurringSettingsPage() {
         <DialogContent
           {...newRecurringSwipeDismiss}
           className={cn(
-            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:border",
+            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:border",
             mobileDrawerDialogClassName
           )}
         >
-          <DialogHeader className="p-6 pb-4 border-b border-border/50">
-            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-4 mb-1 sm:hidden")} aria-hidden="true" />
+          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
             <DialogTitle className="text-xl font-semibold">New Recurring Expense</DialogTitle>
             <DialogDescription>
-              Add a monthly expense that gets pre-added at the start of each month.
+              Add a monthly bill to include it in your budget upfront.
             </DialogDescription>
           </DialogHeader>
           <div ref={newRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -574,15 +665,15 @@ export default function RecurringSettingsPage() {
         <DialogContent
           {...editRecurringSwipeDismiss}
           className={cn(
-            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:border",
+            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:border",
             mobileDrawerDialogClassName
           )}
         >
-          <DialogHeader className="p-6 pb-4 border-b border-border/50">
-            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-4 mb-1 sm:hidden")} aria-hidden="true" />
+          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
             <DialogTitle className="text-xl font-semibold">Edit Recurring Expense</DialogTitle>
             <DialogDescription>
-              Update future monthly instances for this recurring expense.
+              Update the monthly rule for future budget planning.
             </DialogDescription>
           </DialogHeader>
           <div ref={editRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -653,152 +744,167 @@ function RecurringForm({
   onSave,
 }: RecurringFormProps) {
   return (
-    <div className="p-6 space-y-5">
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Amount</Label>
-        <div className="flex items-center rounded-xl border border-border/60 bg-muted/20 px-3">
-          <span className="text-lg text-muted-foreground">$</span>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.amount}
-            onChange={(e) => onChange({ ...form, amount: e.target.value })}
-            placeholder="0.00"
-            className="h-12 border-0 bg-transparent px-2 text-lg font-semibold focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        </div>
+    <div className="flex min-h-full flex-col">
+      <div className="flex-1 space-y-5 px-5 py-5 sm:px-6">
+        <FormSection title="Expense">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Amount</Label>
+              <div className="flex items-center rounded-xl border border-border/60 bg-muted/20 px-3">
+                <span className="text-lg text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.amount}
+                  onChange={(e) => onChange({ ...form, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="h-12 border-0 bg-transparent px-2 text-lg font-semibold focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Expense name</Label>
+              <Input
+                value={form.expense}
+                onChange={(e) => onChange({ ...form, expense: e.target.value })}
+                placeholder="Rent"
+                className="h-12 rounded-xl sm:h-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-sm">Category</Label>
+              <Select
+                value={form.category}
+                onValueChange={(value) => onChange({ ...form, category: value as Category })}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="needs">Needs</SelectItem>
+                  <SelectItem value="wants">Wants</SelectItem>
+                  <SelectItem value="savings_debts">Savings & Debts</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Tag</Label>
+              <Select
+                value={form.tag_id}
+                onValueChange={(value) => onChange({ ...form, tag_id: value })}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue placeholder="Select tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Card</Label>
+            <Select
+              value={form.card_id || "__none"}
+              onValueChange={(value) => onChange({ ...form, card_id: value === "__none" ? "" : value })}
+            >
+              <SelectTrigger className="h-10 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">No card</SelectItem>
+                {cards.map((card) => (
+                  <SelectItem key={card.id} value={card.id}>
+                    {card.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </FormSection>
+
+        <FormSection title="Schedule">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-sm">Billing rule</Label>
+              <Select
+                value={form.billing_type}
+                onValueChange={(value) => onChange({ ...form, billing_type: value as RecurringBillingType })}
+              >
+                <SelectTrigger className="h-10 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day_of_month">Specific day</SelectItem>
+                  <SelectItem value="last_day">Last day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">Billing day</Label>
+              <Input
+                type="number"
+                min="1"
+                max="31"
+                value={form.billing_type === "last_day" ? "" : form.billing_day}
+                onChange={(e) => onChange({ ...form, billing_day: e.target.value })}
+                disabled={form.billing_type === "last_day"}
+                placeholder={form.billing_type === "last_day" ? "Auto" : "1-31"}
+                className="h-10 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-sm">Starts month</Label>
+              <MonthPicker
+                value={form.starts_month}
+                onChange={(value) => onChange({ ...form, starts_month: value })}
+                placeholder="Select month"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm">Ends month</Label>
+              <MonthPicker
+                value={form.ends_month}
+                onChange={(value) => onChange({ ...form, ends_month: value })}
+                placeholder="No end month"
+                className="w-full"
+                allowClear
+              />
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="Status">
+          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/15 px-4 py-3">
+            <div>
+              <Label className="text-sm">Active</Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">Include this monthly rule in future planning.</p>
+            </div>
+            <Switch
+              checked={form.is_active}
+              onCheckedChange={(checked) => onChange({ ...form, is_active: checked })}
+            />
+          </div>
+        </FormSection>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-sm">Expense</Label>
-        <Input
-          value={form.expense}
-          onChange={(e) => onChange({ ...form, expense: e.target.value })}
-          placeholder="Rent"
-          className="h-10 rounded-xl"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label className="text-sm">Category</Label>
-          <Select
-            value={form.category}
-            onValueChange={(value) => onChange({ ...form, category: value as Category })}
-          >
-            <SelectTrigger className="h-10 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="needs">Needs</SelectItem>
-              <SelectItem value="wants">Wants</SelectItem>
-              <SelectItem value="savings_debts">Savings & Debts</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm">Tag</Label>
-          <Select
-            value={form.tag_id}
-            onValueChange={(value) => onChange({ ...form, tag_id: value })}
-          >
-            <SelectTrigger className="h-10 rounded-xl">
-              <SelectValue placeholder="Select tag" />
-            </SelectTrigger>
-            <SelectContent>
-              {tags.map((tag) => (
-                <SelectItem key={tag.id} value={tag.id}>
-                  {tag.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-sm">Card (optional)</Label>
-        <Select
-          value={form.card_id || "__none"}
-          onValueChange={(value) => onChange({ ...form, card_id: value === "__none" ? "" : value })}
-        >
-          <SelectTrigger className="h-10 rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none">No card</SelectItem>
-            {cards.map((card) => (
-              <SelectItem key={card.id} value={card.id}>
-                {card.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label className="text-sm">Billing rule</Label>
-          <Select
-            value={form.billing_type}
-            onValueChange={(value) => onChange({ ...form, billing_type: value as RecurringBillingType })}
-          >
-            <SelectTrigger className="h-10 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day_of_month">Specific day</SelectItem>
-              <SelectItem value="last_day">Last day</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm">Billing day</Label>
-          <Input
-            type="number"
-            min="1"
-            max="31"
-            value={form.billing_type === "last_day" ? "" : form.billing_day}
-            onChange={(e) => onChange({ ...form, billing_day: e.target.value })}
-            disabled={form.billing_type === "last_day"}
-            placeholder={form.billing_type === "last_day" ? "Auto" : "1-31"}
-            className="h-10 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label className="text-sm">Starts month</Label>
-          <MonthPicker
-            value={form.starts_month}
-            onChange={(value) => onChange({ ...form, starts_month: value })}
-            placeholder="Select month"
-            className="w-full"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm">Ends month (optional)</Label>
-          <MonthPicker
-            value={form.ends_month}
-            onChange={(value) => onChange({ ...form, ends_month: value })}
-            placeholder="No end month"
-            className="w-full"
-            allowClear
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between pt-1">
-        <Label className="text-sm">Active</Label>
-        <Switch
-          checked={form.is_active}
-          onCheckedChange={(checked) => onChange({ ...form, is_active: checked })}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 border-t border-border/50 pt-4">
+      <div className="sticky bottom-0 flex shrink-0 justify-end gap-2 border-t border-border/50 bg-background/95 px-5 py-4 backdrop-blur sm:px-6">
         <Button
           variant="ghost"
           className="rounded-xl"
@@ -815,5 +921,20 @@ function RecurringForm({
         </Button>
       </div>
     </div>
+  )
+}
+
+function FormSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+      <div className="space-y-4">{children}</div>
+    </section>
   )
 }
