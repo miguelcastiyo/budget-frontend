@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getMonthDateRange, toIsoDate } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { CategoryCard } from "@/components/budget/category-card"
 import { TagBreakdown } from "@/components/budget/tag-breakdown"
@@ -38,6 +38,22 @@ function emptyTagMetrics(month: string): TagMetricsResponse {
   }
 }
 
+function getOverviewRecentDateRange(month: string, today = new Date()) {
+  const monthRange = getMonthDateRange(month)
+  if (!monthRange) {
+    return null
+  }
+
+  if (month === getCurrentMonthKey(today)) {
+    return {
+      date_from: monthRange.date_from,
+      date_to: toIsoDate(today),
+    }
+  }
+
+  return monthRange
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
@@ -55,11 +71,22 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const dashboard = await apiClient.getDashboard(currentMonth)
+      const recentDateRange = getOverviewRecentDateRange(currentMonth)
+      const [dashboard, recentTransactionsPage] = await Promise.all([
+        apiClient.getDashboard(currentMonth),
+        recentDateRange
+          ? apiClient.getTransactions({
+            ...recentDateRange,
+            page: 1,
+            page_size: 10,
+            sort: "date_desc",
+          })
+          : null,
+      ])
 
       setCategoryMetrics(dashboard.category_metrics)
       setTagMetrics(dashboard.tag_metrics)
-      setRecentTransactions(dashboard.recent_transactions)
+      setRecentTransactions(recentTransactionsPage?.items ?? dashboard.recent_transactions)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
