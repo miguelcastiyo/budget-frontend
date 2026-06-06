@@ -5,33 +5,131 @@ import type { ComponentType, DragEvent, RefObject } from "react"
 import Link from "next/link"
 import { ArrowLeft, CalendarIcon, CheckCircle2, CreditCard, Database, Download, FileUp, Loader2, Tags, Upload, XCircle } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { CsvImportField, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, DataRunItem, DataRunStatus } from "@/lib/api/types"
+import type { Category, CsvImportAmountStrategy, CsvImportCategoryStrategy, CsvImportDateStrategy, CsvImportField, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, CsvImportTagStrategy, CsvImportTagStrategyEntry, DataRunItem, DataRunStatus, Tag } from "@/lib/api/types"
 import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 
 type ExportDateMode = "all" | "custom"
-type ImportStep = "upload" | "map" | "review" | "done"
+type ImportStep = "upload" | "map" | "dates" | "categories" | "tags" | "review" | "done"
+type CategorySetupMode = "value_map" | "default" | "exact_column"
+type HeaderImportField = Exclude<CsvImportField, "category">
 
-const IMPORT_FIELDS: Array<{ key: CsvImportField; label: string; required: boolean; hint: string }> = [
+const HEADER_IMPORT_FIELDS: Array<{ key: HeaderImportField; label: string; required: boolean; hint: string }> = [
   { key: "date", label: "Date", required: true, hint: "Transaction date" },
   { key: "expense", label: "Expense", required: true, hint: "Merchant or description" },
   { key: "amount", label: "Amount", required: true, hint: "Positive amount" },
-  { key: "category", label: "Category", required: true, hint: "Needs, wants, savings/debts" },
   { key: "tag", label: "Tag", required: true, hint: "Creates missing tags on import" },
   { key: "card", label: "Card", required: false, hint: "Creates missing cards on import" },
   { key: "is_split", label: "Split", required: false, hint: "Optional true/false flag" },
 ]
 
 const NONE_VALUE = "__none"
+
+const CATEGORY_OPTIONS: Array<{ value: Category; label: string }> = [
+  { value: "needs", label: "Needs" },
+  { value: "wants", label: "Wants" },
+  { value: "savings_debts", label: "Savings" },
+]
+
+const CATEGORY_SOURCE_HINTS = ["bank_category_guess", "category", "budget_category", "type", "label", "tag", "tags"]
+
+function normalizedHeader(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+}
+
+function inferCategory(value: string): Category {
+  const normalized = value.toLowerCase().trim()
+  if (normalized === "needs" || normalized.includes("need")) {
+    return "needs"
+  }
+  if (normalized === "wants" || normalized.includes("want")) {
+    return "wants"
+  }
+  if (normalized.includes("savings_debts") || normalized.includes("savings & debts") || normalized.includes("debt")) {
+    return "savings_debts"
+  }
+  if (["savings", "saving", "investment", "investments", "debt", "loan"].some((keyword) => normalized.includes(keyword))) {
+    return "savings_debts"
+  }
+  if (["dining", "coffee", "entertainment", "shopping", "travel", "misc", "restaurant", "movie"].some((keyword) => normalized.includes(keyword))) {
+    return "wants"
+  }
+  return "needs"
+}
+
+function bestCategorySource(preview: CsvImportPreviewResponse): string {
+  const headersByNormalized = new Map(preview.headers.map((header) => [normalizedHeader(header), header]))
+  for (const hint of CATEGORY_SOURCE_HINTS) {
+    const exact = headersByNormalized.get(hint)
+    if (exact) {
+      return exact
+    }
+  }
+
+  return preview.suggested_mapping.category ?? preview.suggested_mapping.tag ?? preview.headers[0] ?? ""
+}
+
+function profileForHeader(preview: CsvImportPreviewResponse | null, header: string) {
+  return preview?.column_profiles.find((profile) => profile.header === header) ?? null
+}
+
+function dateProfileForHeader(preview: CsvImportPreviewResponse | null, header: string) {
+  return preview?.date_profiles.find((profile) => profile.header === header) ?? null
+}
+
+function defaultCategoryMap(preview: CsvImportPreviewResponse, sourceHeader: string): Record<string, Category> {
+  const profile = profileForHeader(preview, sourceHeader)
+  if (!profile) {
+    return {}
+  }
+
+  return Object.fromEntries(profile.unique_values.map((item) => [item.value, inferCategory(item.value)]))
+}
+
+function currentImportYear(): number {
+  return new Date().getFullYear()
+}
+
+function defaultTagValueMap(preview: CsvImportPreviewResponse, tagHeader: string, tags: Tag[]): Record<string, CsvImportTagStrategyEntry> {
+  const profile = profileForHeader(preview, tagHeader)
+  if (!profile) {
+    return {}
+  }
+  const tagsByName = new Map(tags.map((tag) => [tag.name.trim().toLowerCase(), tag]))
+
+  return Object.fromEntries(profile.unique_values.map((item) => {
+    const existing = tagsByName.get(item.value.trim().toLowerCase())
+    return [
+      item.value,
+      existing ? { mode: "existing", tag_id: existing.id } : { mode: "new", name: item.value },
+    ]
+  }))
+}
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString("en-US", {
@@ -64,11 +162,36 @@ function statusLabel(status: DataRunStatus): string {
   return "Failed"
 }
 
+function activityStatusLabel(item: DataRunItem): string {
+  if (item.type === "import" && item.rolled_back_at) {
+    return "Rolled back"
+  }
+
+  return statusLabel(item.status)
+}
+
 function statusClassName(status: DataRunStatus): string {
   if (status === "completed") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
   if (status === "partial") return "bg-amber-500/10 text-amber-700 dark:text-amber-300"
   if (status === "started") return "bg-blue-500/10 text-blue-700 dark:text-blue-300"
   return "bg-destructive/10 text-destructive"
+}
+
+function activityStatusClassName(item: DataRunItem): string {
+  if (item.type === "import" && item.rolled_back_at) {
+    return "bg-slate-500/10 text-slate-700 dark:text-slate-300"
+  }
+
+  return statusClassName(item.status)
+}
+
+function importRunIdFromDataRun(item: DataRunItem): string | null {
+  if (item.type !== "import" || !item.id.startsWith("import_")) {
+    return null
+  }
+
+  const id = item.id.slice("import_".length)
+  return /^\d+$/.test(id) ? id : null
 }
 
 function ResultSummary({ result }: { result: CsvImportResponse }) {
@@ -82,13 +205,19 @@ function ResultSummary({ result }: { result: CsvImportResponse }) {
         )}
         <div className="min-w-0 flex-1">
           <p className="font-medium">{result.message}</p>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-6">
             <Stat label="Rows" value={result.total_rows} />
             <Stat label="Valid" value={result.valid_rows} />
             <Stat label="Imported" value={result.imported_rows} />
             <Stat label="Duplicates" value={result.duplicate_rows} />
+            <Stat label="Skipped" value={result.skipped_rows} />
             <Stat label="Invalid" value={result.invalid_rows} />
           </div>
+          {result.skipped_blank_amount_rows > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {result.skipped_blank_amount_rows} row(s) had no value in the mapped amount column and were skipped.
+            </p>
+          )}
           {result.errors.length > 0 && (
             <div className="mt-3 max-h-44 space-y-1.5 overflow-y-auto rounded-lg border border-destructive/20 bg-destructive/5 p-3">
               {result.errors.slice(0, 8).map((errorItem, index) => (
@@ -158,15 +287,15 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 }
 
 function ImportStepper({ stepIndex }: { stepIndex: number }) {
-  const steps = ["Upload", "Map", "Review", "Import"]
+  const steps = ["Upload", "Map", "Dates", "Categories", "Tags", "Review", "Import"]
 
   return (
-    <div className="grid grid-cols-4 rounded-xl border border-border/70 bg-muted/20 p-1">
+    <div className="grid grid-cols-7 rounded-xl border border-border/70 bg-muted/20 p-1">
       {steps.map((label, index) => (
         <div
           key={label}
           className={cn(
-            "flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-xs font-medium transition-colors",
+            "flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-[11px] font-medium transition-colors sm:text-xs",
             stepIndex === index
               ? "bg-background text-foreground shadow-sm"
               : stepIndex > index
@@ -333,13 +462,13 @@ function MappingControls({
 }: {
   preview: CsvImportPreviewResponse
   mapping: CsvImportMapping
-  onChange: (field: CsvImportField, header: string | null) => void
+  onChange: (field: HeaderImportField, header: string | null) => void
 }) {
   const usedHeaders = new Set(Object.values(mapping).filter(Boolean))
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
-      {IMPORT_FIELDS.map((field) => {
+      {HEADER_IMPORT_FIELDS.map((field) => {
         const value = mapping[field.key] ?? ""
         return (
           <div key={field.key} className="grid gap-2 border-b border-border/70 p-3 last:border-b-0 sm:grid-cols-[minmax(8rem,0.42fr)_minmax(0,1fr)] sm:items-center">
@@ -366,6 +495,251 @@ function MappingControls({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function CategorySetup({
+  preview,
+  mode,
+  sourceHeader,
+  valueMap,
+  defaultCategory,
+  onModeChange,
+  onSourceChange,
+  onValueChange,
+  onDefaultCategoryChange,
+}: {
+  preview: CsvImportPreviewResponse
+  mode: CategorySetupMode
+  sourceHeader: string
+  valueMap: Record<string, Category>
+  defaultCategory: Category
+  onModeChange: (mode: CategorySetupMode) => void
+  onSourceChange: (header: string) => void
+  onValueChange: (sourceValue: string, category: Category) => void
+  onDefaultCategoryChange: (category: Category) => void
+}) {
+  const profile = profileForHeader(preview, sourceHeader)
+  const values = profile?.unique_values ?? []
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-sm">Category setup</Label>
+          <Select value={mode} onValueChange={(next) => onModeChange(next as CategorySetupMode)}>
+            <SelectTrigger className="h-10 rounded-lg border-border/70">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="value_map">Map source values</SelectItem>
+              <SelectItem value="default">Use one category</SelectItem>
+              <SelectItem value="exact_column">CSV has Budget categories</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {mode === "default" ? (
+          <div className="space-y-1.5">
+            <Label className="text-sm">Default category</Label>
+            <Select value={defaultCategory} onValueChange={(next) => onDefaultCategoryChange(next as Category)}>
+              <SelectTrigger className="h-10 rounded-lg border-border/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label className="text-sm">Source column</Label>
+            <Select value={sourceHeader || NONE_VALUE} onValueChange={(next) => onSourceChange(next === NONE_VALUE ? "" : next)}>
+              <SelectTrigger className="h-10 rounded-lg border-border/70">
+                <SelectValue placeholder="Choose CSV header" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_VALUE}>Choose source</SelectItem>
+                {preview.headers.map((header) => (
+                  <SelectItem key={header} value={header}>
+                    {header}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      {mode === "value_map" && (
+        <div className="space-y-2">
+          {profile?.unique_values_truncated ? (
+            <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+              This source has more than 100 unique values. Choose a smaller category column or use one default category.
+            </p>
+          ) : values.length > 0 ? (
+            <div className="max-h-[calc(100dvh-22rem)] space-y-2 overflow-y-auto pr-1 sm:max-h-[28rem]">
+              {values.map((item) => (
+                <div key={item.value} className="grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(10rem,1fr)_minmax(18rem,22rem)] md:items-center">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium">{item.value}</p>
+                    <p className="text-xs text-muted-foreground">{item.count} row(s)</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {CATEGORY_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={cn(
+                          "h-9 rounded-lg border px-1.5 text-xs font-medium transition-colors",
+                          valueMap[item.value] === option.value
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
+                        )}
+                        onClick={() => onValueChange(item.value, option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+              Choose a source column with category-like values.
+            </p>
+          )}
+        </div>
+      )}
+
+      {mode === "exact_column" && (
+        <p className="text-xs text-muted-foreground">
+          Use this only when the selected column already contains needs, wants, or savings_debts.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function DateSetup({
+  profile,
+  selectedYear,
+  onYearChange,
+}: {
+  profile: ReturnType<typeof dateProfileForHeader>
+  selectedYear: string
+  onYearChange: (year: string) => void
+}) {
+  const examples = profile?.yearless_examples ?? []
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end">
+        <div>
+          <Label className="text-sm">Year for dates without a year</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {profile?.yearless_date_count ?? 0} row(s) need a year before validation.
+          </p>
+        </div>
+        <Select value={selectedYear} onValueChange={onYearChange}>
+          <SelectTrigger className="h-10 rounded-lg border-border/70">
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 8 }, (_, index) => currentImportYear() + 1 - index).map((year) => (
+              <SelectItem key={year} value={String(year)}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {examples.length > 0 && selectedYear && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {examples.slice(0, 4).map((example) => {
+            const [month, day] = example.split("/")
+            const normalized = `${selectedYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+            return (
+              <div key={example} className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                <span className="text-muted-foreground">{example}</span>
+                <span className="px-2 text-muted-foreground">{"->"}</span>
+                <span className="font-medium">{normalized}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TagSetup({
+  preview,
+  tagHeader,
+  tags,
+  valueMap,
+  onChange,
+}: {
+  preview: CsvImportPreviewResponse
+  tagHeader: string
+  tags: Tag[]
+  valueMap: Record<string, CsvImportTagStrategyEntry>
+  onChange: (sourceValue: string, entry: CsvImportTagStrategyEntry) => void
+}) {
+  const profile = profileForHeader(preview, tagHeader)
+  const values = profile?.unique_values ?? []
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
+      {values.length === 0 ? (
+        <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+          Choose a tag column in the Map step.
+        </p>
+      ) : (
+        <div className="max-h-[calc(100dvh-22rem)] space-y-2 overflow-y-auto pr-1 sm:max-h-[28rem]">
+          {values.map((item) => {
+            const entry = valueMap[item.value] ?? { mode: "new", name: item.value }
+            const selectValue = entry.mode === "existing" ? `existing:${entry.tag_id}` : "__new"
+            return (
+              <div key={item.value} className="grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(10rem,1fr)_minmax(18rem,24rem)] md:items-center">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium">{item.value}</p>
+                  <p className="text-xs text-muted-foreground">{item.count} row(s)</p>
+                </div>
+                <div className="grid gap-2">
+                  <Select
+                    value={selectValue}
+                    onValueChange={(next) => {
+                      if (next === "__new") {
+                        onChange(item.value, { mode: "new", name: item.value })
+                        return
+                      }
+                      onChange(item.value, { mode: "existing", tag_id: next.replace("existing:", "") })
+                    }}
+                  >
+                    <SelectTrigger className="h-10 rounded-lg border-border/70">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new">Create "{item.value}"</SelectItem>
+                      {tags.map((tag) => (
+                        <SelectItem key={tag.id} value={`existing:${tag.id}`}>
+                          Use {tag.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -418,7 +792,7 @@ function MobileSampleRows({ preview, mapping }: { preview: CsvImportPreviewRespo
     )
   }
 
-  const mappedFields = IMPORT_FIELDS.filter((field) => mapping[field.key])
+  const mappedFields = HEADER_IMPORT_FIELDS.filter((field) => mapping[field.key])
 
   return (
     <div className="space-y-2 md:hidden">
@@ -442,7 +816,15 @@ function MobileSampleRows({ preview, mapping }: { preview: CsvImportPreviewRespo
   )
 }
 
-function ActivityRow({ item }: { item: DataRunItem }) {
+function ActivityRow({
+  item,
+  onRollback,
+  isRollingBack,
+}: {
+  item: DataRunItem
+  onRollback: (item: DataRunItem) => void
+  isRollingBack: boolean
+}) {
   const rangeLabel = item.type === "export"
     ? item.date_from && item.date_to
       ? `${formatDateOnly(item.date_from)} - ${formatDateOnly(item.date_to)}`
@@ -462,8 +844,8 @@ function ActivityRow({ item }: { item: DataRunItem }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium">{item.type === "export" ? "Export" : "Import"}</p>
-            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", statusClassName(item.status))}>
-              {statusLabel(item.status)}
+            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", activityStatusClassName(item))}>
+              {activityStatusLabel(item)}
             </span>
           </div>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{rangeLabel}</p>
@@ -472,8 +854,32 @@ function ActivityRow({ item }: { item: DataRunItem }) {
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>{item.imported_rows ?? 0} imported</span>
               <span>{item.duplicate_rows ?? 0} duplicates</span>
+              {(item.skipped_rows ?? 0) > 0 && <span>{item.skipped_rows} skipped</span>}
               <span>{item.invalid_rows ?? 0} invalid</span>
+              {item.rolled_back_at && <span>{item.rolled_back_rows} rolled back</span>}
             </div>
+          )}
+          {item.type === "import" && item.rollback_available && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 h-9 w-full rounded-lg sm:w-auto"
+              disabled={isRollingBack}
+              onClick={() => onRollback(item)}
+            >
+              {isRollingBack ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Rolling back
+                </>
+              ) : (
+                "Rollback"
+              )}
+            </Button>
+          )}
+          {item.type === "import" && item.rollback_unavailable_reason === "pre_rollback_feature" && (
+            <p className="mt-2 text-xs text-muted-foreground">Rollback unavailable for imports before this feature.</p>
           )}
           {item.error_summary && (
             <p className="mt-2 text-xs text-destructive">{item.error_summary}</p>
@@ -489,11 +895,23 @@ export default function DataSettingsPage() {
   const [dataRuns, setDataRuns] = useState<DataRunItem[]>([])
   const [isLoadingRuns, setIsLoadingRuns] = useState(true)
   const [runsError, setRunsError] = useState<string | null>(null)
+  const [rollbackTarget, setRollbackTarget] = useState<DataRunItem | null>(null)
+  const [rollbackError, setRollbackError] = useState<string | null>(null)
+  const [rollingBackImportId, setRollingBackImportId] = useState<string | null>(null)
 
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importStep, setImportStep] = useState<ImportStep>("upload")
   const [importPreview, setImportPreview] = useState<CsvImportPreviewResponse | null>(null)
   const [importMapping, setImportMapping] = useState<CsvImportMapping>({})
+  const [existingTags, setExistingTags] = useState<Tag[]>([])
+  const [dateYear, setDateYear] = useState("")
+  const [categoryMode, setCategoryMode] = useState<CategorySetupMode>("value_map")
+  const [categorySourceHeader, setCategorySourceHeader] = useState("")
+  const [categoryValueMap, setCategoryValueMap] = useState<Record<string, Category>>({})
+  const [tagValueMap, setTagValueMap] = useState<Record<string, CsvImportTagStrategyEntry>>({})
+  const [defaultCategory, setDefaultCategory] = useState<Category>("needs")
+  const [amountStrategy, setAmountStrategy] = useState<CsvImportAmountStrategy>({ blank_mapped_amount: "skip" })
   const [validationResult, setValidationResult] = useState<CsvImportResponse | null>(null)
   const [commitResult, setCommitResult] = useState<CsvImportResponse | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -534,6 +952,13 @@ export default function DataSettingsPage() {
     setImportStep("upload")
     setImportPreview(null)
     setImportMapping({})
+    setDateYear("")
+    setCategoryMode("value_map")
+    setCategorySourceHeader("")
+    setCategoryValueMap({})
+    setTagValueMap({})
+    setDefaultCategory("needs")
+    setAmountStrategy({ blank_mapped_amount: "skip" })
     setValidationResult(null)
     setCommitResult(null)
     setImportError(null)
@@ -546,6 +971,13 @@ export default function DataSettingsPage() {
     setImportStep("upload")
     setImportPreview(null)
     setImportMapping({})
+    setDateYear("")
+    setCategoryMode("value_map")
+    setCategorySourceHeader("")
+    setCategoryValueMap({})
+    setTagValueMap({})
+    setDefaultCategory("needs")
+    setAmountStrategy({ blank_mapped_amount: "skip" })
     setValidationResult(null)
     setCommitResult(null)
     setImportError(null)
@@ -565,9 +997,23 @@ export default function DataSettingsPage() {
 
     setIsPreviewing(true)
     try {
-      const preview = await apiClient.previewImportTransactions(file)
+      const [preview, tagsResponse] = await Promise.all([
+        apiClient.previewImportTransactions(file),
+        apiClient.getTags(),
+      ])
+      const sourceHeader = bestCategorySource(preview)
+      const suggestedMapping = { ...preview.suggested_mapping }
+      delete suggestedMapping.category
       setImportPreview(preview)
-      setImportMapping(preview.suggested_mapping)
+      setExistingTags(tagsResponse.items)
+      setImportMapping(suggestedMapping)
+      setDateYear(String(currentImportYear()))
+      setCategoryMode("value_map")
+      setCategorySourceHeader(sourceHeader)
+      setCategoryValueMap(defaultCategoryMap(preview, sourceHeader))
+      setTagValueMap(defaultTagValueMap(preview, suggestedMapping.tag ?? "", tagsResponse.items))
+      setDefaultCategory("needs")
+      setAmountStrategy({ blank_mapped_amount: "skip" })
       setImportStep("map")
     } catch (err) {
       setImportFile(null)
@@ -581,7 +1027,7 @@ export default function DataSettingsPage() {
     }
   }
 
-  const handleMappingChange = (field: CsvImportField, header: string | null) => {
+  const handleMappingChange = (field: HeaderImportField, header: string | null) => {
     setImportMapping((previous) => {
       const next = { ...previous }
       if (header) {
@@ -591,10 +1037,124 @@ export default function DataSettingsPage() {
       }
       return next
     })
+    if (field === "tag") {
+      setTagValueMap(importPreview && header ? defaultTagValueMap(importPreview, header, existingTags) : {})
+    }
     setValidationResult(null)
     setCommitResult(null)
     setImportError(null)
     setImportStep("map")
+  }
+
+  const openImportDialog = () => {
+    resetImportState()
+    setIsImportDialogOpen(true)
+  }
+
+  const closeImportDialog = () => {
+    if (isPreviewing || isValidating || isImporting) {
+      return
+    }
+    setIsImportDialogOpen(false)
+  }
+
+  const goToPreviousImportStep = () => {
+    setImportError(null)
+    if (importStep === "done") {
+      setImportStep("review")
+      return
+    }
+    if (importStep === "review") {
+      setImportStep("tags")
+      return
+    }
+    if (importStep === "tags") {
+      setImportStep("categories")
+      return
+    }
+    if (importStep === "categories") {
+      setImportStep(needsDateSetup ? "dates" : "map")
+      return
+    }
+    if (importStep === "dates") {
+      setImportStep("map")
+      return
+    }
+    if (importStep === "map") {
+      setImportStep("upload")
+    }
+  }
+
+  const goToNextImportStep = () => {
+    setImportError(null)
+    if (importStep === "upload" && importPreview) {
+      setImportStep("map")
+      return
+    }
+    if (importStep === "map" && requiredMappingComplete && !hasDuplicateMapping) {
+      setImportStep(needsDateSetup ? "dates" : "categories")
+      return
+    }
+    if (importStep === "dates" && dateSetupComplete) {
+      setImportStep("categories")
+      return
+    }
+    if (importStep === "categories" && categorySetupComplete) {
+      setImportStep("tags")
+      return
+    }
+    if (importStep === "tags" && canValidateImport) {
+      void handleValidateImport()
+    }
+  }
+
+  const handleCategoryModeChange = (mode: CategorySetupMode) => {
+    setCategoryMode(mode)
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("categories")
+  }
+
+  const handleCategorySourceChange = (header: string) => {
+    setCategorySourceHeader(header)
+    setCategoryValueMap(importPreview && header ? defaultCategoryMap(importPreview, header) : {})
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("categories")
+  }
+
+  const handleCategoryValueChange = (sourceValue: string, category: Category) => {
+    setCategoryValueMap((previous) => ({ ...previous, [sourceValue]: category }))
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("categories")
+  }
+
+  const handleDefaultCategoryChange = (category: Category) => {
+    setDefaultCategory(category)
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("categories")
+  }
+
+  const handleDateYearChange = (year: string) => {
+    setDateYear(year)
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("dates")
+  }
+
+  const handleTagValueChange = (sourceValue: string, entry: CsvImportTagStrategyEntry) => {
+    setTagValueMap((previous) => ({ ...previous, [sourceValue]: entry }))
+    setValidationResult(null)
+    setCommitResult(null)
+    setImportError(null)
+    setImportStep("tags")
   }
 
   const handleValidateImport = async () => {
@@ -607,7 +1167,7 @@ export default function DataSettingsPage() {
     setCommitResult(null)
 
     try {
-      const result = await apiClient.importTransactions(importFile, "dry_run", importMapping)
+      const result = await apiClient.importTransactions(importFile, "dry_run", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setValidationResult(result)
       setImportStep("review")
     } catch (err) {
@@ -630,7 +1190,7 @@ export default function DataSettingsPage() {
     setImportError(null)
 
     try {
-      const result = await apiClient.importTransactions(importFile, "commit", importMapping)
+      const result = await apiClient.importTransactions(importFile, "commit", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setCommitResult(result)
       setImportStep("done")
       await loadDataRuns()
@@ -690,18 +1250,95 @@ export default function DataSettingsPage() {
     }
   }
 
-  const requiredMappingComplete = IMPORT_FIELDS
+  const handleRollbackImport = async () => {
+    if (!rollbackTarget) {
+      return
+    }
+
+    const importRunId = importRunIdFromDataRun(rollbackTarget)
+    if (!importRunId) {
+      setRollbackError("Unable to identify this import.")
+      return
+    }
+
+    setRollingBackImportId(rollbackTarget.id)
+    setRollbackError(null)
+
+    try {
+      await apiClient.rollbackImport(importRunId)
+      setRollbackTarget(null)
+      await loadDataRuns()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setRollbackError(err.error.message)
+      } else {
+        setRollbackError("Unable to rollback import.")
+      }
+    } finally {
+      setRollingBackImportId(null)
+    }
+  }
+
+  const requiredMappingComplete = HEADER_IMPORT_FIELDS
     .filter((field) => field.required)
     .every((field) => Boolean(importMapping[field.key]))
-  const mappedHeaders = Object.values(importMapping).filter(Boolean)
+  const effectiveImportMapping = useMemo<CsvImportMapping>(() => {
+    const mapping = { ...importMapping }
+    if (categoryMode === "exact_column" && categorySourceHeader) {
+      mapping.category = categorySourceHeader
+    } else {
+      delete mapping.category
+    }
+    return mapping
+  }, [categoryMode, categorySourceHeader, importMapping])
+  const mappedHeaders = Object.values(effectiveImportMapping).filter(Boolean)
   const hasDuplicateMapping = new Set(mappedHeaders).size !== mappedHeaders.length
-  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && !hasDuplicateMapping)
+  const categoryProfile = profileForHeader(importPreview, categorySourceHeader)
+  const categoryValues = categoryProfile?.unique_values ?? []
+  const dateProfile = dateProfileForHeader(importPreview, importMapping.date ?? "")
+  const needsDateSetup = Boolean(dateProfile && dateProfile.yearless_date_count > 0)
+  const dateSetupComplete = !needsDateSetup || Boolean(dateYear)
+  const categorySetupComplete =
+    categoryMode === "default" ||
+    (categoryMode === "exact_column" && Boolean(categorySourceHeader)) ||
+    (categoryMode === "value_map" &&
+      Boolean(categorySourceHeader) &&
+      !categoryProfile?.unique_values_truncated &&
+      categoryValues.length > 0 &&
+      categoryValues.every((item) => Boolean(categoryValueMap[item.value])))
+  const tagProfile = profileForHeader(importPreview, importMapping.tag ?? "")
+  const tagValues = tagProfile?.unique_values ?? []
+  const tagSetupComplete = tagValues.length > 0 && tagValues.every((item) => Boolean(tagValueMap[item.value]))
+  const resolvedCategoryStrategy = useMemo<CsvImportCategoryStrategy>(() => {
+    if (categoryMode === "default") {
+      return { mode: "default", default_category: defaultCategory }
+    }
+    if (categoryMode === "exact_column") {
+      return { mode: "exact_column" }
+    }
+    return { mode: "value_map", source_header: categorySourceHeader, value_map: categoryValueMap }
+  }, [categoryMode, categorySourceHeader, categoryValueMap, defaultCategory])
+  const resolvedDateStrategy = useMemo<CsvImportDateStrategy>(() => {
+    if (needsDateSetup) {
+      return { missing_year: "apply_year", year: Number(dateYear) }
+    }
+    return { missing_year: "reject" }
+  }, [dateYear, needsDateSetup])
+  const resolvedTagStrategy = useMemo<CsvImportTagStrategy>(() => ({
+    mode: "value_map",
+    value_map: tagValueMap,
+  }), [tagValueMap])
+  const amountProfile = profileForHeader(importPreview, importMapping.amount ?? "")
+  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && tagSetupComplete && !hasDuplicateMapping)
   const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
   const importStepIndex = useMemo(() => {
     if (importStep === "upload") return 0
     if (importStep === "map") return 1
-    if (importStep === "review") return 2
-    return 3
+    if (importStep === "dates") return 2
+    if (importStep === "categories") return 3
+    if (importStep === "tags") return 4
+    if (importStep === "review") return 5
+    return 6
   }, [importStep])
   const selectedExportFromDate = parseIsoDate(exportCustomFrom)
   const selectedExportToDate = parseIsoDate(exportCustomTo)
@@ -724,109 +1361,13 @@ export default function DataSettingsPage() {
 
       <main className="mx-auto grid max-w-lg gap-5 px-4 pt-4 sm:px-5 lg:max-w-7xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:px-8">
         <section className="space-y-4">
-          <Card className="overflow-hidden border-0 shadow-sm">
-            <div className="border-b border-border/70 p-4 sm:p-5">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center">
-                <PanelHeader icon={Upload} title="Import CSV" description="Map uploaded columns, review validation, then import valid rows." />
-                <ImportStepper stepIndex={importStepIndex} />
-              </div>
-            </div>
-
-            <div className="space-y-5 p-4 sm:p-5">
-              <FilePicker
-                file={importFile}
-                preview={importPreview}
-                isBusy={isPreviewing || isValidating || isImporting}
-                isPreviewing={isPreviewing}
-                inputRef={fileInputRef}
-                onSelect={(file) => void handleFileSelect(file)}
-                onReset={resetImportState}
-              />
-
-              {importError && (
-                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                  {importError}
-                </div>
-              )}
-
-              {importPreview && (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-                  <div className="space-y-3">
-                    <div className="flex items-end justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold">Map headers</h3>
-                        <p className="text-xs text-muted-foreground">{importPreview.headers.length} column(s) detected.</p>
-                      </div>
-                      {validationResult && (
-                        <Button type="button" variant="ghost" size="sm" className="h-8 rounded-lg px-2 text-xs" onClick={() => setImportStep("map")}>
-                          Edit mapping
-                        </Button>
-                      )}
-                    </div>
-                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} />
-                    {!requiredMappingComplete && (
-                      <p className="text-xs text-destructive">Map every required field before validation.</p>
-                    )}
-                    {hasDuplicateMapping && (
-                      <p className="text-xs text-destructive">Each CSV header can only be mapped once.</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="text-sm font-semibold">Review</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {validationResult ? "Validation results and planned new items." : "Sample values from the selected mapping."}
-                      </p>
-                    </div>
-                    <MobileSampleRows preview={importPreview} mapping={importMapping} />
-                    <div className="hidden md:block">
-                      <SampleRows preview={importPreview} />
-                    </div>
-                    {validationResult && <ResultSummary result={validationResult} />}
-                    {commitResult && <ResultSummary result={commitResult} />}
-                  </div>
-                </div>
-              )}
-
-              {importPreview && (
-                <div className="grid gap-2 border-t border-border/70 pt-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                  <p className="text-xs text-muted-foreground">
-                    {canCommitImport ? "Validated rows are ready to import." : "Validate the mapping before importing."}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="h-11 rounded-lg"
-                    disabled={!canValidateImport || isValidating || isImporting}
-                    onClick={() => void handleValidateImport()}
-                  >
-                    {isValidating ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Validating
-                      </>
-                    ) : (
-                      "Validate Mapping"
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="h-11 rounded-lg"
-                    disabled={!canCommitImport || isValidating || isImporting}
-                    onClick={() => void handleCommitImport()}
-                  >
-                    {isImporting ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Importing
-                      </>
-                    ) : (
-                      "Import Valid Rows"
-                    )}
-                  </Button>
-                </div>
-              )}
+          <Card className="border-0 p-4 shadow-sm sm:p-5">
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <PanelHeader icon={Upload} title="Import CSV" description="Start a guided import to map columns, categories, and review validation." />
+              <Button type="button" className="h-11 rounded-lg sm:w-auto" onClick={openImportDialog}>
+                <Upload className="size-4" />
+                Import CSV
+              </Button>
             </div>
           </Card>
 
@@ -1101,7 +1642,15 @@ export default function DataSettingsPage() {
           ) : dataRuns.length > 0 ? (
             <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
               {dataRuns.slice(0, 10).map((item) => (
-                <ActivityRow key={item.id} item={item} />
+                <ActivityRow
+                  key={item.id}
+                  item={item}
+                  onRollback={(target) => {
+                    setRollbackError(null)
+                    setRollbackTarget(target)
+                  }}
+                  isRollingBack={rollingBackImportId === item.id}
+                />
               ))}
             </Card>
           ) : (
@@ -1113,6 +1662,308 @@ export default function DataSettingsPage() {
           )}
         </section>
       </main>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
+        if (open) {
+          setIsImportDialogOpen(true)
+        } else {
+          closeImportDialog()
+        }
+      }}>
+        <DialogContent className="!flex h-[100dvh] !max-w-none flex-col gap-0 rounded-none border-0 p-0 sm:h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl sm:rounded-xl sm:border" showCloseButton={!isPreviewing && !isValidating && !isImporting}>
+          <DialogHeader className="border-b border-border/70 p-4 pr-12 text-left sm:p-5 sm:pr-12">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_26rem] md:items-center">
+              <div className="min-w-0">
+                <DialogTitle>Import CSV</DialogTitle>
+                <DialogDescription>
+                  {importStep === "upload" && "Choose the CSV file to preview before anything is imported."}
+                  {importStep === "map" && "Match CSV headers to Budget fields."}
+                  {importStep === "dates" && "Choose a year for dates that do not include one."}
+                  {importStep === "categories" && "Translate external labels into Budget categories."}
+                  {importStep === "tags" && "Review imported tags before validation."}
+                  {importStep === "review" && "Review validation results before importing."}
+                  {importStep === "done" && "Import complete."}
+                </DialogDescription>
+              </div>
+              <ImportStepper stepIndex={importStepIndex} />
+            </div>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="mx-auto max-w-4xl space-y-4">
+              {importError && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {importError}
+                </div>
+              )}
+
+              {importStep === "upload" && (
+                <div className="space-y-4">
+                  <FilePicker
+                    file={importFile}
+                    preview={importPreview}
+                    isBusy={isPreviewing || isValidating || isImporting}
+                    isPreviewing={isPreviewing}
+                    inputRef={fileInputRef}
+                    onSelect={(file) => void handleFileSelect(file)}
+                    onReset={resetImportState}
+                  />
+                  {importPreview && (
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
+                      {importPreview.headers.length} column(s) detected across {importPreview.total_rows} row(s).
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {importStep === "map" && importPreview && (
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Map headers</h3>
+                      <p className="text-xs text-muted-foreground">{importPreview.headers.length} column(s) detected.</p>
+                    </div>
+                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} />
+                    {!requiredMappingComplete && (
+                      <p className="text-xs text-destructive">Map every required field before continuing.</p>
+                    )}
+                    {hasDuplicateMapping && (
+                      <p className="text-xs text-destructive">Each CSV header can only be mapped once.</p>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">Sample rows</h3>
+                      <p className="text-xs text-muted-foreground">Use this to confirm the selected columns look right.</p>
+                    </div>
+                    <MobileSampleRows preview={importPreview} mapping={importMapping} />
+                    <div className="hidden md:block">
+                      <SampleRows preview={importPreview} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {importStep === "dates" && importPreview && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Set dates</h3>
+                    <p className="text-xs text-muted-foreground">Dates without a year need one shared year for this import.</p>
+                  </div>
+                  <DateSetup profile={dateProfile} selectedYear={dateYear} onYearChange={handleDateYearChange} />
+                </div>
+              )}
+
+              {importStep === "categories" && importPreview && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Set categories</h3>
+                    <p className="text-xs text-muted-foreground">Budget categories stay fixed. Map bank labels into Needs, Wants, or Savings.</p>
+                  </div>
+                  <CategorySetup
+                    preview={importPreview}
+                    mode={categoryMode}
+                    sourceHeader={categorySourceHeader}
+                    valueMap={categoryValueMap}
+                    defaultCategory={defaultCategory}
+                    onModeChange={handleCategoryModeChange}
+                    onSourceChange={handleCategorySourceChange}
+                    onValueChange={handleCategoryValueChange}
+                    onDefaultCategoryChange={handleDefaultCategoryChange}
+                  />
+                  {!categorySetupComplete && (
+                    <p className="text-xs text-destructive">Finish category setup before validation.</p>
+                  )}
+                  {amountProfile && amountProfile.blank_count > 0 && amountStrategy.blank_mapped_amount === "skip" && (
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+                      {amountProfile.blank_count} row(s) have a blank value in {importMapping.amount}. Those rows will be skipped instead of treated as errors.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {importStep === "tags" && importPreview && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Review tags</h3>
+                    <p className="text-xs text-muted-foreground">Map imported tag values to existing tags or create new ones.</p>
+                  </div>
+                  <TagSetup
+                    preview={importPreview}
+                    tagHeader={importMapping.tag ?? ""}
+                    tags={existingTags}
+                    valueMap={tagValueMap}
+                    onChange={handleTagValueChange}
+                  />
+                  {!tagSetupComplete && (
+                    <p className="text-xs text-destructive">Review every imported tag value before validation.</p>
+                  )}
+                </div>
+              )}
+
+              {importStep === "review" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Review import</h3>
+                    <p className="text-xs text-muted-foreground">Only valid, non-duplicate rows will be imported.</p>
+                  </div>
+                  {validationResult ? (
+                    <ResultSummary result={validationResult} />
+                  ) : (
+                    <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Validate the import to see row counts and planned new tags or cards.
+                    </div>
+                  )}
+                  {importPreview && (
+                    <div className="hidden md:block">
+                      <SampleRows preview={importPreview} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {importStep === "done" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold">Import complete</h3>
+                    <p className="text-xs text-muted-foreground">Recent Activity has been refreshed.</p>
+                  </div>
+                  {commitResult && <ResultSummary result={commitResult} />}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border/70 bg-background p-4 sm:p-5">
+            <div className="mx-auto grid max-w-4xl gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 rounded-lg sm:w-auto"
+                disabled={importStep === "upload" || isPreviewing || isValidating || isImporting}
+                onClick={goToPreviousImportStep}
+              >
+                Back
+              </Button>
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                {importStep === "upload" && "No data is written during preview."}
+                {importStep === "map" && (needsDateSetup ? "Date setup comes next." : "Category setup comes next.")}
+                {importStep === "dates" && "The selected year applies only to dates missing a year."}
+                {importStep === "categories" && "Tag review comes next."}
+                {importStep === "tags" && "Validation checks rows without writing."}
+                {importStep === "review" && "Import writes valid rows only."}
+                {importStep === "done" && "You can start another import or close this dialog."}
+              </p>
+              <div className="grid gap-2 sm:flex sm:justify-end">
+                {importStep === "done" ? (
+                  <>
+                    <Button type="button" variant="secondary" className="h-11 rounded-lg" onClick={resetImportState}>
+                      Import Another CSV
+                    </Button>
+                    <Button type="button" className="h-11 rounded-lg" onClick={closeImportDialog}>
+                      Done
+                    </Button>
+                  </>
+                ) : importStep === "review" ? (
+                  <Button
+                    type="button"
+                    className="h-11 rounded-lg"
+                    disabled={!canCommitImport || isImporting}
+                    onClick={() => void handleCommitImport()}
+                  >
+                    {isImporting ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Importing
+                      </>
+                    ) : (
+                      "Import Valid Rows"
+                    )}
+                  </Button>
+                ) : importStep === "tags" ? (
+                  <Button
+                    type="button"
+                    className="h-11 rounded-lg"
+                    disabled={!canValidateImport || isValidating || isImporting}
+                    onClick={() => void handleValidateImport()}
+                  >
+                    {isValidating ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Validating
+                      </>
+                    ) : (
+                      "Validate"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="h-11 rounded-lg"
+                    disabled={
+                      (importStep === "upload" && !importPreview) ||
+                      (importStep === "map" && (!requiredMappingComplete || hasDuplicateMapping)) ||
+                      (importStep === "dates" && !dateSetupComplete) ||
+                      (importStep === "categories" && !categorySetupComplete) ||
+                      isPreviewing ||
+                      isValidating ||
+                      isImporting
+                    }
+                    onClick={goToNextImportStep}
+                  >
+                    Continue
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!rollbackTarget} onOpenChange={(open) => {
+        if (!open && !rollingBackImportId) {
+          setRollbackTarget(null)
+          setRollbackError(null)
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rollback import?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the transactions created by this import. Tags and cards will stay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {rollbackTarget && (
+            <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+              <p className="truncate font-medium">{rollbackTarget.source_filename || "CSV import"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {rollbackTarget.imported_rows ?? 0} imported on {formatDateTime(rollbackTarget.created_at)}
+              </p>
+            </div>
+          )}
+          {rollbackError && <p className="text-sm text-destructive">{rollbackError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!rollingBackImportId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!!rollingBackImportId}
+              onClick={(event) => {
+                event.preventDefault()
+                void handleRollbackImport()
+              }}
+            >
+              {rollingBackImportId ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Rolling back
+                </>
+              ) : (
+                "Rollback import"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>

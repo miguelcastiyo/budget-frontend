@@ -451,10 +451,54 @@ export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" 
 
 export type CsvImportMapping = Partial<Record<CsvImportField, string>>
 
+export interface CsvImportColumnProfileValue {
+  value: string
+  count: number
+}
+
+export interface CsvImportColumnProfile {
+  header: string
+  blank_count: number
+  unique_values_truncated: boolean
+  unique_values: CsvImportColumnProfileValue[]
+}
+
+export interface CsvImportDateProfile {
+  header: string
+  full_date_count: number
+  yearless_date_count: number
+  yearless_examples: string[]
+  invalid_examples: string[]
+}
+
+export type CsvImportCategoryStrategy =
+  | { mode: "exact_column" }
+  | { mode: "value_map"; source_header: string; value_map: Record<string, Category> }
+  | { mode: "default"; default_category: Category }
+
+export interface CsvImportAmountStrategy {
+  blank_mapped_amount: "error" | "skip"
+}
+
+export type CsvImportDateStrategy =
+  | { missing_year: "reject" }
+  | { missing_year: "apply_year"; year: number }
+
+export type CsvImportTagStrategyEntry =
+  | { mode: "existing"; tag_id: string }
+  | { mode: "new"; name: string }
+
+export interface CsvImportTagStrategy {
+  mode: "value_map"
+  value_map: Record<string, CsvImportTagStrategyEntry>
+}
+
 export interface CsvImportPreviewResponse {
   mode: "preview"
   headers: string[]
   sample_rows: Record<string, string>[]
+  column_profiles: CsvImportColumnProfile[]
+  date_profiles: CsvImportDateProfile[]
   suggested_mapping: CsvImportMapping
   total_rows: number
   limits: {
@@ -482,6 +526,8 @@ export interface CsvImportResponse {
   imported_rows: number
   duplicate_rows: number
   invalid_rows: number
+  skipped_rows: number
+  skipped_blank_amount_rows: number
   errors_truncated: boolean
   max_returned_errors: number
   errors: CsvImportErrorItem[]
@@ -505,11 +551,23 @@ export interface DataRunItem {
   imported_rows: number | null
   duplicate_rows: number | null
   invalid_rows: number | null
+  skipped_rows: number | null
+  skipped_blank_amount_rows: number | null
   error_summary: string | null
+  rollback_available: boolean
+  rolled_back_at: string | null
+  rolled_back_rows: number
+  rollback_unavailable_reason: "pre_rollback_feature" | null
 }
 
 export interface DataRunsResponse {
   items: DataRunItem[]
+}
+
+export interface ImportRollbackResponse {
+  status: "rolled_back"
+  import_run_id: string
+  deleted_rows: number
 }
 
 // Errors

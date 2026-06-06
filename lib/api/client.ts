@@ -37,6 +37,11 @@ import type {
   CsvImportResponse,
   CsvImportPreviewResponse,
   CsvImportMapping,
+  CsvImportCategoryStrategy,
+  CsvImportAmountStrategy,
+  CsvImportDateStrategy,
+  CsvImportTagStrategy,
+  ImportRollbackResponse,
   CreateInviteRequest,
   InviteResponse,
   InvitesResponse,
@@ -458,6 +463,12 @@ class ApiClient {
     return this.request<DataRunsResponse>(`/me/data-runs?${params.toString()}`)
   }
 
+  async rollbackImport(importRunId: string): Promise<ImportRollbackResponse> {
+    return this.request<ImportRollbackResponse>(`/me/imports/${importRunId}/transactions`, {
+      method: "DELETE",
+    })
+  }
+
   async exportTransactions(filters?: TransactionFilters): Promise<Blob> {
     const params = new URLSearchParams()
     if (filters) {
@@ -484,14 +495,26 @@ class ApiClient {
     return this.importTransactionsRequest<CsvImportPreviewResponse>(file, "preview")
   }
 
-  async importTransactions(file: File, mode: "dry_run" | "commit", mapping: CsvImportMapping): Promise<CsvImportResponse> {
-    return this.importTransactionsRequest<CsvImportResponse>(file, mode, mapping)
+  async importTransactions(
+    file: File,
+    mode: "dry_run" | "commit",
+    mapping: CsvImportMapping,
+    categoryStrategy?: CsvImportCategoryStrategy,
+    amountStrategy?: CsvImportAmountStrategy,
+    dateStrategy?: CsvImportDateStrategy,
+    tagStrategy?: CsvImportTagStrategy
+  ): Promise<CsvImportResponse> {
+    return this.importTransactionsRequest<CsvImportResponse>(file, mode, mapping, categoryStrategy, amountStrategy, dateStrategy, tagStrategy)
   }
 
   private async importTransactionsRequest<T>(
     file: File,
     mode: "preview" | "dry_run" | "commit",
-    mapping?: CsvImportMapping
+    mapping?: CsvImportMapping,
+    categoryStrategy?: CsvImportCategoryStrategy,
+    amountStrategy?: CsvImportAmountStrategy,
+    dateStrategy?: CsvImportDateStrategy,
+    tagStrategy?: CsvImportTagStrategy
   ): Promise<T> {
     this.ensureCsrfTokenLoaded()
 
@@ -500,6 +523,18 @@ class ApiClient {
     formData.append("mode", mode)
     if (mapping) {
       formData.append("mapping", JSON.stringify(mapping))
+    }
+    if (categoryStrategy) {
+      formData.append("category_strategy", JSON.stringify(categoryStrategy))
+    }
+    if (amountStrategy) {
+      formData.append("amount_strategy", JSON.stringify(amountStrategy))
+    }
+    if (dateStrategy) {
+      formData.append("date_strategy", JSON.stringify(dateStrategy))
+    }
+    if (tagStrategy) {
+      formData.append("tag_strategy", JSON.stringify(tagStrategy))
     }
 
     const headers: HeadersInit = {}
