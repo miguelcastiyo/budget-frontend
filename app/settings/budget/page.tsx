@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, X } from "lucide-react"
+import { ArrowLeft, Pencil, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
@@ -31,6 +32,7 @@ import {
 } from "@/lib/budget-allocation"
 import {
   asNumber,
+  calculateHourlyMonthlyIncome,
   calculateMonthlyIncome,
   defaultIncomeFormState,
   hydrateIncomeForm,
@@ -46,12 +48,12 @@ export default function BudgetSettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
-  const [showMobileEditor, setShowMobileEditor] = useState(false)
-  const mobileEditorScrollRef = useRef<HTMLDivElement>(null)
-  const mobileEditorSwipeDismiss = useSwipeDismiss({
-    open: showMobileEditor,
-    onDismiss: () => setShowMobileEditor(false),
-    scrollRef: mobileEditorScrollRef,
+  const [showBudgetEditor, setShowBudgetEditor] = useState(false)
+  const editorScrollRef = useRef<HTMLDivElement>(null)
+  const editorSwipeDismiss = useSwipeDismiss({
+    open: showBudgetEditor,
+    onDismiss: () => setShowBudgetEditor(false),
+    scrollRef: editorScrollRef,
   })
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function BudgetSettingsPage() {
     : !hasValidIncome || !hasValidAllocation
       ? "Fix issues before saving"
       : hasBudgetChanges
-        ? "Save Budget"
+        ? "Save changes"
         : "Saved"
   const headerSubtitle = isLoading
     ? "Loading settings"
@@ -107,7 +109,7 @@ export default function BudgetSettingsPage() {
 
       hydrateForm(response)
       setSuccess("Budget saved")
-      setShowMobileEditor(false)
+      setShowBudgetEditor(false)
     } catch (err) {
       setError(err instanceof ApiError ? err.error.message : "Unable to save budget")
     } finally {
@@ -132,11 +134,11 @@ export default function BudgetSettingsPage() {
 
   const budgetEditor = (idPrefix: string, showInlineSave = true) => (
     <div className="space-y-5">
-      <Card className="border-0 p-5 shadow-sm">
+      <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
         <div className="mb-5">
-          <h2 className="font-semibold">Income</h2>
+          <h2 className="font-semibold">Budget basis</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Estimate your monthly take-home income.
+            Set the monthly amount your dashboard and insights should use.
           </p>
         </div>
         <IncomeBreakdownForm
@@ -145,13 +147,13 @@ export default function BudgetSettingsPage() {
           disabled={isLoading || isSaving}
           idPrefix={`${idPrefix}-income`}
         />
-      </Card>
+      </section>
 
-      <Card className="border-0 p-5 shadow-sm">
+      <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
         <div className="mb-5">
-          <h2 className="font-semibold">Budget Allocation</h2>
+          <h2 className="font-semibold">Allocation</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Split your monthly income into category targets.
+            Split your monthly budget into category targets.
           </p>
         </div>
         <BudgetAllocationForm
@@ -162,7 +164,17 @@ export default function BudgetSettingsPage() {
         />
 
         {showInlineSave && <div className="mt-4">{saveBudgetButton}</div>}
-      </Card>
+      </section>
+
+      <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
+        <div className="mb-4">
+          <h2 className="font-semibold">Preview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Estimated budget and category targets before saving.
+          </p>
+        </div>
+        <BudgetAllocationSummary allocationForm={allocationForm} income={income} />
+      </section>
 
       <p className="px-4 text-center text-sm text-muted-foreground">
         The 50/30/20 rule suggests allocating 50% to needs, 30% to wants, and 20% to savings and debt repayment.
@@ -173,13 +185,13 @@ export default function BudgetSettingsPage() {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
-        <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4">
+        <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4 lg:max-w-6xl lg:px-8">
           <Link href="/settings">
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold">Budget</h1>
             <p className="truncate text-sm text-muted-foreground">
               {headerSubtitle}
@@ -188,38 +200,33 @@ export default function BudgetSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg space-y-6 px-5 pt-5">
+      <main className="mx-auto max-w-lg space-y-4 px-5 pt-5 lg:max-w-6xl lg:px-8 lg:pt-8">
         {error && <p className="text-sm text-destructive">{error}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
 
-        <Card className="border-0 p-5 shadow-sm sm:hidden">
-          <p className="text-sm font-medium text-muted-foreground">Monthly budget basis</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight">
-            {isLoading ? "--" : formatCurrency(income)}
-            {!isLoading && <span className="text-base font-medium text-muted-foreground"> / month</span>}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">Used by dashboard targets and insights.</p>
-          <MobileAllocationSummary allocationForm={allocationForm} income={income} />
-          <Button
-            className="mt-4 h-12 w-full rounded-xl"
-            onClick={() => setShowMobileEditor(true)}
-            disabled={isLoading}
-          >
-            Edit Budget
-          </Button>
-        </Card>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+          <div className="space-y-4">
+            <BudgetSummaryCard
+              income={income}
+              isLoading={isLoading}
+              onEdit={() => setShowBudgetEditor(true)}
+            />
+            <BudgetAllocationCard allocationForm={allocationForm} income={income} />
+          </div>
 
-        <div className="hidden sm:block">
-          {budgetEditor("settings")}
+          <aside className="space-y-4">
+            <BudgetUsageCard />
+            <BudgetDetailsCard incomeForm={incomeForm} allocationForm={allocationForm} income={income} />
+          </aside>
         </div>
       </main>
 
-      <Dialog open={showMobileEditor} onOpenChange={setShowMobileEditor}>
+      <Dialog open={showBudgetEditor} onOpenChange={setShowBudgetEditor}>
         <DialogContent
-          {...mobileEditorSwipeDismiss}
+          {...editorSwipeDismiss}
           showCloseButton={false}
           className={cn(
-            "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
+            "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem] sm:rounded-2xl sm:border",
             mobileDrawerDialogClassName
           )}
         >
@@ -229,9 +236,9 @@ export default function BudgetSettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <DialogTitle className="truncate text-lg font-semibold sm:text-xl">Edit Budget</DialogTitle>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {headerSubtitle}
-                  </p>
+                  <DialogDescription className="mt-0.5 truncate text-xs text-muted-foreground">
+                    Update your monthly budget basis and category targets.
+                  </DialogDescription>
                 </div>
                 <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                   <X className="h-4 w-4" />
@@ -240,12 +247,22 @@ export default function BudgetSettingsPage() {
               </div>
             </div>
 
-            <div ref={mobileEditorScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-              {budgetEditor("mobile-settings", false)}
+            <div ref={editorScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5">
+              {budgetEditor("settings-edit", false)}
             </div>
 
+            {/* Safe-area padding keeps the tray footer clear of the iOS home indicator while the scroll body has matching bottom breathing room. */}
             <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-6 sm:pt-4">
-              {saveBudgetButton}
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  className="h-12 flex-1 rounded-xl"
+                  onClick={() => setShowBudgetEditor(false)}
+                >
+                  Cancel
+                </Button>
+                <div className="flex-1">{saveBudgetButton}</div>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -256,7 +273,110 @@ export default function BudgetSettingsPage() {
   )
 }
 
-function MobileAllocationSummary({
+function BudgetSummaryCard({
+  income,
+  isLoading,
+  onEdit,
+}: {
+  income: number
+  isLoading: boolean
+  onEdit: () => void
+}) {
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">Monthly budget basis</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight">
+            {isLoading ? "--" : formatCurrency(income)}
+            {!isLoading && <span className="text-base font-medium text-muted-foreground"> / month</span>}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Used by dashboard targets and insights.</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-mr-2 -mt-2 rounded-full text-muted-foreground hover:text-foreground"
+          onClick={onEdit}
+          disabled={isLoading}
+          aria-label="Edit budget"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+function BudgetAllocationCard({
+  allocationForm,
+  income,
+}: {
+  allocationForm: BudgetAllocationFormState
+  income: number
+}) {
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="font-semibold">Budget allocation</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Category targets for the selected budget basis.</p>
+      </div>
+      <BudgetAllocationSummary allocationForm={allocationForm} income={income} />
+    </Card>
+  )
+}
+
+function BudgetUsageCard() {
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <h2 className="text-sm font-semibold">How this budget is used</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Your monthly budget powers dashboard targets, spending progress, and insights. Update it when your take-home income or budgeting approach changes.
+      </p>
+    </Card>
+  )
+}
+
+function BudgetDetailsCard({
+  incomeForm,
+  allocationForm,
+  income,
+}: {
+  incomeForm: IncomeFormState
+  allocationForm: BudgetAllocationFormState
+  income: number
+}) {
+  const primaryIncome = incomeForm.incomeSourceType === "monthly"
+    ? asNumber(incomeForm.primaryMonthlyIncome)
+    : calculateHourlyMonthlyIncome(incomeForm.primaryHourlyRate, incomeForm.primaryWeeklyHours)
+  const extraIncome = income - primaryIncome
+  const allocationDetail = allocationForm.allocationMode === "percent"
+    ? `${asNumber(allocationForm.needsPercent).toFixed(0)} / ${asNumber(allocationForm.wantsPercent).toFixed(0)} / ${asNumber(allocationForm.savingsPercent).toFixed(0)}`
+    : "By amount"
+
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <h2 className="text-sm font-semibold">Budget details</h2>
+      <div className="mt-4 space-y-3 text-sm">
+        <DetailRow label="Budget basis" value={incomeForm.incomeSourceType === "monthly" ? "Monthly" : "Hourly"} />
+        <DetailRow label="Main income" value={formatCurrency(primaryIncome)} />
+        <DetailRow label="Extra income" value={incomeForm.sideIncomeType === "none" ? "None" : formatCurrency(extraIncome)} />
+        <DetailRow label="Allocation" value={allocationDetail} />
+      </div>
+    </Card>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  )
+}
+
+function BudgetAllocationSummary({
   allocationForm,
   income,
 }: {
