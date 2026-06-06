@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,7 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 interface TagIconPickerProps {
   tagName: string
@@ -110,6 +111,8 @@ export default function TagsSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const newTagScrollRef = useRef<HTMLDivElement>(null)
+  const editTagScrollRef = useRef<HTMLDivElement>(null)
   const editingTag = tags.find((tag) => tag.id === editingId) ?? null
   const hasEditingTagChanges = editingTag
     ? editingName.trim() !== editingTag.name.trim() || (editingIconKey || "") !== (editingTag.icon_key ?? "")
@@ -181,6 +184,16 @@ export default function TagsSettingsPage() {
     setNewTagName("")
     setNewTagIconKey("")
   }
+  const newTagSwipeDismiss = useSwipeDismiss({
+    open: showNewTag,
+    onDismiss: closeNewTagDrawer,
+    scrollRef: newTagScrollRef,
+  })
+  const editTagSwipeDismiss = useSwipeDismiss({
+    open: editingId !== null,
+    onDismiss: handleCancelEdit,
+    scrollRef: editTagScrollRef,
+  })
 
   const handleAddTag = async () => {
     const name = newTagName.trim()
@@ -312,6 +325,7 @@ export default function TagsSettingsPage() {
         }}
       >
         <DialogContent
+          {...newTagSwipeDismiss}
           showCloseButton={false}
           className={cn(
             "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
@@ -339,7 +353,7 @@ export default function TagsSettingsPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <div ref={newTagScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               <div className="grid min-w-0 gap-4">
                 <div className="relative min-w-0">
                   <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -391,6 +405,7 @@ export default function TagsSettingsPage() {
         }}
       >
         <DialogContent
+          {...editTagSwipeDismiss}
           showCloseButton={false}
           className={cn(
             "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
@@ -420,7 +435,7 @@ export default function TagsSettingsPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+            <div ref={editTagScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               <div className="grid min-w-0 gap-4">
                 <div className="relative min-w-0">
                   <EditingTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

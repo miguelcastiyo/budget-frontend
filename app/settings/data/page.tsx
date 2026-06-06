@@ -34,6 +34,7 @@ import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 type ExportDateMode = "all" | "custom"
 type ImportStep = "upload" | "map" | "dates" | "categories" | "tags" | "review" | "done"
@@ -905,6 +906,7 @@ function ActivityRow({
 
 export default function DataSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const importDialogScrollRef = useRef<HTMLDivElement>(null)
   const [dataRuns, setDataRuns] = useState<DataRunItem[]>([])
   const [isLoadingRuns, setIsLoadingRuns] = useState(true)
   const [runsError, setRunsError] = useState<string | null>(null)
@@ -1070,6 +1072,11 @@ export default function DataSettingsPage() {
     }
     setIsImportDialogOpen(false)
   }
+  const importDialogSwipeDismiss = useSwipeDismiss({
+    open: isImportDialogOpen,
+    onDismiss: closeImportDialog,
+    scrollRef: importDialogScrollRef,
+  })
 
   const goToPreviousImportStep = () => {
     setImportError(null)
@@ -1684,6 +1691,7 @@ export default function DataSettingsPage() {
         }
       }}>
         <DialogContent
+          {...importDialogSwipeDismiss}
           className={cn(
             "!flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl",
             mobileDrawerDialogClassName
@@ -1709,7 +1717,7 @@ export default function DataSettingsPage() {
             </div>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div ref={importDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
             <div className="mx-auto max-w-4xl space-y-4">
               {importError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">

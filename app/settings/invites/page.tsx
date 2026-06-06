@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ArrowLeft, CalendarIcon, CheckCircle, Clock, Mail, Plus, Shield, UserPlus, X, XCircle } from "lucide-react"
@@ -24,6 +24,7 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import type { CreateInviteRequest, InviteResponse } from "@/lib/api/types"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 type InviteRole = CreateInviteRequest["role"]
 type InviteStatusFilter = "all" | InviteResponse["status"]
@@ -114,6 +115,7 @@ export default function InvitesSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const createDialogScrollRef = useRef<HTMLDivElement>(null)
 
   const isOwner = profile?.role === "owner"
 
@@ -200,6 +202,11 @@ export default function InvitesSettingsPage() {
     setShowCreateDialog(false)
     resetForm()
   }
+  const createDialogSwipeDismiss = useSwipeDismiss({
+    open: showCreateDialog,
+    onDismiss: closeCreateDialog,
+    scrollRef: createDialogScrollRef,
+  })
 
   const selectedExpiryDate = parseLocalDateTime(expiresAt)
   const selectedExpiryTime = expiresAt.slice(11, 16) || "17:00"
@@ -382,6 +389,7 @@ export default function InvitesSettingsPage() {
         }}
       >
         <DialogContent
+          {...createDialogSwipeDismiss}
           showCloseButton={false}
           className={cn(
             "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:w-[min(calc(100dvw-2rem),38rem)] sm:max-w-[38rem] sm:rounded-2xl sm:border",
@@ -411,7 +419,7 @@ export default function InvitesSettingsPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div ref={createDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               <div className="space-y-5">
                 <div className="space-y-3">
                   <div className="space-y-2">

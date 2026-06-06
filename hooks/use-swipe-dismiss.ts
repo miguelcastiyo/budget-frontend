@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
+import { useCallback, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
 
 interface UseSwipeDismissOptions {
   open: boolean
@@ -9,6 +9,7 @@ interface UseSwipeDismissOptions {
 }
 
 interface SwipeDismissProps {
+  onClick: (event: ReactMouseEvent<HTMLElement>) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
   onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
@@ -96,6 +97,17 @@ export function useSwipeDismiss({
       setIsSettling(false)
     }, DISMISS_MS)
   }, [onDismiss, resetDrag])
+
+  const handleClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    if (!open || !isMobileViewport()) {
+      return
+    }
+
+    const target = event.target
+    if (target instanceof HTMLElement && target.closest("[data-swipe-handle='true']")) {
+      onDismiss()
+    }
+  }, [onDismiss, open])
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (!open || !isMobileViewport() || event.pointerType === "mouse" || isInteractiveTarget(event.target)) {
@@ -189,6 +201,7 @@ export function useSwipeDismiss({
   const translate = dragY > 0 || isSettling ? `0 ${dragY}px` : undefined
 
   return {
+    onClick: handleClick,
     onPointerDown: handlePointerDown,
     onPointerMove: handlePointerMove,
     onPointerUp: handlePointerEnd,

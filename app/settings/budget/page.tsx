@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
@@ -19,6 +19,7 @@ import type { BudgetSettings } from "@/lib/api/types"
 import { formatCurrency } from "@/lib/formatters"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import {
   budgetSettingsPayload,
   defaultBudgetAllocationFormState,
@@ -43,6 +44,12 @@ export default function BudgetSettingsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
   const [showMobileEditor, setShowMobileEditor] = useState(false)
+  const mobileEditorScrollRef = useRef<HTMLDivElement>(null)
+  const mobileEditorSwipeDismiss = useSwipeDismiss({
+    open: showMobileEditor,
+    onDismiss: () => setShowMobileEditor(false),
+    scrollRef: mobileEditorScrollRef,
+  })
 
   useEffect(() => {
     const loadBudgetSettings = async () => {
@@ -188,6 +195,7 @@ export default function BudgetSettingsPage() {
 
       <Dialog open={showMobileEditor} onOpenChange={setShowMobileEditor}>
         <DialogContent
+          {...mobileEditorSwipeDismiss}
           showCloseButton={false}
           className={cn(
             "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
@@ -211,7 +219,7 @@ export default function BudgetSettingsPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div ref={mobileEditorScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               {budgetEditor("mobile-settings", false)}
             </div>
 

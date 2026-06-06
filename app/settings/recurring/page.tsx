@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ArrowLeft, CalendarIcon, Pencil, Plus, Trash2 } from "lucide-react"
@@ -53,6 +53,8 @@ import type {
 } from "@/lib/api/types"
 import { formatCurrency } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
 
 interface RecurringFormState {
@@ -240,6 +242,8 @@ export default function RecurringSettingsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingForm, setEditingForm] = useState<RecurringFormState | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const newRecurringScrollRef = useRef<HTMLDivElement>(null)
+  const editRecurringScrollRef = useRef<HTMLDivElement>(null)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
@@ -286,6 +290,24 @@ export default function RecurringSettingsPage() {
   }, [loadData])
 
   const tagOptions = useMemo(() => tags, [tags])
+  const closeNewRecurringDialog = () => {
+    setShowNew(false)
+    setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
+  }
+  const closeEditRecurringDialog = () => {
+    setEditingId(null)
+    setEditingForm(null)
+  }
+  const newRecurringSwipeDismiss = useSwipeDismiss({
+    open: showNew,
+    onDismiss: closeNewRecurringDialog,
+    scrollRef: newRecurringScrollRef,
+  })
+  const editRecurringSwipeDismiss = useSwipeDismiss({
+    open: editingId !== null && editingForm !== null,
+    onDismiss: closeEditRecurringDialog,
+    scrollRef: editRecurringScrollRef,
+  })
 
   const handleCreate = async () => {
     if (!newForm.expense.trim() || !newForm.tag_id) {
@@ -505,32 +527,39 @@ export default function RecurringSettingsPage() {
       <Dialog
         open={showNew}
         onOpenChange={(open) => {
-          setShowNew(open)
-          if (!open) {
-            setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
+          if (open) {
+            setShowNew(true)
+          } else {
+            closeNewRecurringDialog()
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          {...newRecurringSwipeDismiss}
+          className={cn(
+            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:border",
+            mobileDrawerDialogClassName
+          )}
+        >
           <DialogHeader className="p-6 pb-4 border-b border-border/50">
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-4 mb-1 sm:hidden")} aria-hidden="true" />
             <DialogTitle className="text-xl font-semibold">New Recurring Expense</DialogTitle>
             <DialogDescription>
               Add a monthly expense that gets pre-added at the start of each month.
             </DialogDescription>
           </DialogHeader>
-          <RecurringForm
-            form={newForm}
-            tags={tagOptions}
-            cards={cards}
-            isMutating={isMutating}
-            saveLabel="Create recurring expense"
-            onChange={setNewForm}
-            onCancel={() => {
-              setShowNew(false)
-              setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
-            }}
-            onSave={() => void handleCreate()}
-          />
+          <div ref={newRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <RecurringForm
+              form={newForm}
+              tags={tagOptions}
+              cards={cards}
+              isMutating={isMutating}
+              saveLabel="Create recurring expense"
+              onChange={setNewForm}
+              onCancel={closeNewRecurringDialog}
+              onSave={() => void handleCreate()}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -538,34 +567,39 @@ export default function RecurringSettingsPage() {
         open={editingId !== null && editingForm !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setEditingId(null)
-            setEditingForm(null)
+            closeEditRecurringDialog()
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          {...editRecurringSwipeDismiss}
+          className={cn(
+            "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[90vh] sm:max-w-lg sm:rounded-2xl sm:border",
+            mobileDrawerDialogClassName
+          )}
+        >
           <DialogHeader className="p-6 pb-4 border-b border-border/50">
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-4 mb-1 sm:hidden")} aria-hidden="true" />
             <DialogTitle className="text-xl font-semibold">Edit Recurring Expense</DialogTitle>
             <DialogDescription>
               Update future monthly instances for this recurring expense.
             </DialogDescription>
           </DialogHeader>
-          {editingForm && (
-            <RecurringForm
-              form={editingForm}
-              tags={tagOptions}
-              cards={cards}
-              isMutating={isMutating}
-              canSave={hasEditingChanges}
-              saveLabel="Save changes"
-              onChange={setEditingForm}
-              onCancel={() => {
-                setEditingId(null)
-                setEditingForm(null)
-              }}
-              onSave={() => void handleSaveEdit()}
-            />
-          )}
+          <div ref={editRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            {editingForm && (
+              <RecurringForm
+                form={editingForm}
+                tags={tagOptions}
+                cards={cards}
+                isMutating={isMutating}
+                canSave={hasEditingChanges}
+                saveLabel="Save changes"
+                onChange={setEditingForm}
+                onCancel={closeEditRecurringDialog}
+                onSave={() => void handleSaveEdit()}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
