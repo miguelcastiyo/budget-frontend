@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { Category, CsvImportAmountStrategy, CsvImportCategoryStrategy, CsvImportDateStrategy, CsvImportField, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, CsvImportTagStrategy, CsvImportTagStrategyEntry, DataRunItem, DataRunStatus, Tag } from "@/lib/api/types"
 import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
+import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 
@@ -288,25 +289,37 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 
 function ImportStepper({ stepIndex }: { stepIndex: number }) {
   const steps = ["Upload", "Map", "Dates", "Categories", "Tags", "Review", "Import"]
+  const progress = ((stepIndex + 1) / steps.length) * 100
 
   return (
-    <div className="grid grid-cols-7 rounded-xl border border-border/70 bg-muted/20 p-1">
-      {steps.map((label, index) => (
-        <div
-          key={label}
-          className={cn(
-            "flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-[11px] font-medium transition-colors sm:text-xs",
-            stepIndex === index
-              ? "bg-background text-foreground shadow-sm"
-              : stepIndex > index
-                ? "text-foreground"
-                : "text-muted-foreground"
-          )}
-        >
-          <span className="truncate">{label}</span>
+    <>
+      <div className="space-y-2 sm:hidden">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium">{steps[stepIndex]}</span>
+          <span className="text-muted-foreground">{stepIndex + 1} / {steps.length}</span>
         </div>
-      ))}
-    </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <div className="hidden grid-cols-7 rounded-xl border border-border/70 bg-muted/20 p-1 sm:grid">
+        {steps.map((label, index) => (
+          <div
+            key={label}
+            className={cn(
+              "flex h-9 min-w-0 items-center justify-center rounded-lg px-1 text-xs font-medium transition-colors",
+              stepIndex === index
+                ? "bg-background text-foreground shadow-sm"
+                : stepIndex > index
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+            )}
+          >
+            <span className="truncate">{label}</span>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -1670,8 +1683,15 @@ export default function DataSettingsPage() {
           closeImportDialog()
         }
       }}>
-        <DialogContent className="!flex h-[100dvh] !max-w-none flex-col gap-0 rounded-none border-0 p-0 sm:h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl sm:rounded-xl sm:border" showCloseButton={!isPreviewing && !isValidating && !isImporting}>
-          <DialogHeader className="border-b border-border/70 p-4 pr-12 text-left sm:p-5 sm:pr-12">
+        <DialogContent
+          className={cn(
+            "!flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl",
+            mobileDrawerDialogClassName
+          )}
+          showCloseButton={!isPreviewing && !isValidating && !isImporting}
+        >
+          <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 p-4 pr-12 text-left backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5 sm:pr-12">
+            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_26rem] md:items-center">
               <div className="min-w-0">
                 <DialogTitle>Import CSV</DialogTitle>
@@ -1689,7 +1709,7 @@ export default function DataSettingsPage() {
             </div>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
             <div className="mx-auto max-w-4xl space-y-4">
               {importError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -1834,7 +1854,7 @@ export default function DataSettingsPage() {
             </div>
           </div>
 
-          <div className="border-t border-border/70 bg-background p-4 sm:p-5">
+          <div className="shrink-0 border-t border-border/70 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5">
             <div className="mx-auto grid max-w-4xl gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
               <Button
                 type="button"
