@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatCurrency } from "@/lib/formatters"
 import {
+  asNumber,
   calculateHourlyMonthlyIncome,
   calculateMonthlyIncome,
   type IncomeFormState,
@@ -26,17 +27,29 @@ export function IncomeBreakdownForm({
   const update = (patch: Partial<IncomeFormState>) => onChange({ ...value, ...patch })
   const primaryHourlyMonthly = calculateHourlyMonthlyIncome(value.primaryHourlyRate, value.primaryWeeklyHours)
   const sideHourlyMonthly = calculateHourlyMonthlyIncome(value.sideHourlyRate, value.sideWeeklyHours)
+  const primaryMonthly =
+    value.incomeSourceType === "monthly"
+      ? asNumber(value.primaryMonthlyIncome)
+      : primaryHourlyMonthly
+  const sideMonthly =
+    value.sideIncomeType === "monthly"
+      ? asNumber(value.sideMonthlyIncome)
+      : value.sideIncomeType === "hourly"
+        ? sideHourlyMonthly
+        : 0
   const monthlyTotal = calculateMonthlyIncome(value)
+  const usesHourlyIncome = value.incomeSourceType === "hourly" || value.sideIncomeType === "hourly"
+  const hasSideIncome = value.sideIncomeType !== "none"
 
   return (
     <div className="space-y-5">
       <div className="space-y-3">
-        <Label>Primary income</Label>
+        <Label>Main income</Label>
         <Tabs
           value={value.incomeSourceType}
           onValueChange={(nextValue) => update({ incomeSourceType: nextValue as IncomeFormState["incomeSourceType"] })}
         >
-          <TabsList className="w-full">
+          <TabsList className="h-11 w-full rounded-xl">
             <TabsTrigger value="monthly" className="flex-1" disabled={disabled}>Monthly</TabsTrigger>
             <TabsTrigger value="hourly" className="flex-1" disabled={disabled}>Hourly</TabsTrigger>
           </TabsList>
@@ -74,12 +87,12 @@ export function IncomeBreakdownForm({
       </div>
 
       <div className="space-y-3">
-        <Label>Side income</Label>
+        <Label>Extra income</Label>
         <Tabs
           value={value.sideIncomeType}
           onValueChange={(nextValue) => update({ sideIncomeType: nextValue as IncomeFormState["sideIncomeType"] })}
         >
-          <TabsList className="w-full">
+          <TabsList className="h-11 w-full rounded-xl">
             <TabsTrigger value="none" className="flex-1" disabled={disabled}>None</TabsTrigger>
             <TabsTrigger value="monthly" className="flex-1" disabled={disabled}>Monthly</TabsTrigger>
             <TabsTrigger value="hourly" className="flex-1" disabled={disabled}>Hourly</TabsTrigger>
@@ -135,9 +148,21 @@ export function IncomeBreakdownForm({
         )}
       </div>
 
-      <div className="rounded-xl bg-muted p-4">
-        <p className="text-sm text-muted-foreground">Estimated monthly income</p>
-        <p className="text-2xl font-bold">{formatCurrency(monthlyTotal)}</p>
+      <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
+        <p className="text-sm font-medium text-muted-foreground">Estimated monthly income</p>
+        <p className="mt-1 text-3xl font-bold tracking-tight">
+          {formatCurrency(monthlyTotal)} <span className="text-base font-medium text-muted-foreground">/ month</span>
+        </p>
+        {hasSideIncome && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {formatCurrency(primaryMonthly)} main + {formatCurrency(sideMonthly)} extra.
+          </p>
+        )}
+        {usesHourlyIncome && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Hourly income uses rate x weekly hours x 52 / 12.
+          </p>
+        )}
       </div>
     </div>
   )
