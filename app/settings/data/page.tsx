@@ -846,8 +846,9 @@ function ActivityRow({
     : item.source_filename || "CSV import"
 
   return (
-    <div className="p-4">
-      <div className="flex items-start gap-3">
+    <div className="p-4 lg:px-5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <div className="flex min-w-0 items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
           {item.type === "export" ? (
             <Download className="size-5 text-muted-foreground" />
@@ -863,9 +864,9 @@ function ActivityRow({
             </span>
           </div>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{rangeLabel}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(item.created_at)}</p>
+          <p className="mt-1 text-xs text-muted-foreground lg:hidden">{formatDateTime(item.created_at)}</p>
           {item.type === "import" && (
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground lg:hidden">
               <span>{item.imported_rows ?? 0} imported</span>
               <span>{item.duplicate_rows ?? 0} duplicates</span>
               {(item.skipped_rows ?? 0) > 0 && <span>{item.skipped_rows} skipped</span>}
@@ -897,6 +898,18 @@ function ActivityRow({
           )}
           {item.error_summary && (
             <p className="mt-2 text-xs text-destructive">{item.error_summary}</p>
+          )}
+        </div>
+        </div>
+        <div className="hidden text-right text-xs text-muted-foreground lg:block">
+          <p>{formatDateTime(item.created_at)}</p>
+          {item.type === "import" && (
+            <div className="mt-2 flex justify-end gap-3">
+              <span>{item.imported_rows ?? 0} imported</span>
+              <span>{item.duplicate_rows ?? 0} duplicates</span>
+              {(item.skipped_rows ?? 0) > 0 && <span>{item.skipped_rows} skipped</span>}
+              <span>{item.invalid_rows ?? 0} invalid</span>
+            </div>
           )}
         </div>
       </div>
@@ -1379,9 +1392,9 @@ export default function DataSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-lg gap-5 px-4 pt-5 sm:px-5 lg:max-w-7xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:px-8">
-        <section className="space-y-4">
-          <Card className="border-0 p-4 shadow-sm sm:p-5">
+      <main className="mx-auto max-w-lg space-y-5 px-4 pt-5 sm:px-5 lg:max-w-6xl lg:px-8">
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-stretch">
+          <Card className="border-0 p-4 shadow-sm sm:p-5 lg:flex lg:items-center">
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <PanelHeader icon={Upload} title="Import CSV" description="Start a guided import to map columns, categories, and review validation." />
               <Button type="button" className="h-11 rounded-lg sm:w-auto" onClick={openImportDialog}>
@@ -1391,7 +1404,7 @@ export default function DataSettingsPage() {
             </div>
           </Card>
 
-          <Card className="border-0 p-4 shadow-sm sm:p-5 lg:hidden">
+          <Card className="border-0 p-4 shadow-sm sm:p-5">
             <PanelHeader icon={Download} title="Export CSV" description="Download all transactions or a custom date range." />
 
             <div className="mt-5 space-y-4">
@@ -1513,128 +1526,7 @@ export default function DataSettingsPage() {
           </Card>
         </section>
 
-        <section className="space-y-4 lg:sticky lg:top-24">
-          <Card className="hidden border-0 p-4 shadow-sm lg:block">
-            <PanelHeader icon={Download} title="Export CSV" description="Download all transactions or a custom date range." />
-
-            <div className="mt-5 space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExportDateMode("all")
-                    setExportError(null)
-                  }}
-                  className={cn(
-                    "h-10 cursor-pointer rounded-lg border px-3 text-sm font-medium transition-colors",
-                    exportDateMode === "all"
-                      ? "border-secondary bg-secondary text-foreground"
-                      : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                  )}
-                >
-                  All Time
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExportDateMode("custom")
-                    setExportError(null)
-                  }}
-                  className={cn(
-                    "h-10 cursor-pointer rounded-lg border px-3 text-sm font-medium transition-colors",
-                    exportDateMode === "custom"
-                      ? "border-secondary bg-secondary text-foreground"
-                      : "border-border/70 bg-background text-muted-foreground hover:border-border hover:text-foreground"
-                  )}
-                >
-                  Custom
-                </button>
-              </div>
-
-              {exportDateMode === "custom" && (
-                <div className="grid gap-3">
-                  <div className="space-y-2">
-                    <Label>From</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 w-full justify-start rounded-lg border-border/60 px-3 font-normal hover:border-foreground/20"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{selectedExportFromDate ? formatDateOnly(exportCustomFrom) : "Select start date"}</span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedExportFromDate ?? undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              setExportCustomFrom(toIsoDate(date))
-                              setExportError(null)
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>To</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 w-full justify-start rounded-lg border-border/60 px-3 font-normal hover:border-foreground/20"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{selectedExportToDate ? formatDateOnly(exportCustomTo) : "Select end date"}</span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedExportToDate ?? undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              setExportCustomTo(toIsoDate(date))
-                              setExportError(null)
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-              )}
-
-              {exportError && <p className="text-sm text-destructive">{exportError}</p>}
-
-              <Button
-                type="button"
-                className="h-10 w-full rounded-lg"
-                disabled={isExporting}
-                onClick={() => void handleExport()}
-              >
-                {isExporting ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Exporting
-                  </>
-                ) : (
-                  <>
-                    <Download className="size-4" />
-                    Export CSV
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-
+        <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div>
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent Activity</h2>
