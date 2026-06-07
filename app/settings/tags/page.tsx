@@ -99,7 +99,7 @@ function TagIconPicker({ tagName, value, onChange }: TagIconPickerProps) {
             )
           })}
         </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent sm:hidden" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background via-background/80 to-transparent sm:hidden" aria-hidden="true" />
       </div>
     </div>
   )
