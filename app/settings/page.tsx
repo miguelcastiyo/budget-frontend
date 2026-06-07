@@ -9,7 +9,6 @@ import { ProfileEditDialog } from "@/components/settings/profile-edit-dialog"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { formatCurrency } from "@/lib/formatters"
 import {
   Wallet,
   Tag,
@@ -27,7 +26,6 @@ import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { SettingsSummaryResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
 interface SettingsItemProps {
@@ -133,41 +131,11 @@ export default function SettingsPage() {
   const router = useRouter()
   const { profile, setProfile, signOut } = useAuth()
   const { resolvedTheme } = useTheme()
-  const [summary, setSummary] = useState<SettingsSummaryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [themeReady, setThemeReady] = useState(false)
   const [isUpdatingTheme, setIsUpdatingTheme] = useState(false)
   const [showProfileEditor, setShowProfileEditor] = useState(false)
-
-  useEffect(() => {
-    let isMounted = true
-
-    const loadSettingsData = async () => {
-      try {
-        const response = await apiClient.getSettingsSummary()
-        if (isMounted) {
-          setSummary(response)
-          setError(null)
-        }
-      } catch (err) {
-        if (!isMounted) {
-          return
-        }
-        if (err instanceof ApiError) {
-          setError(err.error.message)
-        } else {
-          setError("Unable to load settings summary")
-        }
-      }
-    }
-
-    void loadSettingsData()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
 
   useEffect(() => {
     setThemeReady(true)
@@ -183,15 +151,6 @@ export default function SettingsPage() {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "BU"
-
-  const budgetMeta = summary?.monthly_income
-    ? `${formatCurrency(summary.monthly_income)}/month`
-    : undefined
-  const tagsMeta = summary === null ? undefined : `${summary.tags_count} ${summary.tags_count === 1 ? "tag" : "tags"}`
-  const cardsMeta = summary === null ? undefined : `${summary.cards_count} ${summary.cards_count === 1 ? "card" : "cards"}`
-  const recurringMeta = summary === null
-    ? undefined
-    : `${summary.recurring_count} active · ${formatCurrency(summary.recurring_committed_total)} committed`
 
   const handleSignOut = async () => {
     setIsSigningOut(true)
@@ -300,14 +259,12 @@ export default function SettingsPage() {
                 icon={<Wallet className="w-5 h-5 text-muted-foreground" />}
                 label="Budget"
                 description="Monthly plan and limits"
-                meta={budgetMeta}
                 href="/settings/budget"
               />
               <SettingsItem
                 icon={<Repeat className="w-5 h-5 text-muted-foreground" />}
                 label="Recurring"
                 description="Bills and repeating expenses"
-                meta={recurringMeta}
                 href="/settings/recurring"
               />
             </SettingsSection>
@@ -317,14 +274,12 @@ export default function SettingsPage() {
                 icon={<Tag className="w-5 h-5 text-muted-foreground" />}
                 label="Tags"
                 description="Categories for your spending"
-                meta={tagsMeta}
                 href="/settings/tags"
               />
               <SettingsItem
                 icon={<CreditCard className="w-5 h-5 text-muted-foreground" />}
                 label="Cards"
                 description="Payment methods"
-                meta={cardsMeta}
                 href="/settings/cards"
               />
             </SettingsSection>
