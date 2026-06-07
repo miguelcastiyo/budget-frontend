@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { Tag } from "@/lib/api/types"
-import { ArrowLeft, Plus, Pencil, Trash2, X } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import {
   AlertDialog,
@@ -24,6 +24,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
@@ -51,8 +57,8 @@ function TagIconPicker({ tagName, value, onChange }: TagIconPickerProps) {
           <span className="truncate">{iconLabel}</span>
         </span>
       </div>
-      <div className="relative min-w-0 max-w-full overflow-hidden">
-        <div className="flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative min-w-0 max-w-full overflow-hidden sm:overflow-visible">
+        <div className="flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pr-0 [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             aria-pressed={!value}
@@ -93,10 +99,14 @@ function TagIconPicker({ tagName, value, onChange }: TagIconPickerProps) {
             )
           })}
         </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent sm:hidden" aria-hidden="true" />
       </div>
     </div>
   )
+}
+
+function tagCountLabel(count: number) {
+  return `${count} ${count === 1 ? "tag" : "tags"}`
 }
 
 export default function TagsSettingsPage() {
@@ -240,77 +250,155 @@ export default function TagsSettingsPage() {
       if (err instanceof ApiError) {
         setError(err.error.message)
       } else {
-        setError("Unable to delete tag")
+        setError("Unable to remove tag")
       }
     } finally {
       setIsMutating(false)
     }
   }
 
+  const openNewTagDialog = () => {
+    setNewTagName("")
+    setNewTagIconKey("")
+    setShowNewTag(true)
+  }
+
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
-        <div className="max-w-lg mx-auto px-5 py-4 flex items-center gap-4">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-4">
           <Link href="/settings">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <ArrowLeft className="w-5 h-5" />
+            <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold flex-1">Tags</h1>
+          <h1 className="flex-1 text-xl font-bold">Tags</h1>
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full"
-            onClick={() => {
-              setNewTagName("")
-              setNewTagIconKey("")
-              setShowNewTag(true)
-            }}
+            className="rounded-full sm:hidden"
+            aria-label="Create tag"
+            onClick={openNewTagDialog}
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
+          </Button>
+          <Button className="hidden rounded-xl sm:inline-flex" onClick={openNewTagDialog}>
+            <Plus className="h-4 w-4" />
+            New tag
           </Button>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-5 pt-5 space-y-4">
+      <main className="mx-auto max-w-5xl space-y-4 px-5 pt-5">
         <p className="text-sm text-muted-foreground">
           Tags help you categorize your transactions. You can also create new tags when adding a transaction.
         </p>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Card className="overflow-hidden border-0 shadow-sm divide-y divide-border">
-          {!isLoading && tags.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground">No tags yet.</div>
+        <Card className="overflow-hidden border-0 shadow-sm">
+          <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5">
+            <div>
+              <h2 className="text-sm font-semibold">Tags</h2>
+              <p className="text-xs text-muted-foreground">{isLoading ? "Loading tags" : tagCountLabel(tags.length)}</p>
+            </div>
+          </div>
+
+          {isLoading && (
+            <div className="divide-y divide-border">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-3 p-4 sm:py-3.5">
+                  <div className="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-secondary" />
+                  <div className="h-4 w-32 animate-pulse rounded-full bg-secondary" />
+                  <div className="ml-auto h-9 w-9 animate-pulse rounded-full bg-secondary" />
+                </div>
+              ))}
+            </div>
           )}
 
-          {tags.map((tag) => {
-            const TagIcon = getTagIcon(tag.name, tag.icon_key)
+          {!isLoading && error && tags.length === 0 && (
+            <div className="p-5">
+              <p className="font-medium">Could not load tags</p>
+              <p className="mt-1 text-sm text-muted-foreground">Try refreshing the page.</p>
+            </div>
+          )}
 
-            return (
-              <div key={tag.id} className="flex items-center gap-3 p-4">
-                <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-                  <TagIcon className="w-4 h-4 text-foreground" />
-                </div>
-                <span className="flex-1 font-medium">{tag.name}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="rounded-full"
-                  onClick={() => handleStartEdit(tag)}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="rounded-full text-destructive hover:text-destructive"
-                  onClick={() => setDeleteTagId(tag.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-          )})}
+          {!isLoading && !error && tags.length === 0 && (
+            <div className="p-5">
+              <p className="font-medium">No tags yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create tags to organize transactions in a way that fits your budget.
+              </p>
+              <Button className="mt-4 rounded-xl" onClick={openNewTagDialog}>
+                <Plus className="h-4 w-4" />
+                New tag
+              </Button>
+            </div>
+          )}
+
+          {!isLoading && tags.length > 0 && (
+            <div className="divide-y divide-border">
+              {tags.map((tag) => {
+                const TagIcon = getTagIcon(tag.name, tag.icon_key)
+
+                return (
+                  <div key={tag.id} className="flex min-h-[76px] items-center gap-3 p-4 sm:min-h-[68px] sm:px-5 sm:py-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+                      <TagIcon className="h-4 w-4 text-foreground" />
+                    </div>
+                    <span className="min-w-0 flex-1 truncate font-medium">{tag.name}</span>
+                    <div className="flex items-center gap-1 sm:hidden">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-full"
+                        aria-label={`Edit ${tag.name}`}
+                        onClick={() => handleStartEdit(tag)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-full text-destructive hover:text-destructive"
+                        aria-label={`Remove ${tag.name}`}
+                        onClick={() => setDeleteTagId(tag.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="hidden sm:block">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="rounded-full text-muted-foreground hover:text-foreground"
+                            aria-label={`Tag actions for ${tag.name}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem onClick={() => handleStartEdit(tag)}>
+                            <Pencil className="h-4 w-4" />
+                            Edit tag
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteTagId(tag.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remove tag
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </Card>
       </main>
 
@@ -328,7 +416,7 @@ export default function TagsSettingsPage() {
           {...newTagSwipeDismiss}
           showCloseButton={false}
           className={cn(
-            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
+            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,36rem)] sm:w-[min(calc(100dvw-2rem),35rem)] sm:max-w-[35rem] sm:rounded-2xl sm:border",
             mobileDrawerDialogClassName
           )}
         >
@@ -388,7 +476,7 @@ export default function TagsSettingsPage() {
                   className="h-12 rounded-xl text-base font-semibold"
                   disabled={!newTagName.trim() || isMutating}
                 >
-                  {isMutating ? "Adding..." : "Add tag"}
+                  {isMutating ? "Creating..." : "Create tag"}
                 </Button>
               </div>
             </div>
@@ -408,7 +496,7 @@ export default function TagsSettingsPage() {
           {...editTagSwipeDismiss}
           showCloseButton={false}
           className={cn(
-            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,34rem)] sm:w-[min(calc(100dvw-2rem),30rem)] sm:max-w-[30rem] sm:rounded-2xl sm:border",
+            "flex h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),34rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,36rem)] sm:w-[min(calc(100dvw-2rem),35rem)] sm:max-w-[35rem] sm:rounded-2xl sm:border",
             mobileDrawerDialogClassName
           )}
         >
@@ -480,9 +568,9 @@ export default function TagsSettingsPage() {
       <AlertDialog open={!!deleteTagId} onOpenChange={(open) => !open && setDeleteTagId(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete tag?</AlertDialogTitle>
+            <AlertDialogTitle>Remove tag?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the tag from your list. Existing transactions with this tag will keep their current tag.
+              This removes the tag from your available tag list. Existing transactions that already use this tag will not be changed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -492,7 +580,7 @@ export default function TagsSettingsPage() {
               className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isMutating}
             >
-              Delete
+              Remove tag
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
