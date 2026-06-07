@@ -145,7 +145,7 @@ assertEqual(dateFilters.parseIsoDate("2026-02-29"), null, "parseIsoDate rejects 
 assertEqual(dateFilters.parseIsoDate("2024-02-29").getFullYear(), 2024, "parseIsoDate accepts leap day")
 
 assertEqual(formatters.formatCurrency("1234.5"), "$1,234.50", "currency formatter renders dollars")
-assertEqual(formatters.formatCategory("savings_debts"), "Savings & Debts", "category formatter renders savings label")
+assertEqual(formatters.formatCategory("savings"), "Savings", "category formatter renders savings label")
 assertEqual(formatters.getCategoryColorClass("unknown"), "bg-muted", "category color falls back for unknown values")
 assertEqual(formatters.getCategoryTextClass("unknown"), "text-muted-foreground", "category text color falls back for unknown values")
 

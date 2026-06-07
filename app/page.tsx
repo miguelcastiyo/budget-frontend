@@ -25,7 +25,7 @@ function emptyCategoryMetrics(month: string): CategoryMetricsResponse {
     categories: [
       { category: "needs", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
       { category: "wants", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
-      { category: "savings_debts", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
+      { category: "savings", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
     ],
   }
 }

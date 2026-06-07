@@ -30,7 +30,8 @@ No transaction data is written during Upload, Map, Dates, Budget Groups, Spendin
    - Applies one selected year before validation.
 
 4. Budget Groups
-   - Maps imported labels into Needs, Wants, or Savings & Debts.
+   - Maps imported labels into Needs, Wants, or Savings.
+   - Debt-like labels should map to Needs; use the Spending Tags step to select or create `Debt`.
    - Internal APIs may still use category naming, but the import flow uses Budget Groups for user-facing clarity.
 
 5. Spending Tags
@@ -64,7 +65,7 @@ No transaction data is written during Upload, Map, Dates, Budget Groups, Spendin
 
 ## Design Decisions
 
-- The import flow uses "Budget Groups" for Needs / Wants / Savings & Debts.
+- The import flow uses "Budget Groups" for Needs / Wants / Savings.
 - The import flow uses "Spending Tags" for user labels such as Dining, Coffee, Utilities, and Transportation.
 - Helper copy emphasizes preview and review to reduce anxiety.
 - Review is the trust checkpoint; it describes what will be imported or skipped before data is written.

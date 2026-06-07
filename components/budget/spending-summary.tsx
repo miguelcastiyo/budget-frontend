@@ -93,7 +93,7 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
                     const colors = {
                       needs: "var(--needs)",
                       wants: "var(--wants)",
-                      savings_debts: "var(--savings)",
+                      savings: "var(--savings)",
                     }
 
                     return (
@@ -137,12 +137,12 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
                 const colorClasses = {
                   needs: "bg-needs",
                   wants: "bg-wants",
-                  savings_debts: "bg-savings",
+                  savings: "bg-savings",
                 }
                 const labels = {
                   needs: "Needs",
                   wants: "Wants",
-                  savings_debts: "Savings",
+                  savings: "Savings",
                 }
 
                 return (

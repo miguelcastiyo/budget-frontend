@@ -1,6 +1,6 @@
 // API Types matching openapi.yaml contract
 
-export type Category = "needs" | "wants" | "savings_debts"
+export type Category = "needs" | "wants" | "savings"
 
 export type AuthProvider = "password" | "google"
 export type UserRole = "owner" | "admin" | "member"
@@ -202,10 +202,10 @@ export interface BudgetSettings {
   allocation_mode: AllocationMode
   needs_percent?: string
   wants_percent?: string
-  savings_debts_percent?: string
+  savings_percent?: string
   needs_amount?: string
   wants_amount?: string
-  savings_debts_amount?: string
+  savings_amount?: string
 }
 
 export interface BudgetSettingsResolvedResponse {
@@ -233,14 +233,14 @@ export interface BudgetSettingsPercentInput extends BudgetSettingsIncomeInput {
   allocation_mode: "percent"
   needs_percent: string
   wants_percent: string
-  savings_debts_percent: string
+  savings_percent: string
 }
 
 export interface BudgetSettingsAmountInput extends BudgetSettingsIncomeInput {
   allocation_mode: "amount"
   needs_amount: string
   wants_amount: string
-  savings_debts_amount: string
+  savings_amount: string
 }
 
 // Transactions

@@ -481,7 +481,7 @@ function BudgetAllocationSummary({
       className: "bg-wants",
     },
     {
-      label: "Savings & Debts",
+      label: "Savings",
       value: savingsPercent,
       target: isPercentMode
         ? formatCurrency((savingsPercent / 100) * income)

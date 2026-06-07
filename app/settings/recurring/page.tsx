@@ -865,7 +865,7 @@ function RecurringForm({
                 <SelectContent>
                   <SelectItem value="needs">Needs</SelectItem>
                   <SelectItem value="wants">Wants</SelectItem>
-                  <SelectItem value="savings_debts">Savings & Debts</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
                 </SelectContent>
               </Select>
             </div>

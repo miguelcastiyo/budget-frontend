@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/formatters"
 interface SpendingRingProps {
   spent: number
   budget: number
-  category: "needs" | "wants" | "savings_debts"
+  category: "needs" | "wants" | "savings"
   size?: "xs" | "sm" | "md" | "lg"
   showAmount?: boolean
 }
@@ -19,7 +19,7 @@ const categoryColors = {
     stroke: "var(--wants)", 
     track: "var(--wants)",
   },
-  savings_debts: {
+  savings: {
     stroke: "var(--savings)",
     track: "var(--savings)",
   },

@@ -31,10 +31,10 @@ export function hydrateBudgetAllocationForm(settings: BudgetSettings): BudgetAll
     allocationMode: settings.allocation_mode,
     needsPercent: settings.needs_percent || "50.00",
     wantsPercent: settings.wants_percent || "30.00",
-    savingsPercent: settings.savings_debts_percent || "20.00",
+    savingsPercent: settings.savings_percent || "20.00",
     needsAmount: settings.needs_amount || "0.00",
     wantsAmount: settings.wants_amount || "0.00",
-    savingsAmount: settings.savings_debts_amount || "0.00",
+    savingsAmount: settings.savings_amount || "0.00",
   }
 }
 
@@ -80,17 +80,17 @@ export function budgetAllocationPayload(
   state: BudgetAllocationFormState
 ): Pick<
   BudgetSettingsPercentInput,
-  "allocation_mode" | "needs_percent" | "wants_percent" | "savings_debts_percent"
+  "allocation_mode" | "needs_percent" | "wants_percent" | "savings_percent"
 > | Pick<
   BudgetSettingsAmountInput,
-  "allocation_mode" | "needs_amount" | "wants_amount" | "savings_debts_amount"
+  "allocation_mode" | "needs_amount" | "wants_amount" | "savings_amount"
 > {
   if (state.allocationMode === "percent") {
     return {
       allocation_mode: "percent",
       needs_percent: toDecimalString(state.needsPercent),
       wants_percent: toDecimalString(state.wantsPercent),
-      savings_debts_percent: toDecimalString(state.savingsPercent),
+      savings_percent: toDecimalString(state.savingsPercent),
     }
   }
 
@@ -98,7 +98,7 @@ export function budgetAllocationPayload(
     allocation_mode: "amount",
     needs_amount: toDecimalString(state.needsAmount),
     wants_amount: toDecimalString(state.wantsAmount),
-    savings_debts_amount: toDecimalString(state.savingsAmount),
+    savings_amount: toDecimalString(state.savingsAmount),
   }
 }
 

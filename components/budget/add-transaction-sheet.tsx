@@ -643,7 +643,7 @@ export function AddTransactionSheet({
   const categoryConfig = {
     needs: { label: "Needs", selectedClassName: "bg-needs/15" },
     wants: { label: "Wants", selectedClassName: "bg-wants/15" },
-    savings_debts: { label: "Savings", selectedClassName: "bg-savings/15" },
+    savings: { label: "Savings", selectedClassName: "bg-savings/15" },
   } as const
   const primarySuggestion = !isEditMode ? suggestions[0] : undefined
   const primarySuggestionParts = primarySuggestion
@@ -1037,7 +1037,7 @@ export function AddTransactionSheet({
                   <div className="space-y-2 sm:col-span-2">
                     <Label className="text-sm font-medium">Category</Label>
                     <div className="grid grid-cols-3 gap-2">
-                      {(["needs", "wants", "savings_debts"] as const).map((cat) => {
+                      {(["needs", "wants", "savings"] as const).map((cat) => {
                         const config = categoryConfig[cat]
                         const isSelected = category === cat
 

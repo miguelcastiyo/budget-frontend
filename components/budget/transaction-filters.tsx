@@ -67,7 +67,7 @@ interface TransactionFiltersProps {
 const categories: { value: Category; label: string }[] = [
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
-  { value: "savings_debts", label: "Savings & Debts" },
+  { value: "savings", label: "Savings" },
 ]
 
 interface ChipRailItem {

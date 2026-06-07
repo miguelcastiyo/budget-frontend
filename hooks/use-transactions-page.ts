@@ -49,7 +49,7 @@ function transactionError(err: unknown, fallbackMessage: string): ErrorDialogSta
 }
 
 function parseCategoryQuery(value: string): Category | null {
-  if (value === "needs" || value === "wants" || value === "savings_debts") {
+  if (value === "needs" || value === "wants" || value === "savings") {
     return value
   }
 

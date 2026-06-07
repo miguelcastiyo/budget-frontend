@@ -55,7 +55,7 @@ const NONE_VALUE = "__none"
 const CATEGORY_OPTIONS: Array<{ value: Category; label: string }> = [
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
-  { value: "savings_debts", label: "Savings & Debts" },
+  { value: "savings", label: "Savings" },
 ]
 
 const CATEGORY_SOURCE_HINTS = ["bank_category_guess", "category", "budget_category", "type", "label", "tag", "tags"]
@@ -72,11 +72,14 @@ function inferCategory(value: string): Category {
   if (normalized === "wants" || normalized.includes("want")) {
     return "wants"
   }
-  if (normalized.includes("savings_debts") || normalized.includes("savings & debts") || normalized.includes("debt")) {
-    return "savings_debts"
+  if (["debt", "debts", "loan", "loans", "credit card payment", "credit card payments"].some((keyword) => normalized.includes(keyword))) {
+    return "needs"
   }
-  if (["savings", "saving", "investment", "investments", "debt", "loan"].some((keyword) => normalized.includes(keyword))) {
-    return "savings_debts"
+  if (normalized.includes("savings")) {
+    return "savings"
+  }
+  if (["savings", "saving", "investment", "investments"].some((keyword) => normalized.includes(keyword))) {
+    return "savings"
   }
   if (["dining", "coffee", "entertainment", "shopping", "travel", "misc", "restaurant", "movie"].some((keyword) => normalized.includes(keyword))) {
     return "wants"
@@ -663,7 +666,7 @@ function CategorySetup({
 
       {mode === "exact_column" && (
         <p className="text-xs text-muted-foreground">
-          Use this only when the selected column already contains Needs, Wants, or Savings & Debts.
+          Use this only when the selected column already contains Needs, Wants, or Savings.
         </p>
       )}
     </div>
@@ -1647,7 +1650,7 @@ export default function DataSettingsPage() {
                   {importStep === "upload" && "Choose the CSV file to preview before anything is imported."}
                   {importStep === "map" && "Match CSV headers to Budget fields."}
                   {importStep === "dates" && "Choose a year for dates that do not include one."}
-                  {importStep === "categories" && "Map imported labels into Needs, Wants, or Savings & Debts."}
+                  {importStep === "categories" && "Map imported labels into Needs, Wants, or Savings."}
                   {importStep === "tags" && "Match imported labels to existing tags or create new ones."}
                   {importStep === "review" && "Review validation results before importing."}
                   {importStep === "done" && "Import complete."}
@@ -1726,7 +1729,7 @@ export default function DataSettingsPage() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold">Budget group setup</h3>
-                    <p className="text-xs text-muted-foreground">Map imported labels into Needs, Wants, or Savings & Debts.</p>
+                    <p className="text-xs text-muted-foreground">Map imported labels into Needs, Wants, or Savings.</p>
                   </div>
                   <CategorySetup
                     preview={importPreview}

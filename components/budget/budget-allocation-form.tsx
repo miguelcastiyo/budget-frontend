@@ -75,7 +75,7 @@ export function BudgetAllocationForm({
         />
         <AllocationInput
           id="allocation-savings-percent"
-          label="Savings & Debts"
+          label="Savings"
           value={value.savingsPercent}
           onChange={(savingsPercent) => update({ savingsPercent })}
           suffix="%"
@@ -125,7 +125,7 @@ export function BudgetAllocationForm({
         />
         <AllocationInput
           id="allocation-savings-amount"
-          label="Savings & Debts"
+          label="Savings"
           value={value.savingsAmount}
           onChange={(savingsAmount) => update({ savingsAmount })}
           prefix="$"
@@ -180,14 +180,14 @@ function AllocationSummaryBar({ value }: { value: BudgetAllocationFormState }) {
   const segments = [
     { key: "needs", label: "Needs", value: needs, className: "bg-needs" },
     { key: "wants", label: "Wants", value: wants, className: "bg-wants" },
-    { key: "savings", label: "Savings & Debts", value: savings, className: "bg-savings" },
+    { key: "savings", label: "Savings", value: savings, className: "bg-savings" },
   ]
 
   return (
     <div className="mb-5 rounded-2xl border border-border/70 bg-muted/30 p-3">
       <div
         className="flex h-3 overflow-hidden rounded-full bg-muted"
-        aria-label="Budget allocation split across Needs, Wants, and Savings & Debts"
+        aria-label="Budget allocation split across Needs, Wants, and Savings"
       >
         {segments.map((segment) => (
           <div

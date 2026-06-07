@@ -12,8 +12,8 @@ export function formatCategory(category: string): string {
       return "Needs"
     case "wants":
       return "Wants"
-    case "savings_debts":
-      return "Savings & Debts"
+    case "savings":
+      return "Savings"
     default:
       return category
   }
@@ -25,7 +25,7 @@ export function getCategoryColorClass(category: string): string {
       return "bg-needs"
     case "wants":
       return "bg-wants"
-    case "savings_debts":
+    case "savings":
       return "bg-savings"
     default:
       return "bg-muted"
@@ -38,7 +38,7 @@ export function getCategoryTextClass(category: string): string {
       return "text-needs"
     case "wants":
       return "text-wants"
-    case "savings_debts":
+    case "savings":
       return "text-savings"
     default:
       return "text-muted-foreground"

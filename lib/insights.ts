@@ -24,7 +24,7 @@ export const rangePresets: { value: Exclude<RangePreset, "custom">; label: strin
 export const categoryColors: Record<Category, string> = {
   needs: "var(--color-needs)",
   wants: "var(--color-wants)",
-  savings_debts: "var(--color-savings)",
+  savings: "var(--color-savings)",
 }
 
 const tagPalette = [
