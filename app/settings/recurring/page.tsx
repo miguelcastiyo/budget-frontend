@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { ArrowLeft, CalendarIcon, MoreHorizontal, Pencil, Plus, Repeat, Trash2 } from "lucide-react"
+import { ArrowLeft, CalendarIcon, CreditCard, MoreHorizontal, Pencil, Plus, Repeat, Trash2, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -59,7 +59,7 @@ import type {
   Card as CardType,
 } from "@/lib/api/types"
 import { formatCurrency } from "@/lib/formatters"
-import { getTagIcon } from "@/lib/tag-icons"
+import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
@@ -75,6 +75,34 @@ interface RecurringFormState {
   starts_month: string
   ends_month: string
   is_active: boolean
+}
+
+const MAX_TAG_CHIP_LABEL_LENGTH = 11
+const TAG_CHIP_LABEL_OVERRIDES: Record<string, string> = {
+  subscriptions: "Subs",
+  subscription: "Subs",
+  transportation: "Transit",
+}
+
+const categoryConfig = {
+  needs: { label: "Needs", selectedClassName: "bg-needs/15" },
+  wants: { label: "Wants", selectedClassName: "bg-wants/15" },
+  savings: { label: "Savings", selectedClassName: "bg-savings/15" },
+} as const
+
+function compactTagLabel(name: string): string {
+  const normalized = name.trim().replace(/\s+/g, " ")
+  const override = TAG_CHIP_LABEL_OVERRIDES[normalized.toLocaleLowerCase()]
+  if (override) {
+    return override
+  }
+
+  if (normalized.length <= MAX_TAG_CHIP_LABEL_LENGTH) {
+    return normalized
+  }
+
+  const firstWord = normalized.split(" ")[0] || normalized
+  return firstWord.length <= MAX_TAG_CHIP_LABEL_LENGTH ? firstWord : firstWord.slice(0, MAX_TAG_CHIP_LABEL_LENGTH)
 }
 
 function formatRecurringAmount(value: string): string {
@@ -356,7 +384,7 @@ export default function RecurringSettingsPage() {
 
   const handleCreate = async () => {
     if (!newForm.expense.trim() || !newForm.tag_id || !isValidRecurringAmount(newForm.amount) || !isValidBillingDay(newForm)) {
-      setError("Add an expense name, amount, tag, and valid billing day")
+      setError("Add a description, amount, tag, and valid billing day")
       return
     }
 
@@ -388,6 +416,21 @@ export default function RecurringSettingsPage() {
     } finally {
       setIsMutating(false)
     }
+  }
+
+  const handleCreateTag = async (name: string, iconKey: string): Promise<Tag> => {
+    const created = await apiClient.createTag({
+      name: name.trim(),
+      icon_key: iconKey || null,
+    })
+    setTags((previous) => [...previous, created])
+    return created
+  }
+
+  const handleCreateCard = async (name: string): Promise<CardType> => {
+    const created = await apiClient.createCard({ name: name.trim() })
+    setCards((previous) => [...previous, created])
+    return created
   }
 
   const handleSaveEdit = async () => {
@@ -679,14 +722,14 @@ export default function RecurringSettingsPage() {
             mobileDrawerDialogClassName
           )}
         >
-          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
+          <DialogHeader className="relative z-10 shrink-0 border-b border-border/50 bg-background/95 px-5 pb-3 pt-2 text-left backdrop-blur sm:px-6 sm:pb-4 sm:pt-5">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
-            <DialogTitle className="text-xl font-semibold">New Recurring Expense</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">New Recurring Bill</DialogTitle>
             <DialogDescription>
-              Add a monthly bill to include it in your budget upfront.
+              Add a monthly bill so it counts toward your budget upfront.
             </DialogDescription>
           </DialogHeader>
-          <div ref={newRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={newRecurringScrollRef} className="min-h-0 flex-1 scroll-pt-4 overflow-y-auto">
             <RecurringForm
               form={newForm}
               tags={tagOptions}
@@ -694,6 +737,8 @@ export default function RecurringSettingsPage() {
               isMutating={isMutating}
               saveLabel="Create recurring expense"
               onChange={setNewForm}
+              onCreateTag={handleCreateTag}
+              onCreateCard={handleCreateCard}
               onCancel={closeNewRecurringDialog}
               onSave={() => void handleCreate()}
             />
@@ -716,14 +761,14 @@ export default function RecurringSettingsPage() {
             mobileDrawerDialogClassName
           )}
         >
-          <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
+          <DialogHeader className="relative z-10 shrink-0 border-b border-border/50 bg-background/95 px-5 pb-3 pt-2 text-left backdrop-blur sm:px-6 sm:pb-4 sm:pt-5">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
-            <DialogTitle className="text-xl font-semibold">Edit Recurring Expense</DialogTitle>
+            <DialogTitle className="text-xl font-semibold">Edit Recurring Bill</DialogTitle>
             <DialogDescription>
               Update the monthly rule for future budget planning.
             </DialogDescription>
           </DialogHeader>
-          <div ref={editRecurringScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={editRecurringScrollRef} className="min-h-0 flex-1 scroll-pt-4 overflow-y-auto">
             {editingForm && (
               <RecurringForm
                 form={editingForm}
@@ -733,6 +778,8 @@ export default function RecurringSettingsPage() {
                 canSave={hasEditingChanges}
                 saveLabel="Save changes"
                 onChange={setEditingForm}
+                onCreateTag={handleCreateTag}
+                onCreateCard={handleCreateCard}
                 onCancel={closeEditRecurringDialog}
                 onSave={() => void handleSaveEdit()}
               />
@@ -775,6 +822,8 @@ interface RecurringFormProps {
   canSave?: boolean
   saveLabel: string
   onChange: (next: RecurringFormState) => void
+  onCreateTag: (name: string, iconKey: string) => Promise<Tag>
+  onCreateCard: (name: string) => Promise<CardType>
   onCancel: () => void
   onSave: () => void
 }
@@ -787,6 +836,8 @@ function RecurringForm({
   canSave = true,
   saveLabel,
   onChange,
+  onCreateTag,
+  onCreateCard,
   onCancel,
   onSave,
 }: RecurringFormProps) {
@@ -795,123 +846,446 @@ function RecurringForm({
     expense: false,
     billing_day: false,
   })
+  const [showNewTag, setShowNewTag] = useState(false)
+  const [newTagName, setNewTagName] = useState("")
+  const [newTagIconKey, setNewTagIconKey] = useState("")
+  const [showNewCard, setShowNewCard] = useState(false)
+  const [newCardName, setNewCardName] = useState("")
+  const [isCreatingTag, setIsCreatingTag] = useState(false)
+  const [isCreatingCard, setIsCreatingCard] = useState(false)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const hasAmount = form.amount.trim() !== ""
   const hasExpense = form.expense.trim() !== ""
   const amountIsValid = isValidRecurringAmount(form.amount)
   const billingDayIsValid = isValidBillingDay(form)
   const canSubmit = Boolean(canSave && hasExpense && form.tag_id && amountIsValid && billingDayIsValid)
-  const disabledReason = !hasExpense
-    ? "Expense name is required."
-    : !amountIsValid
-      ? "Amount must be greater than $0."
-      : !billingDayIsValid
-        ? "Billing day must be 1-31."
-        : !canSave
-          ? "Make a change to save."
-          : null
+  const displayAmount = form.amount || "00.00"
+  const amountLength = displayAmount.length
+  const amountInputStyle = {
+    width: `${Math.min(Math.max(amountLength + 0.25, 5), 10.5)}ch`,
+  } satisfies CSSProperties
+  const amountTextClassName = amountLength > 7
+    ? "text-4xl sm:text-3xl"
+    : "text-5xl sm:text-4xl"
+  const tagChipRailStyle = {
+    gridAutoColumns: "clamp(6.75rem, calc((100% - 1.5rem) / 3.35), 8.75rem)",
+  } satisfies CSSProperties
+  const amountErrorId = "recurring-amount-error"
+  const descriptionErrorId = "recurring-description-error"
+  const billingDayErrorId = "recurring-billing-day-error"
+  const showAmountError = (submitAttempted || touched.amount) && !amountIsValid
+  const showDescriptionError = (submitAttempted || touched.expense) && !hasExpense
+  const showBillingDayError = (submitAttempted || touched.billing_day) && !billingDayIsValid
+  const selectedNewTagIconOption = TAG_ICON_OPTIONS.find((option) => option.key === newTagIconKey)
+  const AutoNewTagIcon = getTagIcon(newTagName || "Tag", null)
+  const NewTagPreviewIcon = selectedNewTagIconOption?.icon ?? AutoNewTagIcon
+  const newTagIconLabel = selectedNewTagIconOption?.label ?? "Auto"
+
+  const handleCreateInlineTag = async () => {
+    const name = newTagName.trim()
+    if (!name || isCreatingTag) {
+      return
+    }
+
+    setIsCreatingTag(true)
+    setInlineError(null)
+
+    try {
+      const created = await onCreateTag(name, newTagIconKey)
+      onChange({ ...form, tag_id: created.id })
+      setShowNewTag(false)
+      setNewTagName("")
+      setNewTagIconKey("")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setInlineError(err.error.message)
+      } else {
+        setInlineError("Unable to create tag")
+      }
+    } finally {
+      setIsCreatingTag(false)
+    }
+  }
+
+  const handleCreateInlineCard = async () => {
+    const name = newCardName.trim()
+    if (!name || isCreatingCard) {
+      return
+    }
+
+    setIsCreatingCard(true)
+    setInlineError(null)
+
+    try {
+      const created = await onCreateCard(name)
+      onChange({ ...form, card_id: created.id })
+      setShowNewCard(false)
+      setNewCardName("")
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setInlineError(err.error.message)
+      } else {
+        setInlineError("Unable to create card")
+      }
+    } finally {
+      setIsCreatingCard(false)
+    }
+  }
+
+  const handleSubmit = () => {
+    if (!canSubmit) {
+      setSubmitAttempted(true)
+      setTouched({ amount: true, expense: true, billing_day: true })
+      return
+    }
+
+    onSave()
+  }
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 space-y-5 px-5 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5">
+      <div className="flex-1 space-y-4 px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
         <FormSection title="Expense">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Amount</Label>
-              <div className="flex items-center rounded-xl border border-border/60 bg-muted/20 px-3">
-                <span className="text-lg text-muted-foreground">$</span>
+          <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-4 sm:px-4 sm:py-4">
+            <label htmlFor="recurring-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Amount
+            </label>
+            <div className="mt-2.5 flex justify-center">
+              <div className="inline-flex items-baseline gap-2">
+                <span className={cn("font-semibold leading-none text-muted-foreground", amountTextClassName)}>
+                  $
+                </span>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  id="recurring-amount"
+                  name="recurring_amount"
+                  type="text"
+                  inputMode="decimal"
+                  enterKeyHint="next"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-form-type="other"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   value={form.amount}
-                  onChange={(e) => onChange({ ...form, amount: e.target.value })}
+                  style={amountInputStyle}
+                  onChange={(e) => {
+                    setSubmitAttempted(false)
+                    onChange({ ...form, amount: e.target.value })
+                  }}
                   onBlur={() => setTouched((previous) => ({ ...previous, amount: true }))}
-                  placeholder="0.00"
-                  aria-invalid={touched.amount && !amountIsValid}
-                  className="h-12 border-0 bg-transparent px-2 text-lg font-semibold focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="00.00"
+                  aria-invalid={showAmountError}
+                  aria-describedby={showAmountError ? amountErrorId : undefined}
+                  className={cn(
+                    "h-auto min-w-0 max-w-[68vw] border-0 bg-transparent p-0 text-left font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                    amountTextClassName
+                  )}
                 />
               </div>
-              {(touched.amount || (hasAmount && !amountIsValid)) && !amountIsValid && (
-                <p className="text-xs text-destructive">Amount must be greater than $0.</p>
-              )}
             </div>
+            {showAmountError && (
+              <p id={amountErrorId} className="mt-2.5 text-center text-xs text-destructive">Amount must be greater than $0.</p>
+            )}
+          </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm">Expense name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="recurring-description" className="text-sm font-medium">Description</Label>
+            <div className="relative">
               <Input
+                id="recurring-description"
                 value={form.expense}
                 onChange={(e) => onChange({ ...form, expense: e.target.value })}
                 onBlur={() => setTouched((previous) => ({ ...previous, expense: true }))}
-                placeholder="Rent"
-                aria-invalid={touched.expense && !hasExpense}
-                className="h-12 rounded-xl sm:h-10"
+                placeholder="What bill is this?"
+                enterKeyHint={form.tag_id && amountIsValid ? "done" : "next"}
+                aria-invalid={showDescriptionError}
+                aria-describedby={showDescriptionError ? descriptionErrorId : undefined}
+                className="h-11 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent sm:h-10"
               />
-              {touched.expense && !hasExpense && (
-                <p className="text-xs text-destructive">Expense name is required.</p>
-              )}
             </div>
+            {showDescriptionError && (
+              <p id={descriptionErrorId} className="text-xs text-destructive">Description is required.</p>
+            )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-sm">Category</Label>
-              <Select
-                value={form.category}
-                onValueChange={(value) => onChange({ ...form, category: value as Category })}
-              >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="needs">Needs</SelectItem>
-                  <SelectItem value="wants">Wants</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Tag</Label>
+              {!showNewTag && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTagIconKey("")
+                    setShowNewTag(true)
+                  }}
+                  className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New tag
+                </button>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm">Tag</Label>
-              <Select
-                value={form.tag_id}
-                onValueChange={(value) => onChange({ ...form, tag_id: value })}
-              >
-                <SelectTrigger className="h-10 rounded-xl">
-                  <SelectValue placeholder="Select tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {showNewTag ? (
+              <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card p-3">
+                <div className="flex items-center justify-between gap-3 pb-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Create tag</p>
+                    <p className="truncate text-xs text-muted-foreground">It will be selected for this recurring expense.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowNewTag(false)
+                      setNewTagName("")
+                      setNewTagIconKey("")
+                    }}
+                    className="h-9 w-9 shrink-0 rounded-lg p-0"
+                    aria-label="Cancel new tag"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid min-w-0 gap-3">
+                  <div className="relative min-w-0">
+                    <NewTagPreviewIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Tag name"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      className="h-11 rounded-xl border-border/60 pl-10 sm:h-10"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          void handleCreateInlineTag()
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-xs font-medium text-muted-foreground">Icon</Label>
+                      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                        <NewTagPreviewIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{newTagIconLabel}</span>
+                      </span>
+                    </div>
+                    <div className="relative min-w-0 max-w-full overflow-hidden">
+                      <div className="flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <button
+                          type="button"
+                          aria-pressed={!newTagIconKey}
+                          aria-label="Use automatic icon"
+                          title="Auto icon"
+                          onClick={() => setNewTagIconKey("")}
+                          className={cn(
+                            "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+                            !newTagIconKey
+                              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                              : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          )}
+                        >
+                          <AutoNewTagIcon className="h-4 w-4 shrink-0" />
+                          Auto
+                        </button>
+                        {TAG_ICON_OPTIONS.map((option) => {
+                          const Icon = option.icon
+                          const isSelected = newTagIconKey === option.key
+
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              aria-pressed={isSelected}
+                              aria-label={`Use ${option.label} icon`}
+                              title={option.label}
+                              onClick={() => setNewTagIconKey(option.key)}
+                              className={cn(
+                                "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
+                                isSelected
+                                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                  : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card via-card/80 to-transparent" aria-hidden="true" />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => void handleCreateInlineTag()}
+                    disabled={!newTagName.trim() || isCreatingTag}
+                    className="h-11 w-full rounded-xl px-4 sm:h-10"
+                  >
+                    {isCreatingTag ? "Adding..." : "Add tag"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="min-w-0">
+                {tags.length > 0 ? (
+                  <div className="relative min-w-0 overflow-hidden">
+                    <div
+                      className="grid min-w-0 grid-flow-col gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      style={tagChipRailStyle}
+                    >
+                      {tags.map((tag) => {
+                        const isSelected = form.tag_id === tag.id
+                        const TagIcon = getTagIcon(tag.name, tag.icon_key)
+                        const label = compactTagLabel(tag.name)
+
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            aria-pressed={isSelected}
+                            aria-label={tag.name}
+                            title={tag.name}
+                            onClick={() => onChange({ ...form, tag_id: tag.id })}
+                            className={cn(
+                              "inline-flex h-11 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors",
+                              isSelected
+                                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                                : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                            )}
+                          >
+                            <TagIcon className="h-4 w-4 shrink-0" />
+                            <span className="min-w-0 truncate">{label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background via-background/80 to-transparent" aria-hidden="true" />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                    Create a tag to use it for this recurring expense.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Category</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["needs", "wants", "savings"] as const).map((category) => {
+                const config = categoryConfig[category]
+                const isSelected = form.category === category
+
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => onChange({ ...form, category })}
+                    className={cn(
+                      "relative h-10 cursor-pointer rounded-xl text-sm font-medium transition-all duration-200 sm:h-11",
+                      isSelected
+                        ? `border-primary ${config.selectedClassName} text-foreground shadow-sm`
+                        : "bg-muted/60 text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {config.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm">Card</Label>
-            <Select
-              value={form.card_id || "__none"}
-              onValueChange={(value) => onChange({ ...form, card_id: value === "__none" ? "" : value })}
-            >
-              <SelectTrigger className="h-10 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">No card</SelectItem>
-                {cards.map((card) => (
-                  <SelectItem key={card.id} value={card.id}>
-                    {card.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">
+                Card <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              {!showNewCard && (
+                <button
+                  type="button"
+                  onClick={() => setShowNewCard(true)}
+                  className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New card
+                </button>
+              )}
+            </div>
+
+            {showNewCard ? (
+              <div className="rounded-xl border border-border/60 bg-card p-3">
+                <div className="flex items-center justify-between gap-3 pb-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Create card</p>
+                    <p className="truncate text-xs text-muted-foreground">It will be selected for this recurring expense.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowNewCard(false)
+                      setNewCardName("")
+                    }}
+                    className="h-9 w-9 shrink-0 rounded-lg p-0"
+                    aria-label="Cancel new card"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="relative min-w-0">
+                    <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Card name"
+                      value={newCardName}
+                      onChange={(e) => setNewCardName(e.target.value)}
+                      className="h-11 rounded-xl border-border/60 pl-10 sm:h-10"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          void handleCreateInlineCard()
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => void handleCreateInlineCard()}
+                    disabled={!newCardName.trim() || isCreatingCard}
+                    className="h-11 rounded-xl px-4 sm:h-10"
+                  >
+                    {isCreatingCard ? "Adding..." : "Add card"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Select
+                value={form.card_id || "__none"}
+                onValueChange={(value) => onChange({ ...form, card_id: value === "__none" ? "" : value })}
+              >
+                <SelectTrigger className="h-10 rounded-xl border-border/60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">No card</SelectItem>
+                  {cards.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </FormSection>
 
-        <FormSection title="Schedule">
+        <FormSection title="Schedule" description="Choose when this bill should be added each month.">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-sm">Billing rule</Label>
@@ -919,7 +1293,7 @@ function RecurringForm({
                 value={form.billing_type}
                 onValueChange={(value) => onChange({ ...form, billing_type: value as RecurringBillingType })}
               >
-                <SelectTrigger className="h-10 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl border-border/60 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -940,18 +1314,20 @@ function RecurringForm({
                 onBlur={() => setTouched((previous) => ({ ...previous, billing_day: true }))}
                 disabled={form.billing_type === "last_day"}
                 placeholder={form.billing_type === "last_day" ? "Auto" : "1-31"}
-                aria-invalid={touched.billing_day && !billingDayIsValid}
-                className="h-10 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                inputMode="numeric"
+                aria-invalid={showBillingDayError}
+                aria-describedby={showBillingDayError ? billingDayErrorId : undefined}
+                className="h-10 rounded-xl border-border/60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              {(touched.billing_day || !billingDayIsValid) && !billingDayIsValid && (
-                <p className="text-xs text-destructive">Billing day must be 1-31.</p>
+              {showBillingDayError && (
+                <p id={billingDayErrorId} className="text-xs text-destructive">Enter a day from 1 to 31.</p>
               )}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label className="text-sm">Starts month</Label>
+              <Label className="text-sm">Starts</Label>
               <MonthPicker
                 value={form.starts_month}
                 onChange={(value) => onChange({ ...form, starts_month: value })}
@@ -960,7 +1336,7 @@ function RecurringForm({
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm">Ends month</Label>
+              <Label className="text-sm">Ends</Label>
               <MonthPicker
                 value={form.ends_month}
                 onChange={(value) => onChange({ ...form, ends_month: value })}
@@ -976,36 +1352,44 @@ function RecurringForm({
           <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/15 px-4 py-3">
             <div>
               <Label className="text-sm">Active</Label>
-              <p className="mt-0.5 text-xs text-muted-foreground">Include this monthly rule in future planning.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Active recurring expenses are added for eligible months.</p>
             </div>
             <Switch
+              aria-label="Recurring expense active"
               checked={form.is_active}
               onCheckedChange={(checked) => onChange({ ...form, is_active: checked })}
             />
           </div>
         </FormSection>
+
+        {inlineError && (
+          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {inlineError}
+          </p>
+        )}
       </div>
 
       {/* Extra bottom padding keeps the sticky tray footer clear of the iOS home indicator and software keyboard scroll area. */}
-      <div className="sticky bottom-0 shrink-0 border-t border-border/50 bg-background/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur sm:px-6 sm:pb-4">
-        {disabledReason && (
-          <p className="mb-2 text-right text-xs text-muted-foreground">{disabledReason}</p>
-        )}
-        <div className="flex justify-end gap-2">
-        <Button
-          variant="ghost"
-          className="rounded-xl"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
-        <Button
-          className="rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
-          onClick={onSave}
-          disabled={isMutating || !canSubmit}
-        >
-          {isMutating ? "Saving..." : saveLabel}
-        </Button>
+      <div className="sticky bottom-0 z-10 shrink-0 border-t border-border/50 bg-background/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur sm:px-6 sm:pb-4">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:justify-end">
+          <Button
+            variant="ghost"
+            className="h-12 rounded-xl px-4 sm:h-10"
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+          <Button
+            className={cn(
+              "h-12 rounded-xl text-base font-semibold sm:h-10 sm:text-sm",
+              !canSubmit && "bg-muted text-muted-foreground shadow-none hover:bg-muted hover:text-muted-foreground"
+            )}
+            onClick={handleSubmit}
+            disabled={isMutating || !canSave}
+            aria-disabled={!canSubmit}
+          >
+            {isMutating ? "Saving..." : saveLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -1014,15 +1398,20 @@ function RecurringForm({
 
 function FormSection({
   title,
+  description,
   children,
 }: {
   title: string
+  description?: string
   children: ReactNode
 }) {
   return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
-      <div className="space-y-4">{children}</div>
+    <section className="space-y-2.5">
+      <div>
+        <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+        {description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>}
+      </div>
+      <div className="space-y-3.5">{children}</div>
     </section>
   )
 }
