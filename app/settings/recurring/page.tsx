@@ -1,17 +1,16 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { CSSProperties, ReactNode } from "react"
+import type { ClipboardEvent, CSSProperties, FormEvent, KeyboardEvent, ReactNode } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { ArrowLeft, CalendarIcon, CreditCard, MoreHorizontal, Pencil, Plus, Repeat, Trash2, X } from "lucide-react"
+import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, CalendarIcon, ChevronLeft, ChevronRight, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogContent,
@@ -24,12 +23,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -58,11 +51,13 @@ import type {
   Tag,
   Card as CardType,
 } from "@/lib/api/types"
-import { formatCurrency } from "@/lib/formatters"
+import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
+
+const MAX_AMOUNT_DIGITS = 9
 
 interface RecurringFormState {
   expense: string
@@ -76,6 +71,8 @@ interface RecurringFormState {
   ends_month: string
   is_active: boolean
 }
+
+type RecurringSort = "date_asc" | "date_desc"
 
 const MAX_TAG_CHIP_LABEL_LENGTH = 11
 const TAG_CHIP_LABEL_OVERRIDES: Record<string, string> = {
@@ -181,6 +178,19 @@ function formatProjectedDate(date: string): string {
   return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
+function formatRecurringGroupDate(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return date
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+}
+
 function formatAddedMonth(month: string): string {
   const parsed = parseMonthValue(month)
   return parsed ? format(parsed, "MMMM yyyy") : month
@@ -192,6 +202,31 @@ function formatBillingSchedule(item: RecurringExpense): string {
   }
 
   return `Day ${item.billing_day} monthly`
+}
+
+function groupRecurringByProjectedDate(items: RecurringExpense[]): Map<string, RecurringExpense[]> {
+  const groups = new Map<string, RecurringExpense[]>()
+
+  items.forEach((item) => {
+    const dateKey = item.projected_date_for_month
+    if (!groups.has(dateKey)) {
+      groups.set(dateKey, [])
+    }
+    groups.get(dateKey)!.push(item)
+  })
+
+  return groups
+}
+
+function sortRecurringItems(items: RecurringExpense[], sort: RecurringSort): RecurringExpense[] {
+  return [...items].sort((first, second) => {
+    const dateCompare = first.projected_date_for_month.localeCompare(second.projected_date_for_month)
+    if (dateCompare !== 0) {
+      return sort === "date_desc" ? -dateCompare : dateCompare
+    }
+
+    return first.expense.localeCompare(second.expense)
+  })
 }
 
 function parseMonthValue(month: string): Date | null {
@@ -215,9 +250,14 @@ function parseMonthValue(month: string): Date | null {
   return parsed
 }
 
-function toMonthValue(value: Date): string {
-  return format(value, "yyyy-MM")
+function monthValueFromParts(year: number, monthIndex: number): string {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}`
 }
+
+const monthPickerMonths = Array.from({ length: 12 }, (_, index) => ({
+  index,
+  label: format(new Date(2026, index, 1), "MMM"),
+}))
 
 interface MonthPickerProps {
   id?: string
@@ -240,6 +280,15 @@ function MonthPicker({
 }: MonthPickerProps) {
   const selectedMonth = parseMonthValue(value)
   const displayLabel = selectedMonth ? format(selectedMonth, "MMMM yyyy") : placeholder
+  const currentMonthValue = getCurrentMonthKey()
+  const initialYear = selectedMonth?.getFullYear() ?? parseMonthValue(currentMonthValue)?.getFullYear() ?? new Date().getFullYear()
+  const [visibleYear, setVisibleYear] = useState(initialYear)
+
+  useEffect(() => {
+    if (selectedMonth) {
+      setVisibleYear(selectedMonth.getFullYear())
+    }
+  }, [value])
 
   return (
     <div className="space-y-1">
@@ -250,6 +299,7 @@ function MonthPicker({
             type="button"
             variant="outline"
             disabled={disabled}
+            aria-label={`Select month. Current selection: ${displayLabel}`}
             className={cn(
               "h-10 rounded-xl justify-start text-left font-normal",
               !selectedMonth && "text-muted-foreground",
@@ -260,19 +310,69 @@ function MonthPicker({
             <span className="truncate">{displayLabel}</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end" avoidCollisions>
-          <AppCalendar
-            mode="single"
-            selected={selectedMonth ?? undefined}
-            onSelect={(next) => {
-              if (!next) {
-                return
-              }
-              onChange(toMonthValue(next))
+        <PopoverContent className="w-[min(calc(100vw-2rem),21rem)] rounded-2xl p-3" align="end" avoidCollisions>
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full"
+              aria-label="Previous year"
+              onClick={() => setVisibleYear((year) => year - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <p className="text-sm font-semibold">{visibleYear}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-full"
+              aria-label="Next year"
+              onClick={() => setVisibleYear((year) => year + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {monthPickerMonths.map((monthOption) => {
+              const monthValue = monthValueFromParts(visibleYear, monthOption.index)
+              const isSelected = value === monthValue
+              const isCurrent = currentMonthValue === monthValue
+
+              return (
+                <button
+                  key={monthValue}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => onChange(monthValue)}
+                  className={cn(
+                    "h-11 rounded-xl border text-sm font-medium transition-colors",
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border/60 bg-muted/20 text-foreground hover:bg-muted/60",
+                    isCurrent && !isSelected && "border-primary/40"
+                  )}
+                >
+                  {monthOption.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3 h-9 w-full rounded-xl text-sm text-muted-foreground"
+            onClick={() => {
+              const currentMonth = parseMonthValue(currentMonthValue)
+              setVisibleYear(currentMonth?.getFullYear() ?? new Date().getFullYear())
+              onChange(currentMonthValue)
             }}
-            defaultMonth={selectedMonth ?? new Date()}
-            initialFocus
-          />
+          >
+            Current month
+          </Button>
         </PopoverContent>
       </Popover>
 
@@ -294,6 +394,7 @@ function MonthPicker({
 
 export default function RecurringSettingsPage() {
   const [month, setMonth] = useState(getCurrentMonthKey())
+  const [recurringSort, setRecurringSort] = useState<RecurringSort>("date_asc")
   const [data, setData] = useState<RecurringExpensesResponse | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<CardType[]>([])
@@ -302,6 +403,7 @@ export default function RecurringSettingsPage() {
   const [newForm, setNewForm] = useState<RecurringFormState>(() => emptyForm(getCurrentMonthKey()))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingForm, setEditingForm] = useState<RecurringFormState | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const newRecurringScrollRef = useRef<HTMLDivElement>(null)
   const editRecurringScrollRef = useRef<HTMLDivElement>(null)
@@ -310,6 +412,7 @@ export default function RecurringSettingsPage() {
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const editingItem = data?.items.find((item) => item.id === editingId) ?? null
+  const detailItem = data?.items.find((item) => item.id === detailId) ?? null
   const hasEditingChanges = Boolean(
     editingForm &&
     editingItem &&
@@ -362,6 +465,14 @@ export default function RecurringSettingsPage() {
       .sort((first, second) => first.projected_date_for_month.localeCompare(second.projected_date_for_month))
       .slice(0, 3),
     [data?.items]
+  )
+  const sortedRecurringItems = useMemo(
+    () => sortRecurringItems(data?.items ?? [], recurringSort),
+    [data?.items, recurringSort]
+  )
+  const recurringGroups = useMemo(
+    () => groupRecurringByProjectedDate(sortedRecurringItems),
+    [sortedRecurringItems]
   )
   const closeNewRecurringDialog = () => {
     setShowNew(false)
@@ -486,6 +597,7 @@ export default function RecurringSettingsPage() {
     try {
       await apiClient.deleteRecurringExpense(deleteId)
       setDeleteId(null)
+      setDetailId(null)
       if (editingId === deleteId) {
         setEditingId(null)
         setEditingForm(null)
@@ -503,6 +615,7 @@ export default function RecurringSettingsPage() {
   }
 
   const startEdit = (item: RecurringExpense) => {
+    setDetailId(null)
     setEditingId(item.id)
     setEditingForm(formFromItem(item))
   }
@@ -519,12 +632,12 @@ export default function RecurringSettingsPage() {
           <h1 className="text-xl font-bold flex-1">Recurring</h1>
           <Button
             variant="ghost"
-            className="h-9 rounded-full px-3 lg:size-9 lg:px-0"
+            className="h-9 rounded-full px-3 lg:hidden"
             aria-label="Add recurring expense"
             onClick={() => setShowNew(true)}
           >
             <Plus className="w-5 h-5" />
-            <span className="text-sm lg:sr-only">Add</span>
+            <span className="text-sm">Add</span>
           </Button>
         </div>
       </header>
@@ -563,20 +676,52 @@ export default function RecurringSettingsPage() {
               </div>
             </Card>
 
-            <Button className="h-10 w-full rounded-xl lg:hidden" onClick={() => setShowNew(true)}>
-              <Plus className="h-4 w-4" />
-              Add recurring expense
-            </Button>
-
             <Card className="overflow-hidden border-0 shadow-sm">
-              <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
+              <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
                 <div>
                   <h2 className="text-sm font-semibold">Recurring items</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{formatAddedMonth(month)}</p>
                 </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  <p>{activeItemsCount} Active</p>
-                  {inactiveItemsCount > 0 && <p>{inactiveItemsCount} Inactive</p>}
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="hidden text-right text-xs text-muted-foreground sm:block">
+                    <p>{activeItemsCount} Active</p>
+                    {inactiveItemsCount > 0 && <p>{inactiveItemsCount} Inactive</p>}
+                  </div>
+                  <div className="inline-flex items-center rounded-lg border border-border/70 bg-background p-0.5">
+                    <span className="hidden px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground lg:inline">
+                      Sort
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setRecurringSort("date_desc")}
+                      aria-label="Sort newest first"
+                      title="Newest first"
+                      className={cn(
+                        "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors lg:px-2",
+                        recurringSort === "date_desc"
+                          ? "bg-secondary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+                      <span className="hidden lg:inline">Newest</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecurringSort("date_asc")}
+                      aria-label="Sort oldest first"
+                      title="Oldest first"
+                      className={cn(
+                        "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors lg:px-2",
+                        recurringSort === "date_asc"
+                          ? "bg-secondary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <ArrowUpNarrowWide className="h-3.5 w-3.5" />
+                      <span className="hidden lg:inline">Oldest</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -586,87 +731,21 @@ export default function RecurringSettingsPage() {
                 </div>
               )}
 
-              <div className="divide-y divide-border/60">
-                {data?.items.map((item) => {
-                  const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
-
-                  return (
-                    <div
-                      key={item.id}
-                      role="button"
-                      tabIndex={0}
-                      className="group flex cursor-pointer gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-5 sm:py-3"
-                      aria-label={`Edit ${item.expense}`}
-                      onClick={() => startEdit(item)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault()
-                          startEdit(item)
-                        }
-                      }}
-                    >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary sm:h-9 sm:w-9">
-                        <TagIcon className="h-4 w-4 text-foreground" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{item.expense}</p>
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                              {item.tag.name}
-                              {item.card ? ` · ${item.card.name}` : ""}
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-sm font-semibold">{formatCurrency(item.amount)}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {item.is_active ? "Active" : "Inactive"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex items-start justify-between gap-3">
-                          <div className="min-w-0 text-xs text-muted-foreground">
-                            <p className="truncate">
-                              {formatBillingSchedule(item)} · Next: {formatProjectedDate(item.projected_date_for_month)}
-                            </p>
-                          </div>
-                          <div
-                            // Keep secondary actions from also triggering the row's edit shortcut.
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  className="-mr-1 -mt-1 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-                                  aria-label={`Actions for ${item.expense}`}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="rounded-xl">
-                                <DropdownMenuItem onClick={() => startEdit(item)}>
-                                  <Pencil className="h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() => setDeleteId(item.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </div>
+              <div>
+                {Array.from(recurringGroups.entries()).map(([date, items]) => (
+                  <div key={date}>
+                    <div className="bg-secondary/40 px-4 py-2">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        {formatRecurringGroupDate(date)}
+                      </span>
                     </div>
-                  )
-                })}
+                    <div className="divide-y divide-border/50">
+                      {items.map((item) => (
+                        <RecurringItemRow key={item.id} item={item} onOpen={() => setDetailId(item.id)} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           </div>
@@ -788,6 +867,21 @@ export default function RecurringSettingsPage() {
         </DialogContent>
       </Dialog>
 
+      <RecurringDetailDialog
+        item={detailItem}
+        open={detailId !== null && detailItem !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailId(null)
+          }
+        }}
+        onEdit={startEdit}
+        onDelete={(item) => {
+          setDetailId(null)
+          setDeleteId(item.id)
+        }}
+      />
+
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
@@ -828,6 +922,227 @@ interface RecurringFormProps {
   onSave: () => void
 }
 
+interface RecurringDetailDialogProps {
+  item: RecurringExpense | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onEdit: (item: RecurringExpense) => void
+  onDelete: (item: RecurringExpense) => void
+}
+
+function RecurringItemRow({
+  item,
+  onOpen,
+}: {
+  item: RecurringExpense
+  onOpen: () => void
+}) {
+  const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+
+  return (
+    <button
+      type="button"
+      className="group flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      aria-label={`Open details for ${item.expense}`}
+      onClick={onOpen}
+    >
+      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
+        <TagIcon className="h-5 w-5 text-white" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-semibold">{item.expense}</p>
+          <span className={cn(
+            "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+            item.is_active
+              ? "bg-primary/10 text-primary"
+              : "bg-muted text-muted-foreground"
+          )}>
+            {item.is_active ? "Active" : "Inactive"}
+          </span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
+            <TagGlyph className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-[9rem] truncate">{item.tag.name}</span>
+          </span>
+          {item.card && (
+            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+              <CreditCard className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <span className="max-w-[9rem] truncate">{item.card.name}</span>
+            </span>
+          )}
+          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+            <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-[11rem] truncate">{formatBillingSchedule(item)}</span>
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Next: {formatProjectedDate(item.projected_date_for_month)}
+        </p>
+      </div>
+
+      <div className="ml-2 shrink-0 text-right">
+        <p className="whitespace-nowrap text-sm font-semibold">
+          {formatCurrency(item.amount)}
+        </p>
+      </div>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground/70" />
+    </button>
+  )
+}
+
+function formatProjectedDateLong(date: string): string {
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) {
+    return date
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+function RecurringDetailDialog({
+  item,
+  open,
+  onOpenChange,
+  onEdit,
+  onDelete,
+}: RecurringDetailDialogProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const swipeDismiss = useSwipeDismiss({
+    open,
+    onDismiss: () => onOpenChange(false),
+    scrollRef,
+  })
+
+  if (!item) {
+    return null
+  }
+
+  const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        {...swipeDismiss}
+        showCloseButton
+        className={cn(
+          "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),36rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem] sm:rounded-2xl sm:border",
+          mobileDrawerDialogClassName
+        )}
+      >
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:px-7 sm:py-7">
+          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-4 sm:hidden")} aria-hidden="true" />
+          <div className="flex items-start gap-4 pr-8">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-secondary">
+              <TagIcon className="h-6 w-6 text-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="truncate text-xl font-semibold">{item.expense}</DialogTitle>
+              <DialogDescription className="mt-1 text-2xl font-semibold text-foreground">
+                {formatCurrency(item.amount)} / month
+              </DialogDescription>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <div className="rounded-2xl bg-secondary/50 p-4 sm:p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DetailRow
+                  className="sm:col-span-2"
+                  icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
+                  label="Schedule"
+                  value={formatBillingSchedule(item)}
+                  detail={`Next: ${formatProjectedDateLong(item.projected_date_for_month)}`}
+                />
+                <DetailRow
+                  icon={<Folder className="h-5 w-5 text-muted-foreground" />}
+                  label="Category"
+                  value={categoryConfig[item.category].label}
+                />
+                <DetailRow
+                  icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />}
+                  label="Tag"
+                  value={item.tag.name}
+                />
+                <DetailRow
+                  icon={<CreditCard className="h-5 w-5 text-muted-foreground" />}
+                  label="Card"
+                  value={item.card?.name ?? "No card"}
+                />
+                <DetailRow
+                  icon={<Repeat className="h-5 w-5 text-muted-foreground" />}
+                  label="Status"
+                  value={item.is_active ? "Active" : "Inactive"}
+                />
+                <DetailRow
+                  className="sm:col-span-2"
+                  icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
+                  label="Active months"
+                  value={`Starts ${formatAddedMonth(item.starts_month)}`}
+                  detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                variant="outline"
+                className="h-12 rounded-xl"
+                onClick={() => onEdit(item)}
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="h-12 rounded-xl text-destructive hover:text-destructive"
+                onClick={() => onDelete(item)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  detail,
+  className,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+  detail?: string
+  className?: string
+}) {
+  return (
+    <div className={cn("flex items-center gap-3", className)}>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="truncate font-medium">{value}</p>
+        {detail && <p className="truncate text-sm text-muted-foreground">{detail}</p>}
+      </div>
+    </div>
+  )
+}
+
 function RecurringForm({
   form,
   tags,
@@ -855,6 +1170,8 @@ function RecurringForm({
   const [isCreatingCard, setIsCreatingCard] = useState(false)
   const [inlineError, setInlineError] = useState<string | null>(null)
   const [submitAttempted, setSubmitAttempted] = useState(false)
+  const amountInputRef = useRef<HTMLInputElement>(null)
+  const expenseInputRef = useRef<HTMLInputElement>(null)
   const hasAmount = form.amount.trim() !== ""
   const hasExpense = form.expense.trim() !== ""
   const amountIsValid = isValidRecurringAmount(form.amount)
@@ -866,8 +1183,8 @@ function RecurringForm({
     width: `${Math.min(Math.max(amountLength + 0.25, 5), 10.5)}ch`,
   } satisfies CSSProperties
   const amountTextClassName = amountLength > 7
-    ? "text-4xl sm:text-3xl"
-    : "text-5xl sm:text-4xl"
+    ? "text-4xl sm:text-5xl md:text-5xl"
+    : "text-5xl sm:text-6xl md:text-6xl"
   const tagChipRailStyle = {
     gridAutoColumns: "clamp(6.75rem, calc((100% - 1.5rem) / 3.35), 8.75rem)",
   } satisfies CSSProperties
@@ -881,6 +1198,136 @@ function RecurringForm({
   const AutoNewTagIcon = getTagIcon(newTagName || "Tag", null)
   const NewTagPreviewIcon = selectedNewTagIconOption?.icon ?? AutoNewTagIcon
   const newTagIconLabel = selectedNewTagIconOption?.label ?? "Auto"
+
+  const formatAmountDigits = (digits: string): string => {
+    if (digits.length === 0) {
+      return ""
+    }
+
+    const paddedDigits = digits.padStart(4, "0")
+
+    return `${paddedDigits.slice(0, -2)}.${paddedDigits.slice(-2)}`
+  }
+
+  const amountDigitsFromDecimal = (value: string): string => {
+    const normalized = value.trim().replace(/,/g, ".")
+    if (normalized === "") {
+      return ""
+    }
+
+    const [whole = "", fraction = ""] = normalized.split(".")
+    const digits = `${whole.replace(/\D/g, "")}${fraction.replace(/\D/g, "").padEnd(2, "0").slice(0, 2)}`
+
+    return digits.replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
+  }
+
+  const amountDigits = amountDigitsFromDecimal(form.amount)
+
+  const setAmountFromDigits = (digits: string) => {
+    const normalizedDigits = digits.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
+
+    setSubmitAttempted(false)
+    onChange({ ...form, amount: formatAmountDigits(normalizedDigits) })
+  }
+
+  const appendAmountDigits = (digits: string) => {
+    if (!digits) {
+      return
+    }
+
+    setAmountFromDigits(`${amountDigits}${digits}`)
+  }
+
+  const amountInputIsFullySelected = (): boolean => {
+    const input = amountInputRef.current
+    if (!input || form.amount.length === 0) {
+      return false
+    }
+
+    return input.selectionStart === 0 && input.selectionEnd === form.amount.length
+  }
+
+  const focusExpenseInput = () => {
+    window.requestAnimationFrame(() => {
+      expenseInputRef.current?.focus()
+    })
+  }
+
+  const handleAmountBeforeInput = (event: FormEvent<HTMLInputElement>) => {
+    const nativeEvent = event.nativeEvent as InputEvent
+    const inputType = nativeEvent.inputType
+    const data = nativeEvent.data ?? ""
+
+    if (inputType === "insertText") {
+      event.preventDefault()
+      if (/^\d+$/.test(data)) {
+        appendAmountDigits(data)
+      }
+      return
+    }
+
+    if (inputType === "deleteContentBackward") {
+      event.preventDefault()
+      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
+      return
+    }
+
+    if (inputType === "deleteContentForward") {
+      event.preventDefault()
+      if (amountInputIsFullySelected()) {
+        setAmountFromDigits("")
+      }
+    }
+  }
+
+  const handleAmountKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      focusExpenseInput()
+      return
+    }
+
+    if (/^\d$/.test(event.key)) {
+      event.preventDefault()
+      appendAmountDigits(event.key)
+      return
+    }
+
+    if (event.key === "Backspace") {
+      event.preventDefault()
+      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
+      return
+    }
+
+    if (event.key === "Delete") {
+      if (amountInputIsFullySelected()) {
+        event.preventDefault()
+        setAmountFromDigits("")
+      }
+      return
+    }
+
+    if (["Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+      return
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return
+    }
+
+    event.preventDefault()
+  }
+
+  const handleAmountPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault()
+
+    const pastedDigits = event.clipboardData.getData("text").replace(/\D/g, "")
+    if (!pastedDigits) {
+      return
+    }
+
+    setAmountFromDigits(amountInputIsFullySelected() ? pastedDigits : `${amountDigits}${pastedDigits}`)
+  }
 
   const handleCreateInlineTag = async () => {
     const name = newTagName.trim()
@@ -947,20 +1394,21 @@ function RecurringForm({
     <div className="flex min-h-full flex-col">
       <div className="flex-1 space-y-4 px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
         <FormSection title="Expense">
-          <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-4 sm:px-4 sm:py-4">
+          <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
             <label htmlFor="recurring-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Amount
             </label>
-            <div className="mt-2.5 flex justify-center">
+            <div className="mt-3 flex justify-center">
               <div className="inline-flex items-baseline gap-2">
                 <span className={cn("font-semibold leading-none text-muted-foreground", amountTextClassName)}>
                   $
                 </span>
                 <Input
+                  ref={amountInputRef}
                   id="recurring-amount"
                   name="recurring_amount"
                   type="text"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   enterKeyHint="next"
                   autoComplete="off"
                   autoCorrect="off"
@@ -971,10 +1419,10 @@ function RecurringForm({
                   data-1p-ignore="true"
                   value={form.amount}
                   style={amountInputStyle}
-                  onChange={(e) => {
-                    setSubmitAttempted(false)
-                    onChange({ ...form, amount: e.target.value })
-                  }}
+                  onBeforeInput={handleAmountBeforeInput}
+                  onChange={(e) => setAmountFromDigits(e.target.value)}
+                  onKeyDown={handleAmountKeyDown}
+                  onPaste={handleAmountPaste}
                   onBlur={() => setTouched((previous) => ({ ...previous, amount: true }))}
                   placeholder="00.00"
                   aria-invalid={showAmountError}
@@ -995,6 +1443,7 @@ function RecurringForm({
             <Label htmlFor="recurring-description" className="text-sm font-medium">Description</Label>
             <div className="relative">
               <Input
+                ref={expenseInputRef}
                 id="recurring-description"
                 value={form.expense}
                 onChange={(e) => onChange({ ...form, expense: e.target.value })}

@@ -7,12 +7,15 @@ The Settings -> Recurring page manages monthly recurring expense items.
 
 ## Current experience
 
-- Mobile uses a compact single-column flow: header, intro copy, month summary, mobile add button, then recurring items.
+- Mobile uses a compact single-column flow: header with the single Add action, intro copy, month summary, then recurring items.
 - Desktop uses a wider settings layout with the main content on the left and a compact helper/summary rail on the right.
 - The summary card keeps month selection, committed total, and recurring item count visible.
-- Recurring rows show expense, tag/card, billing schedule, next projected date, amount, and active/inactive status.
-- Tapping or clicking the main row opens edit for faster management.
-- Row edit and delete actions are also available from an overflow menu; delete still confirms before mutating data.
+- The page is month-based, not day-based; month selection uses a month-only picker with year controls and a Current month shortcut.
+- Recurring rows are grouped by projected date for the selected month and mirror recent transaction rows with a category-colored icon, title, metadata chips, amount, and chevron.
+- Recurring-specific details stay visible as compact chips: tag, card when available, billing schedule, and active/inactive status.
+- The list can be sorted locally by newest or oldest projected date without changing backend behavior.
+- Tapping or clicking a recurring row opens a detail sheet, matching the transaction row interaction pattern.
+- Edit and Delete actions live in the detail sheet; Delete still confirms before mutating data.
 - New and edit use the existing mobile tray / desktop modal pattern, grouped into Expense, Schedule, and Status sections.
 - The recurring form intentionally mirrors the money-entry pattern from Add Transaction: Amount, Description, Classification, Timing, Submit.
 - The top half of the recurring form follows Amount -> Description -> Tag -> Category -> Card, then schedule-specific fields appear separately.
@@ -29,10 +32,12 @@ The Settings -> Recurring page manages monthly recurring expense items.
 ## Design decisions
 
 - "Rules" was renamed to "Recurring items" in user-facing labels because it describes the user's bills rather than the system model.
-- "Added for June 2026" was removed from the default row view to reduce metadata noise; rows focus on what, how much, category/card, status, and next date.
-- Row tap opens edit, while the overflow menu keeps secondary and destructive actions available without making the list feel like an admin table.
+- "Added for June 2026" was removed from the default row view to reduce metadata noise; rows focus on what, how much, tag/card, status, schedule, and projected date grouping.
+- Projected-date group headers intentionally follow the Recent Transactions list pattern while keeping recurring-specific schedule metadata in chips.
+- The sort control mirrors the Transactions page pattern with simple Newest and Oldest date controls.
+- Row tap opens details, while Edit/Delete move into the detail sheet so rows feel closer to transaction rows and less like an admin table.
 - Mobile spacing was tightened around the header, intro, summary card, list header, and rows so the first recurring item appears sooner.
-- The mobile add action appears as a visible "Add recurring expense" button below the summary while the header action remains available.
+- Only one primary Add CTA is visible per layout: mobile uses the header "+ Add" action, while desktop uses the right-rail "Add recurring expense" action.
 - Recurring creation should feel like "Add Transaction + Schedule": amount is the hero field, description uses transaction-style language, tags use mobile chips, category uses segmented buttons, and optional card selection stays with expense classification.
 - Field-level validation appears inline near Amount, Description, and Billing day; the sticky footer is reserved for Cancel and Save/Create actions.
 - The submit button uses muted disabled styling until required fields are valid or an edit has changes.
@@ -45,6 +50,10 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Confirm the bottom navigation clears the iPhone home indicator.
 - Confirm the recurring list can scroll to the final item with breathing room above bottom navigation.
 - Open the new recurring tray and confirm the drag handle, close button, and sticky footer are visible.
+- Open the month picker, change the year, choose a month, and use Current month.
+- Tap a recurring row and confirm the detail sheet opens and closes.
+- Edit an existing item from the detail sheet.
+- Delete an existing item from the detail sheet and confirmation dialog.
 - Focus Amount and confirm the input remains reachable with the software keyboard open.
 - Focus Description and confirm the input remains reachable with the software keyboard open.
 - Select a tag chip and confirm the horizontal rail remains readable.
@@ -57,8 +66,5 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Toggle Active.
 - Scroll to Schedule, Status, and the bottom of the tray without fields being covered by the footer.
 - Create a recurring expense with valid required fields.
-- Edit an existing item by tapping the row.
-- Edit an existing item from the overflow menu.
-- Delete an existing item from the overflow menu and confirmation dialog.
 - Change the selected month and confirm the month picker is readable and not clipped.
 - Sanity check portrait and landscape/responsive widths if orientation is supported.
