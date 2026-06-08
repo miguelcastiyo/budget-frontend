@@ -39,7 +39,7 @@ UI section mapping:
 - `monthly_spend_trend` -> Spending rhythm
 - `recurring_vs_variable` -> Fixed vs flexible
 - `day_of_week_spend` -> Spending habits
-- `largest_transactions` -> Notable transactions
+- `largest_transactions` -> Largest transactions
 
 The frontend does not require backend changes for the current version.
 
@@ -75,11 +75,11 @@ Mobile order:
 5. Fixed vs flexible
 6. Spending rhythm
 7. Spending habits
-8. Notable transactions
+8. Largest transactions
 
 Desktop layout:
 
-- Main column: Snapshot, Budget check-in, Where the money went, Spending rhythm, Notable transactions.
+- Main column: Snapshot, Budget check-in, Where the money went, Spending rhythm, Largest transactions.
 - Secondary column: Range summary, Fixed vs flexible, Spending habits.
 
 The desktop layout should use available width intentionally without duplicating metrics or becoming a generic dashboard.
@@ -97,6 +97,14 @@ Supported presets:
 
 Changing a preset immediately fetches insights. Custom ranges require both dates and only fetch after applying a valid range where `date_from <= date_to`.
 
+User-facing range labels use human-readable dates such as `Jan 1 - Jun 7, 2026`. Raw ISO dates are reserved for API calls, state, and internal logic.
+
+On mobile, range chips stay on one horizontally scrollable line. The rail uses hidden scrollbars and trailing padding so `Custom` remains reachable without making the selector card tall.
+
+## Naming Decisions
+
+The transaction review section is named "Largest transactions" because it shows raw highest individual transactions from `largest_transactions`. Repeated rent or bill entries are expected when reviewing multi-month ranges. Use "Notable spending" only if a later version groups or interprets repeated merchants.
+
 ## Mobile / iOS QA Checklist
 
 Check these in Mobile Safari and iOS Home Screen standalone mode:
@@ -104,6 +112,7 @@ Check these in Mobile Safari and iOS Home Screen standalone mode:
 - Light mode
 - Dark mode
 - Range selector chips
+- Range selector chips horizontally scroll without clipping
 - Custom range date inputs
 - Custom range keyboard behavior
 - Loading skeletons
@@ -115,7 +124,8 @@ Check these in Mobile Safari and iOS Home Screen standalone mode:
 - Spending rhythm
 - Fixed vs flexible stacked bar
 - Spending habits weekday strip
-- Notable transactions
+- Largest transactions
+- View transactions link
 - Bottom nav safe area
 - Final section not hidden behind bottom nav or home indicator
 
@@ -124,5 +134,7 @@ Check these in Mobile Safari and iOS Home Screen standalone mode:
 - Previous-period comparison is not available from the current endpoint. Do not show copy like "12% less than last month" unless comparison data is fetched or added to the backend.
 - One-month daily trend is not available from the current insights endpoint. The page shows a rhythm empty note for one-month ranges instead of inventing daily data.
 - Tag/category drilldowns are informational for v1 unless Transactions routing supports prefilled filters cleanly.
-- Notable transactions currently link users to Transactions for deeper review. Opening the shared transaction detail sheet directly would require fetching or exposing a full `Transaction` record for the selected insight item.
+- Largest transactions currently link users to Transactions for deeper review. The Transactions route does not currently accept arbitrary `date_from` and `date_to` query params from Insights, so the link does not preserve the exact selected range yet.
+- Opening the shared transaction detail sheet directly would require fetching or exposing a full `Transaction` record for the selected insight item.
+- Grouped notable spending is a future enhancement, for example grouping `Rent` into `3 payments - $2,721 total`.
 - Advanced insights can come later after the core review experience is strong.

@@ -257,11 +257,11 @@ export default function InsightsPage() {
   const largestTransaction = data?.largest_transactions[0] ?? null
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className="min-h-[100svh] bg-background pb-mobile-nav">
       <Header />
 
-      <main className="mx-auto w-full max-w-full space-y-4 overflow-x-hidden px-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pb-8">
-        <section className="space-y-3">
+      <main className="mx-auto w-full max-w-full space-y-3 overflow-x-hidden px-5 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pt-standalone-safe-top lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
+        <section className="space-y-3 lg:space-y-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>
             <p className="mt-1 text-sm text-muted-foreground">Review your spending.</p>
@@ -291,7 +291,7 @@ export default function InsightsPage() {
           <InsightEmptyState />
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
-            <div className="space-y-4">
+            <div className="space-y-3 lg:space-y-4">
               {error && (
                 <Card className="border-destructive/20 bg-destructive/5 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -318,7 +318,7 @@ export default function InsightsPage() {
               <div className="lg:hidden">
                 <SpendingHabitsCard items={data.day_of_week_spend} />
               </div>
-              <NotableTransactionsSection items={data.largest_transactions} />
+              <LargestTransactionsSection items={data.largest_transactions} />
             </div>
 
             <aside className="hidden space-y-4 lg:block">
@@ -370,43 +370,46 @@ function InsightsRangeSelector({
   onApplyCustomRange: () => void
 }) {
   return (
-    <Card className="border-0 p-3 shadow-sm lg:p-4">
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {insightPresets.map((preset) => (
+    <Card className="min-w-0 gap-2 border-0 p-2.5 shadow-sm lg:p-3">
+      <div className="relative min-w-0 overflow-hidden">
+        <div className="-mx-0.5 flex min-w-0 gap-2 overflow-x-auto scroll-smooth px-0.5 pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {insightPresets.map((preset) => (
+            <button
+              key={preset.value}
+              type="button"
+              onClick={() => onPresetSelect(preset.value)}
+              aria-pressed={selectedPreset === preset.value}
+              className={cn(
+                "h-9 shrink-0 cursor-pointer rounded-full border px-3 text-sm font-medium transition-colors lg:h-10",
+                selectedPreset === preset.value
+                  ? "border-secondary bg-secondary text-foreground"
+                  : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {preset.label}
+            </button>
+          ))}
           <button
-            key={preset.value}
             type="button"
-            onClick={() => onPresetSelect(preset.value)}
+            onClick={onCustomSelect}
+            aria-pressed={selectedPreset === "custom"}
             className={cn(
-              "h-10 shrink-0 cursor-pointer rounded-full border px-3 text-sm font-medium transition-colors",
-              selectedPreset === preset.value
+              "h-9 shrink-0 cursor-pointer rounded-full border px-3 text-sm font-medium transition-colors lg:h-10",
+              selectedPreset === "custom"
                 ? "border-secondary bg-secondary text-foreground"
                 : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
             )}
           >
-            {preset.label}
+            Custom
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={onCustomSelect}
-          className={cn(
-            "h-10 shrink-0 cursor-pointer rounded-full border px-3 text-sm font-medium transition-colors",
-            selectedPreset === "custom"
-              ? "border-secondary bg-secondary text-foreground"
-              : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Custom
-        </button>
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-card via-card/80 to-transparent" aria-hidden="true" />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+      <div className="mt-2 flex items-center justify-between gap-3 text-sm">
         <div className="min-w-0">
           <p className="font-medium">{rangeLabel}</p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {appliedRange.date_from} to {appliedRange.date_to}
-          </p>
+          <p className="sr-only">Selected range: {formatRange(appliedRange)}</p>
         </div>
         {isLoading && (
           <span className="inline-flex h-2 w-2 shrink-0 animate-pulse rounded-full bg-primary" aria-label="Loading insights" />
@@ -414,7 +417,7 @@ function InsightsRangeSelector({
       </div>
 
       {selectedPreset === "custom" && (
-        <div className="mt-3 rounded-2xl border border-border/70 bg-muted/20 p-3">
+        <div className="mt-2 rounded-2xl border border-border/70 bg-muted/20 p-3">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="insights-custom-from" className="text-xs text-muted-foreground">From</Label>
@@ -451,16 +454,16 @@ function SnapshotCard({ data, rangeLabel }: { data: InsightsMetricsResponse; ran
   const sentence = snapshotSentence(data)
 
   return (
-    <Card className="border-0 p-5 shadow-sm">
+    <Card className="gap-0 border-0 p-4 shadow-sm sm:p-5">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{rangeLabel} Snapshot</p>
-      <div className="mt-4">
+      <div className="mt-3 sm:mt-4">
         <p className="text-sm text-muted-foreground">You spent</p>
         <p className="mt-1 text-4xl font-semibold tracking-tight">{formatMoney(data.total_spend)}</p>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Across {data.total_transactions} transaction{data.total_transactions === 1 ? "" : "s"}.
         </p>
       </div>
-      {sentence && <p className="mt-4 rounded-2xl bg-secondary/50 p-3 text-sm text-muted-foreground">{sentence}</p>}
+      {sentence && <p className="mt-3 border-l-2 border-border/80 pl-3 text-sm leading-relaxed text-muted-foreground sm:mt-4">{sentence}</p>}
     </Card>
   )
 }
@@ -698,7 +701,7 @@ function SpendingHabitsCard({ items }: { items: InsightsDayOfWeekSpendItem[] }) 
               return (
                 <div key={day} className="flex flex-col items-center gap-1">
                   <div className="flex h-14 items-end">
-                    <div className="w-5 rounded-full bg-secondary" style={{ height }} />
+                    <div className="w-5 rounded-full bg-primary/45 dark:bg-primary/55" style={{ height }} />
                   </div>
                   <span className="text-[10px] font-medium text-muted-foreground">{weekdayShortLabel(day)}</span>
                 </div>
@@ -720,11 +723,11 @@ function HabitObservation({ label, value }: { label: string; value: string }) {
   )
 }
 
-function NotableTransactionsSection({ items }: { items: InsightsLargestTransactionItem[] }) {
+function LargestTransactionsSection({ items }: { items: InsightsLargestTransactionItem[] }) {
   return (
     <ReviewSection
-      title="Notable transactions"
-      description="Largest transactions in this range."
+      title="Largest transactions"
+      description="Highest individual transactions in this range."
       action={
         <Link href="/transactions" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           View transactions
@@ -733,11 +736,11 @@ function NotableTransactionsSection({ items }: { items: InsightsLargestTransacti
       }
     >
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notable transactions found for this range.</p>
+        <p className="text-sm text-muted-foreground">No largest transactions found for this range.</p>
       ) : (
         <div className="divide-y divide-border/60">
           {items.slice(0, 5).map((item) => (
-            <NotableTransactionRow key={item.transaction_id} item={item} />
+            <LargestTransactionRow key={item.transaction_id} item={item} />
           ))}
         </div>
       )}
@@ -745,11 +748,11 @@ function NotableTransactionsSection({ items }: { items: InsightsLargestTransacti
   )
 }
 
-function NotableTransactionRow({ item }: { item: InsightsLargestTransactionItem }) {
+function LargestTransactionRow({ item }: { item: InsightsLargestTransactionItem }) {
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div className="flex items-center gap-3 py-2.5 sm:py-3">
       <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
         <TagIcon className="h-5 w-5 text-white" />
       </div>
@@ -792,7 +795,7 @@ function RangeSummaryCard({
   return (
     <ReviewSection title="Review range" description={rangeLabel}>
       <div className="space-y-4">
-        <SummaryLine icon={<CalendarIcon className="h-4 w-4" />} label="Dates" value={`${range.date_from} to ${range.date_to}`} />
+        <SummaryLine icon={<CalendarIcon className="h-4 w-4" />} label="Dates" value={formatRange(range)} />
         <SummaryLine icon={<LineChart className="h-4 w-4" />} label="Months" value={`${monthsInRange}`} />
         {topCategory && <SummaryLine icon={<Folder className="h-4 w-4" />} label="Top category" value={categoryLabels[topCategory.category]} />}
         {topTag && <SummaryLine icon={<TagGlyph className="h-4 w-4" />} label="Top tag" value={topTag.tag_name} />}
@@ -826,7 +829,7 @@ function ReviewSection({
   children: React.ReactNode
 }) {
   return (
-    <Card className="border-0 p-4 shadow-sm sm:p-5">
+    <Card className="gap-0 border-0 p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">{title}</h2>
@@ -858,7 +861,7 @@ function InsightSkeleton() {
 
 function SkeletonCard({ tall = false }: { tall?: boolean }) {
   return (
-    <Card className="border-0 p-5 shadow-sm">
+    <Card className="gap-0 border-0 p-5 shadow-sm">
       <div className="animate-pulse space-y-4">
         <div className="h-4 w-32 rounded-full bg-muted" />
         <div className={cn("rounded-2xl bg-muted", tall ? "h-24" : "h-16")} />
@@ -870,7 +873,7 @@ function SkeletonCard({ tall = false }: { tall?: boolean }) {
 
 function InsightEmptyState() {
   return (
-    <Card className="border-0 p-8 text-center shadow-sm">
+    <Card className="gap-0 border-0 p-8 text-center shadow-sm">
       <h2 className="text-lg font-semibold">No spending found for this range.</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">Try a different date range or add a transaction.</p>
       <Button asChild className="mt-5 rounded-full">
@@ -882,7 +885,7 @@ function InsightEmptyState() {
 
 function InsightErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <Card className="border-destructive/20 bg-destructive/5 p-6 shadow-sm">
+    <Card className="gap-0 border-destructive/20 bg-destructive/5 p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold">Insights could not load.</h2>
