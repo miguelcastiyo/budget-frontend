@@ -258,10 +258,10 @@ export default function InsightsPage() {
   const largestTransaction = data?.largest_transactions[0] ?? null
 
   return (
-    <div className="min-h-[100svh] bg-background pb-mobile-nav">
+    <div className="min-h-[100svh] w-full max-w-[100svw] overflow-x-hidden bg-background pb-mobile-nav">
       <Header />
 
-      <main className="mx-auto w-full max-w-full space-y-3 overflow-x-hidden px-5 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pt-standalone-safe-top lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
+      <main className="mx-auto box-border w-full max-w-[100svw] space-y-3 overflow-x-hidden px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pt-standalone-safe-top sm:px-5 lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
         <section className="space-y-3 lg:space-y-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>
@@ -291,8 +291,8 @@ export default function InsightsPage() {
         ) : noData || !data ? (
           <InsightEmptyState />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
-            <div className="space-y-3 lg:space-y-4">
+          <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
+            <div className="min-w-0 space-y-3 lg:space-y-4">
               {error && (
                 <Card className="border-destructive/20 bg-destructive/5 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
@@ -322,7 +322,7 @@ export default function InsightsPage() {
               <LargestTransactionsSection items={data.largest_transactions} />
             </div>
 
-            <aside className="hidden space-y-4 lg:block">
+            <aside className="hidden min-w-0 space-y-4 lg:block">
               <RangeSummaryCard
                 rangeLabel={rangeLabel}
                 range={appliedRange}
@@ -371,9 +371,9 @@ function InsightsRangeSelector({
   onApplyCustomRange: () => void
 }) {
   return (
-    <Card className="min-w-0 gap-2 border-0 p-2.5 shadow-sm lg:p-3">
+    <Card className="min-w-0 max-w-full gap-2 overflow-hidden border-0 p-2.5 shadow-sm lg:p-3">
       <div className="relative min-w-0 overflow-hidden">
-        <div className="-mx-0.5 flex min-w-0 gap-2 overflow-x-auto scroll-smooth px-0.5 pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {insightPresets.map((preset) => (
             <button
               key={preset.value}
@@ -418,9 +418,9 @@ function InsightsRangeSelector({
       </div>
 
       {selectedPreset === "custom" && (
-        <div className="mt-2 rounded-2xl border border-border/70 bg-muted/20 p-3">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-            <div className="space-y-1.5">
+        <div className="mt-2 min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-muted/20 p-3">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="insights-custom-from" className="text-xs text-muted-foreground">From</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -428,13 +428,13 @@ function InsightsRangeSelector({
                     id="insights-custom-from"
                     type="button"
                     variant="outline"
-                    className="h-10 w-full justify-start rounded-xl bg-background text-left font-normal"
+                    className="h-10 w-full min-w-0 justify-start rounded-xl bg-background text-left font-normal"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    {customFrom ? format(dateFromIso(customFrom), "MMM d, yyyy") : "From"}
+                    <span className="truncate">{customFrom ? format(dateFromIso(customFrom), "MMM d, yyyy") : "From"}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto rounded-2xl p-0" align="start" avoidCollisions>
+                <PopoverContent className="w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto" align="start" avoidCollisions>
                   <AppCalendar
                     mode="single"
                     selected={parseIsoDate(customFrom) ?? undefined}
@@ -448,7 +448,7 @@ function InsightsRangeSelector({
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <Label htmlFor="insights-custom-to" className="text-xs text-muted-foreground">To</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -456,13 +456,13 @@ function InsightsRangeSelector({
                     id="insights-custom-to"
                     type="button"
                     variant="outline"
-                    className="h-10 w-full justify-start rounded-xl bg-background text-left font-normal"
+                    className="h-10 w-full min-w-0 justify-start rounded-xl bg-background text-left font-normal"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    {customTo ? format(dateFromIso(customTo), "MMM d, yyyy") : "To"}
+                    <span className="truncate">{customTo ? format(dateFromIso(customTo), "MMM d, yyyy") : "To"}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto rounded-2xl p-0" align="start" avoidCollisions>
+                <PopoverContent className="w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto" align="start" avoidCollisions>
                   <AppCalendar
                     mode="single"
                     selected={parseIsoDate(customTo) ?? undefined}
@@ -491,7 +491,7 @@ function SnapshotCard({ data, rangeLabel }: { data: InsightsMetricsResponse; ran
   const sentence = snapshotSentence(data)
 
   return (
-    <Card className="gap-0 border-0 p-4 shadow-sm sm:p-5">
+    <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-0 p-4 shadow-sm sm:p-5">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{rangeLabel} Snapshot</p>
       <div className="mt-3 sm:mt-4">
         <p className="text-sm text-muted-foreground">You spent</p>
@@ -531,15 +531,15 @@ function BudgetCheckInRow({ item }: { item: InsightsCategoryBudgetVsActualItem }
   const isOver = overBy > 0
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+    <div className="min-w-0 space-y-2">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-sm font-semibold">{categoryLabels[item.category]}</p>
           <p className="text-xs text-muted-foreground">
             {formatMoney(item.actual_spend)} of {formatMoney(item.budget_amount)}
           </p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <p className="text-sm font-semibold">{formatPercent(item.percent_used)}</p>
           {isOver && <p className="text-xs text-destructive">Over by {formatMoney(overBy)}</p>}
         </div>
@@ -604,13 +604,13 @@ function TagSpendRow({ tag, totalSpend }: { tag: InsightsTagBreakdownItem; total
   const percent = totalSpend > 0 ? numberFrom(tag.percent_of_total_spend) : 0
 
   return (
-    <div className="rounded-xl px-1 py-2">
-      <div className="flex items-center gap-3">
+    <div className="min-w-0 rounded-xl px-1 py-2">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
           <TagIcon className="h-5 w-5 text-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <p className="truncate text-sm font-semibold">{tag.tag_name}</p>
             <p className="shrink-0 text-sm font-semibold">{formatMoney(tag.spend)}</p>
           </div>
@@ -646,12 +646,12 @@ function SpendingRhythmSection({ data }: { data: InsightsMetricsResponse }) {
           const width = maxSpend > 0 ? (spend / maxSpend) * 100 : 0
 
           return (
-            <div key={point.month} className="grid grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3">
+            <div key={point.month} className="grid min-w-0 grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-3">
               <p className="text-xs font-medium text-muted-foreground">{formatMonthLabel(point.month)}</p>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <div className="h-full rounded-full bg-primary/70" style={{ width: `${clampPercent(width)}%` }} />
               </div>
-              <p className="text-sm font-medium">{formatMoney(spend)}</p>
+              <p className="shrink-0 text-sm font-medium">{formatMoney(spend)}</p>
             </div>
           )
         })}
@@ -699,12 +699,12 @@ function FixedFlexibleRow({
   markerClassName: string
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="min-w-0 flex items-center gap-2">
         <span className={cn("h-2.5 w-2.5 rounded-full", markerClassName)} />
-        <p className="text-sm font-medium">{label}</p>
+        <p className="truncate text-sm font-medium">{label}</p>
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="shrink-0 text-sm text-muted-foreground">
         {formatMoney(amount)} · {formatPercent(percent)}
       </p>
     </div>
@@ -789,7 +789,7 @@ function LargestTransactionRow({ item }: { item: InsightsLargestTransactionItem 
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
-    <div className="flex items-center gap-3 py-2.5 sm:py-3">
+    <div className="flex min-w-0 items-center gap-3 py-2.5 sm:py-3">
       <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
         <TagIcon className="h-5 w-5 text-white" />
       </div>
@@ -809,7 +809,7 @@ function LargestTransactionRow({ item }: { item: InsightsLargestTransactionItem 
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{format(dateFromIso(item.date), "MMM d, yyyy")}</p>
       </div>
-      <p className="shrink-0 text-sm font-semibold">-{formatMoney(item.amount)}</p>
+      <p className="max-w-[6.5rem] shrink-0 truncate text-right text-sm font-semibold sm:max-w-none">-{formatMoney(item.amount)}</p>
     </div>
   )
 }
@@ -866,9 +866,9 @@ function ReviewSection({
   children: React.ReactNode
 }) {
   return (
-    <Card className="gap-0 border-0 p-4 shadow-sm sm:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+    <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-0 p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold">{title}</h2>
           {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>

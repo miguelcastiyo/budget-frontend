@@ -101,6 +101,8 @@ User-facing range labels use human-readable dates such as `Jan 1 - Jun 7, 2026`.
 
 On mobile, range chips stay on one horizontally scrollable line. The rail uses hidden scrollbars and trailing padding so `Custom` remains reachable without making the selector card tall.
 
+The Insights page constrains mobile content to the small viewport width (`svw`) and applies `min-width: 0`/overflow guards to review cards and rows. This is specifically to keep iOS Home Screen standalone mode from allowing chips, popovers, or large transaction amounts to create horizontal overflow.
+
 ## Naming Decisions
 
 The transaction review section is named "Largest transactions" because it shows raw highest individual transactions from `largest_transactions`. Repeated rent or bill entries are expected when reviewing multi-month ranges. Use "Notable spending" only if a later version groups or interprets repeated merchants.
@@ -128,6 +130,7 @@ Check these in Mobile Safari and iOS Home Screen standalone mode:
 - View transactions link
 - Bottom nav safe area
 - Final section not hidden behind bottom nav or home indicator
+- No horizontal overflow in iOS Home Screen standalone mode
 
 ## Known Limitations
 
