@@ -16,9 +16,10 @@ import {
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Button } from "@/components/ui/button"
+import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type {
   Category,
@@ -421,23 +422,59 @@ function InsightsRangeSelector({
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="insights-custom-from" className="text-xs text-muted-foreground">From</Label>
-              <Input
-                id="insights-custom-from"
-                type="date"
-                value={customFrom}
-                onChange={(event) => onCustomFromChange(event.target.value)}
-                className="h-10 rounded-xl bg-background"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="insights-custom-from"
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full justify-start rounded-xl bg-background text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {customFrom ? format(dateFromIso(customFrom), "MMM d, yyyy") : "From"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto rounded-2xl p-0" align="start" avoidCollisions>
+                  <AppCalendar
+                    mode="single"
+                    selected={parseIsoDate(customFrom) ?? undefined}
+                    onSelect={(date) => {
+                      if (!date) {
+                        return
+                      }
+                      onCustomFromChange(toIsoDate(date))
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="insights-custom-to" className="text-xs text-muted-foreground">To</Label>
-              <Input
-                id="insights-custom-to"
-                type="date"
-                value={customTo}
-                onChange={(event) => onCustomToChange(event.target.value)}
-                className="h-10 rounded-xl bg-background"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="insights-custom-to"
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full justify-start rounded-xl bg-background text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {customTo ? format(dateFromIso(customTo), "MMM d, yyyy") : "To"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto rounded-2xl p-0" align="start" avoidCollisions>
+                  <AppCalendar
+                    mode="single"
+                    selected={parseIsoDate(customTo) ?? undefined}
+                    onSelect={(date) => {
+                      if (!date) {
+                        return
+                      }
+                      onCustomToChange(toIsoDate(date))
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <Button type="button" className="h-10 rounded-xl" onClick={onApplyCustomRange}>
               Apply
