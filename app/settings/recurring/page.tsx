@@ -642,7 +642,7 @@ export default function RecurringSettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 pt-3 lg:max-w-6xl lg:px-8 lg:pt-8">
+      <main className="mx-auto w-full max-w-full overflow-x-hidden px-4 pt-3 sm:max-w-lg lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="max-w-2xl">
           <p className="text-sm text-muted-foreground">
             Monthly bills are added upfront so your budget reflects committed spending.
@@ -664,12 +664,12 @@ export default function RecurringSettingsPage() {
                   className="w-full sm:w-[190px]"
                 />
               </div>
-              <div className="mt-3 flex items-end justify-between gap-4 sm:mt-4">
-                <div>
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:mt-4">
+                <div className="min-w-0">
                   <p className="text-xs font-medium text-muted-foreground">Committed total</p>
                   <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{formatCurrency(data?.committed_total ?? "0.00")}</p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-xs font-medium text-muted-foreground">Recurring items</p>
                   <p className="mt-1 text-xl font-semibold">{data?.items_count ?? 0}</p>
                 </div>
@@ -677,17 +677,17 @@ export default function RecurringSettingsPage() {
             </Card>
 
             <Card className="overflow-hidden border-0 shadow-sm">
-              <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
-                <div>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
+                <div className="min-w-0">
                   <h2 className="text-sm font-semibold">Recurring items</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{formatAddedMonth(month)}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex min-w-0 shrink-0 items-center gap-2">
                   <div className="hidden text-right text-xs text-muted-foreground sm:block">
                     <p>{activeItemsCount} Active</p>
                     {inactiveItemsCount > 0 && <p>{inactiveItemsCount} Inactive</p>}
                   </div>
-                  <div className="inline-flex items-center rounded-lg border border-border/70 bg-background p-0.5">
+                  <div className="inline-flex max-w-full items-center rounded-lg border border-border/70 bg-background p-0.5">
                     <span className="hidden px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground lg:inline">
                       Sort
                     </span>
@@ -942,7 +942,7 @@ function RecurringItemRow({
   return (
     <button
       type="button"
-      className="group flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      className="group grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem] items-center gap-2 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:gap-3"
       aria-label={`Open details for ${item.expense}`}
       onClick={onOpen}
     >
@@ -950,7 +950,7 @@ function RecurringItemRow({
         <TagIcon className="h-5 w-5 text-white" />
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 overflow-hidden">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-semibold">{item.expense}</p>
           <span className={cn(
@@ -963,19 +963,19 @@ function RecurringItemRow({
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
+          <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
             <TagGlyph className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[9rem] truncate">{item.tag.name}</span>
+            <span className="max-w-[7rem] truncate sm:max-w-[9rem]">{item.tag.name}</span>
           </span>
           {item.card && (
-            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
               <CreditCard className="h-3 w-3 shrink-0 text-muted-foreground" />
-              <span className="max-w-[9rem] truncate">{item.card.name}</span>
+              <span className="max-w-[6rem] truncate sm:max-w-[9rem]">{item.card.name}</span>
             </span>
           )}
-          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
+          <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
             <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[11rem] truncate">{formatBillingSchedule(item)}</span>
+            <span className="max-w-[8rem] truncate sm:max-w-[11rem]">{formatBillingSchedule(item)}</span>
           </span>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -983,7 +983,7 @@ function RecurringItemRow({
         </p>
       </div>
 
-      <div className="ml-2 shrink-0 text-right">
+      <div className="min-w-[4.25rem] shrink-0 text-right sm:min-w-[4.75rem]">
         <p className="whitespace-nowrap text-sm font-semibold">
           {formatCurrency(item.amount)}
         </p>
@@ -1033,29 +1033,29 @@ function RecurringDetailDialog({
         {...swipeDismiss}
         showCloseButton
         className={cn(
-          "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),36rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem] sm:rounded-2xl sm:border",
+          "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem] sm:rounded-2xl sm:border",
           mobileDrawerDialogClassName
         )}
       >
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:px-7 sm:py-7">
-          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-4 sm:hidden")} aria-hidden="true" />
-          <div className="flex items-start gap-4 pr-8">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-secondary">
-              <TagIcon className="h-6 w-6 text-foreground" />
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 sm:px-7 sm:py-7">
+          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
+          <div className="flex items-start gap-3 pr-8 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
+              <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-xl font-semibold">{item.expense}</DialogTitle>
-              <DialogDescription className="mt-1 text-2xl font-semibold text-foreground">
+              <DialogTitle className="truncate text-lg font-semibold sm:text-xl">{item.expense}</DialogTitle>
+              <DialogDescription className="mt-0.5 text-xl font-semibold text-foreground sm:mt-1 sm:text-2xl">
                 {formatCurrency(item.amount)} / month
               </DialogDescription>
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
-            <div className="rounded-2xl bg-secondary/50 p-4 sm:p-5">
-              <div className="grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+            <div className="rounded-2xl bg-secondary/50 p-3 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <DetailRow
-                  className="sm:col-span-2"
+                  className="col-span-2"
                   icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
                   label="Schedule"
                   value={formatBillingSchedule(item)}
@@ -1082,7 +1082,7 @@ function RecurringDetailDialog({
                   value={item.is_active ? "Active" : "Inactive"}
                 />
                 <DetailRow
-                  className="sm:col-span-2"
+                  className="col-span-2"
                   icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
                   label="Active months"
                   value={`Starts ${formatAddedMonth(item.starts_month)}`}
@@ -1091,10 +1091,10 @@ function RecurringDetailDialog({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                className="h-12 rounded-xl"
+                className="h-11 rounded-xl sm:h-12"
                 onClick={() => onEdit(item)}
               >
                 <Pencil className="h-4 w-4" />
@@ -1102,7 +1102,7 @@ function RecurringDetailDialog({
               </Button>
               <Button
                 variant="outline"
-                className="h-12 rounded-xl text-destructive hover:text-destructive"
+                className="h-11 rounded-xl text-destructive hover:text-destructive sm:h-12"
                 onClick={() => onDelete(item)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -1130,14 +1130,14 @@ function DetailRow({
   className?: string
 }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background">
+    <div className={cn("flex items-center gap-2 sm:gap-3", className)}>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background sm:h-10 sm:w-10">
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="truncate font-medium">{value}</p>
-        {detail && <p className="truncate text-sm text-muted-foreground">{detail}</p>}
+        <p className="text-xs text-muted-foreground sm:text-sm">{label}</p>
+        <p className="truncate text-sm font-medium sm:text-base">{value}</p>
+        {detail && <p className="truncate text-xs text-muted-foreground sm:text-sm">{detail}</p>}
       </div>
     </div>
   )
