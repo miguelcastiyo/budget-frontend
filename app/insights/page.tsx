@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import {
@@ -20,6 +20,13 @@ import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type {
   Category,
@@ -33,6 +40,8 @@ import type {
 import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
+import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
+import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
 
 type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "custom"
@@ -41,6 +50,28 @@ interface InsightRange {
   date_from: string
   date_to: string
 }
+
+type NotableSpendingItem =
+  | {
+      type: "single"
+      transaction: InsightsLargestTransactionItem
+      totalAmount: number
+    }
+  | {
+      type: "group"
+      groupKey: string
+      expense: string
+      amountEach: number
+      count: number
+      totalAmount: number
+      category: Category
+      tag: InsightsLargestTransactionItem["tag"]
+      cardName: string | null
+      isSplit: boolean
+      firstDate: string
+      lastDate: string
+      transactions: InsightsLargestTransactionItem[]
+    }
 
 const insightPresets: { value: Exclude<InsightPreset, "custom">; label: string }[] = [
   { value: "this_month", label: "This Month" },
@@ -186,6 +217,83 @@ function snapshotSentence(data: InsightsMetricsResponse): string | null {
   return `Most of your spending went to ${categoryLabels[category.category]}, with ${tag.tag_name} as your top tag.`
 }
 
+function normalizeGroupKeyPart(value: string | null | undefined): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
+    .replace(/\s+/g, " ")
+}
+
+function notableSpendingGroupKey(item: InsightsLargestTransactionItem): string {
+  const tagKey = item.tag.id || item.tag.name
+
+  return [
+    normalizeGroupKeyPart(item.expense),
+    numberFrom(item.amount).toFixed(2),
+    item.category,
+    normalizeGroupKeyPart(tagKey),
+    normalizeGroupKeyPart(item.card_name),
+    item.is_split ? "split" : "single",
+  ].join("|")
+}
+
+function buildNotableSpendingItems(items: InsightsLargestTransactionItem[]): NotableSpendingItem[] {
+  const groups = new Map<string, InsightsLargestTransactionItem[]>()
+
+  items.forEach((item) => {
+    const key = notableSpendingGroupKey(item)
+    groups.set(key, [...(groups.get(key) ?? []), item])
+  })
+
+  return Array.from(groups.entries())
+    .map(([groupKey, transactions]) => {
+      const sortedTransactions = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
+      const first = sortedTransactions[0]
+      const amountEach = numberFrom(first.amount)
+
+      if (sortedTransactions.length === 1) {
+        return {
+          type: "single" as const,
+          transaction: first,
+          totalAmount: amountEach,
+        }
+      }
+
+      return {
+        type: "group" as const,
+        groupKey,
+        expense: first.expense,
+        amountEach,
+        count: sortedTransactions.length,
+        totalAmount: sortedTransactions.reduce((total, item) => total + numberFrom(item.amount), 0),
+        category: first.category,
+        tag: first.tag,
+        cardName: first.card_name,
+        isSplit: first.is_split,
+        firstDate: sortedTransactions[0].date,
+        lastDate: sortedTransactions[sortedTransactions.length - 1].date,
+        transactions: sortedTransactions,
+      }
+    })
+    .sort((a, b) => Math.abs(b.totalAmount) - Math.abs(a.totalAmount))
+}
+
+function formatCompactDateRange(firstDate: string, lastDate: string): string {
+  const first = dateFromIso(firstDate)
+  const last = dateFromIso(lastDate)
+
+  if (firstDate === lastDate) {
+    return format(first, "MMM d, yyyy")
+  }
+
+  if (first.getFullYear() === last.getFullYear()) {
+    return `${format(first, "MMM d")} - ${format(last, "MMM d, yyyy")}`
+  }
+
+  return `${format(first, "MMM d, yyyy")} - ${format(last, "MMM d, yyyy")}`
+}
+
 export default function InsightsPage() {
   const initialRange = useMemo(() => getPresetRange("this_month"), [])
   const [selectedPreset, setSelectedPreset] = useState<InsightPreset>("this_month")
@@ -194,6 +302,7 @@ export default function InsightsPage() {
   const [appliedRange, setAppliedRange] = useState<InsightRange>(initialRange)
   const [customRangeError, setCustomRangeError] = useState<string | null>(null)
   const [showAllTags, setShowAllTags] = useState(false)
+  const [selectedNotableGroup, setSelectedNotableGroup] = useState<Extract<NotableSpendingItem, { type: "group" }> | null>(null)
 
   const [data, setData] = useState<InsightsMetricsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -256,6 +365,10 @@ export default function InsightsPage() {
   const selectedTopTag = topTag(data)
   const selectedTopCategory = topCategory(data)
   const largestTransaction = data?.largest_transactions[0] ?? null
+  const notableSpendingItems = useMemo(
+    () => buildNotableSpendingItems(data?.largest_transactions ?? []),
+    [data?.largest_transactions]
+  )
 
   return (
     <div className="min-h-[100svh] w-full max-w-[100svw] overflow-x-hidden bg-background pb-mobile-nav">
@@ -319,7 +432,10 @@ export default function InsightsPage() {
               <div className="lg:hidden">
                 <SpendingHabitsCard items={data.day_of_week_spend} />
               </div>
-              <LargestTransactionsSection items={data.largest_transactions} />
+              <NotableSpendingSection
+                items={notableSpendingItems}
+                onGroupOpen={setSelectedNotableGroup}
+              />
             </div>
 
             <aside className="hidden min-w-0 space-y-4 lg:block">
@@ -337,6 +453,16 @@ export default function InsightsPage() {
           </div>
         )}
       </main>
+
+      <NotableSpendingGroupSheet
+        group={selectedNotableGroup}
+        open={selectedNotableGroup !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedNotableGroup(null)
+          }
+        }}
+      />
 
       <BottomNav />
     </div>
@@ -760,11 +886,17 @@ function HabitObservation({ label, value }: { label: string; value: string }) {
   )
 }
 
-function LargestTransactionsSection({ items }: { items: InsightsLargestTransactionItem[] }) {
+function NotableSpendingSection({
+  items,
+  onGroupOpen,
+}: {
+  items: NotableSpendingItem[]
+  onGroupOpen: (group: Extract<NotableSpendingItem, { type: "group" }>) => void
+}) {
   return (
     <ReviewSection
-      title="Largest transactions"
-      description="Highest individual transactions in this range."
+      title="Notable spending"
+      description="Largest individual and repeated expenses in this range."
       action={
         <Link href="/transactions" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
           View transactions
@@ -773,11 +905,15 @@ function LargestTransactionsSection({ items }: { items: InsightsLargestTransacti
       }
     >
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No largest transactions found for this range.</p>
+        <p className="text-sm text-muted-foreground">No notable spending found for this range.</p>
       ) : (
         <div className="divide-y divide-border/60">
           {items.slice(0, 5).map((item) => (
-            <LargestTransactionRow key={item.transaction_id} item={item} />
+            item.type === "group" ? (
+              <GroupedNotableSpendingRow key={item.groupKey} item={item} onOpen={() => onGroupOpen(item)} />
+            ) : (
+              <SingleNotableSpendingRow key={item.transaction.transaction_id} item={item.transaction} />
+            )
           ))}
         </div>
       )}
@@ -785,7 +921,7 @@ function LargestTransactionsSection({ items }: { items: InsightsLargestTransacti
   )
 }
 
-function LargestTransactionRow({ item }: { item: InsightsLargestTransactionItem }) {
+function SingleNotableSpendingRow({ item }: { item: InsightsLargestTransactionItem }) {
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
@@ -811,6 +947,146 @@ function LargestTransactionRow({ item }: { item: InsightsLargestTransactionItem 
       </div>
       <p className="max-w-[6.5rem] shrink-0 truncate text-right text-sm font-semibold sm:max-w-none">-{formatMoney(item.amount)}</p>
     </div>
+  )
+}
+
+function GroupedNotableSpendingRow({
+  item,
+  onOpen,
+}: {
+  item: Extract<NotableSpendingItem, { type: "group" }>
+  onOpen: () => void
+}) {
+  const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full min-w-0 cursor-pointer items-center gap-3 py-2.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:py-3"
+      aria-label={`Open details for ${item.expense}, ${item.count} payments totaling ${formatMoney(item.totalAmount)}`}
+    >
+      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
+        <TagIcon className="h-5 w-5 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{item.expense}</p>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium">
+            <TagGlyph className="h-3 w-3 text-muted-foreground" />
+            <span className="truncate">{item.tag.name}</span>
+          </span>
+          {item.cardName && (
+            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
+              <CreditCard className="h-3 w-3 text-muted-foreground" />
+              <span className="truncate">{item.cardName}</span>
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {item.count} payments · {formatMoney(item.amountEach)} each
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {formatCompactDateRange(item.firstDate, item.lastDate)}
+        </p>
+      </div>
+      <p className="max-w-[7rem] shrink-0 truncate text-right text-sm font-semibold sm:max-w-none">
+        -{formatMoney(item.totalAmount)}
+        <span className="block text-[10px] font-medium text-muted-foreground">total</span>
+      </p>
+    </button>
+  )
+}
+
+function NotableSpendingGroupSheet({
+  group,
+  open,
+  onOpenChange,
+}: {
+  group: Extract<NotableSpendingItem, { type: "group" }> | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const swipeDismiss = useSwipeDismiss({
+    open,
+    onDismiss: () => onOpenChange(false),
+    scrollRef,
+  })
+
+  if (!group) {
+    return null
+  }
+
+  const TagIcon = getTagIcon(group.tag.name, group.tag.icon_key)
+  const transactionsDescending = [...group.transactions].sort((a, b) => b.date.localeCompare(a.date))
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        {...swipeDismiss}
+        ref={scrollRef}
+        side="bottom"
+        className="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] overflow-y-auto rounded-t-3xl px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:mx-auto sm:max-w-xl sm:px-6"
+      >
+        <div data-swipe-handle="true" className={`${mobileDrawerHandleClassName} mt-1 sm:hidden`} aria-hidden="true" />
+        <SheetHeader className="px-0 pb-4 pt-3">
+          <div className="flex min-w-0 items-center gap-4 pr-8">
+            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", getCategoryColorClass(group.category))}>
+              <TagIcon className="h-5 w-5 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="truncate text-left text-xl">{group.expense}</SheetTitle>
+              <SheetDescription className="mt-1 text-left text-2xl font-semibold text-foreground">
+                -{formatMoney(group.totalAmount)} total
+              </SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="space-y-4 pb-4">
+          <div className="rounded-2xl bg-secondary/50 p-4">
+            <p className="text-sm font-medium">
+              {group.count} payments · {formatMoney(group.amountEach)} each
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {formatCompactDateRange(group.firstDate, group.lastDate)}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
+                <TagGlyph className="h-3 w-3 text-muted-foreground" />
+                <span className="truncate">{group.tag.name}</span>
+              </span>
+              {group.cardName && (
+                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
+                  <CreditCard className="h-3 w-3 text-muted-foreground" />
+                  <span className="truncate">{group.cardName}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold">Transactions</h3>
+            <div className="mt-2 divide-y divide-border/60 rounded-2xl border border-border/60 bg-card">
+              {transactionsDescending.map((transaction) => (
+                <div key={transaction.transaction_id} className="flex items-center justify-between gap-3 px-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{format(dateFromIso(transaction.date), "MMM d, yyyy")}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{transaction.expense}</p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Button asChild className="h-11 w-full rounded-xl">
+            <Link href="/transactions">View transactions</Link>
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
