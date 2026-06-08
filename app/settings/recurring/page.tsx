@@ -1094,19 +1094,19 @@ function RecurringDetailDialog({
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                className="h-11 rounded-xl text-destructive hover:text-destructive sm:h-12"
-                onClick={() => onDelete(item)}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl sm:h-12"
+                className="order-2 h-11 rounded-xl sm:h-12"
                 onClick={() => onEdit(item)}
               >
                 <Pencil className="h-4 w-4" />
                 Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12"
+                onClick={() => onDelete(item)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
               </Button>
             </div>
           </div>
