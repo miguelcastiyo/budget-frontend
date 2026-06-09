@@ -8,11 +8,11 @@ import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, CalendarIcon, Chevro
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
+import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { TagIconPicker } from "@/components/settings/tag-icon-picker"
 import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
@@ -1162,7 +1162,6 @@ function RecurringForm({
   const showAmountError = (submitAttempted || touched.amount) && !amountIsValid
   const showDescriptionError = (submitAttempted || touched.expense) && !hasExpense
   const showBillingDayError = (submitAttempted || touched.billing_day) && !billingDayIsValid
-  const NewTagInputIcon = getTagIcon(newTagName || "Tag", newTagIconKey || null)
 
   const focusExpenseInput = () => {
     window.requestAnimationFrame(() => {
@@ -1295,60 +1294,21 @@ function RecurringForm({
             </div>
 
             {showNewTag ? (
-              <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card p-3">
-                <div className="flex items-center justify-between gap-3 pb-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">Create tag</p>
-                    <p className="truncate text-xs text-muted-foreground">It will be selected for this recurring expense.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowNewTag(false)
-                      setNewTagName("")
-                      setNewTagIconKey("")
-                    }}
-                    className="h-9 w-9 shrink-0 rounded-lg p-0"
-                    aria-label="Cancel new tag"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="grid min-w-0 gap-3">
-                  <div className="relative min-w-0">
-                    <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Tag name"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      className="h-11 rounded-xl border-border/60 pl-10 sm:h-10"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          void handleCreateInlineTag()
-                        }
-                      }}
-                    />
-                  </div>
-                  <TagIconPicker
-                    tagName={newTagName}
-                    value={newTagIconKey}
-                    onChange={setNewTagIconKey}
-                    label={<Label className="text-xs font-medium text-muted-foreground">Icon</Label>}
-                    fadeClassName="from-card via-card/80 to-transparent"
-                    wrapOnDesktop={false}
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreateInlineTag()}
-                    disabled={!newTagName.trim() || isCreatingTag}
-                    className="h-11 w-full rounded-xl px-4 sm:h-10"
-                  >
-                    {isCreatingTag ? "Adding..." : "Add tag"}
-                  </Button>
-                </div>
-              </div>
+              <InlineCreateTagControl
+                name={newTagName}
+                iconKey={newTagIconKey}
+                onNameChange={setNewTagName}
+                onIconKeyChange={setNewTagIconKey}
+                onCancel={() => {
+                  setShowNewTag(false)
+                  setNewTagName("")
+                  setNewTagIconKey("")
+                }}
+                onSubmit={() => void handleCreateInlineTag()}
+                isSubmitting={isCreatingTag}
+                subtitle="It will be selected for this recurring expense."
+                compact
+              />
             ) : (
               <div className="min-w-0 max-w-full overflow-hidden">
                 {tags.length > 0 ? (
@@ -1421,51 +1381,18 @@ function RecurringForm({
             </div>
 
             {showNewCard ? (
-              <div className="rounded-xl border border-border/60 bg-card p-3">
-                <div className="flex items-center justify-between gap-3 pb-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">Create card</p>
-                    <p className="truncate text-xs text-muted-foreground">It will be selected for this recurring expense.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowNewCard(false)
-                      setNewCardName("")
-                    }}
-                    className="h-9 w-9 shrink-0 rounded-lg p-0"
-                    aria-label="Cancel new card"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <div className="relative min-w-0">
-                    <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Card name"
-                      value={newCardName}
-                      onChange={(e) => setNewCardName(e.target.value)}
-                      className="h-11 rounded-xl border-border/60 pl-10 sm:h-10"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault()
-                          void handleCreateInlineCard()
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => void handleCreateInlineCard()}
-                    disabled={!newCardName.trim() || isCreatingCard}
-                    className="h-11 rounded-xl px-4 sm:h-10"
-                  >
-                    {isCreatingCard ? "Adding..." : "Add card"}
-                  </Button>
-                </div>
-              </div>
+              <InlineCreateCardControl
+                name={newCardName}
+                onNameChange={setNewCardName}
+                onCancel={() => {
+                  setShowNewCard(false)
+                  setNewCardName("")
+                }}
+                onSubmit={() => void handleCreateInlineCard()}
+                isSubmitting={isCreatingCard}
+                subtitle="It will be selected for this recurring expense."
+                compact
+              />
             ) : (
               <FormChipRail
                 items={[

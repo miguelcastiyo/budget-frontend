@@ -32,7 +32,7 @@ import type {
 import { Calendar } from "@/components/ui/calendar"
 import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
-import { TagIconPicker } from "@/components/settings/tag-icon-picker"
+import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
 import {
   Popover,
   PopoverContent,
@@ -534,8 +534,6 @@ export function AddTransactionSheet({
     ...quickPickTags,
     ...tags.filter((tag) => !quickPickTagIds.has(tag.id)),
   ]
-  const NewTagInputIcon = getTagIcon(newTagName || "Tag", newTagIconKey)
-
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig =
     !makeRecurring ||
@@ -675,60 +673,20 @@ export function AddTransactionSheet({
                     </div>
 
                     {showNewTag ? (
-                      <div className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card p-3">
-                        <div className="flex items-center justify-between gap-3 pb-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium">Create tag</p>
-                            <p className="truncate text-xs text-muted-foreground">It will be selected for this transaction.</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                              setShowNewTag(false)
-                              setNewTagName("")
-                              setNewTagIconKey("")
-                            }}
-                            className="h-9 w-9 shrink-0 rounded-lg p-0"
-                            aria-label="Cancel new tag"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="grid min-w-0 gap-3">
-                          <div className="relative min-w-0">
-                            <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              placeholder="Tag name"
-                              value={newTagName}
-                              onChange={(e) => setNewTagName(e.target.value)}
-                              className="h-12 rounded-xl border-border/60 pl-10"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault()
-                                  void handleCreateTag()
-                                }
-                              }}
-                            />
-                          </div>
-                          <TagIconPicker
-                            tagName={newTagName}
-                            value={newTagIconKey}
-                            onChange={setNewTagIconKey}
-                            label={<Label className="text-xs font-medium text-muted-foreground">Icon</Label>}
-                            fadeClassName="from-card via-card/80 to-transparent"
-                            wrapOnDesktop={false}
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => void handleCreateTag()}
-                            disabled={!newTagName.trim() || isCreatingTag}
-                            className="h-12 w-full rounded-xl px-4"
-                          >
-                            {isCreatingTag ? "Adding..." : "Add tag"}
-                          </Button>
-                        </div>
-                      </div>
+                      <InlineCreateTagControl
+                        name={newTagName}
+                        iconKey={newTagIconKey}
+                        onNameChange={setNewTagName}
+                        onIconKeyChange={setNewTagIconKey}
+                        onCancel={() => {
+                          setShowNewTag(false)
+                          setNewTagName("")
+                          setNewTagIconKey("")
+                        }}
+                        onSubmit={() => void handleCreateTag()}
+                        isSubmitting={isCreatingTag}
+                        subtitle="It will be selected for this transaction."
+                      />
                     ) : (
                       <div className="min-w-0 max-w-full overflow-hidden">
                         {displayedQuickPickTags.length > 0 ? (
@@ -874,51 +832,18 @@ export function AddTransactionSheet({
                         </div>
 
                         {showNewCard ? (
-                          <div className="rounded-xl border border-border/60 bg-background p-3">
-                            <div className="flex items-center justify-between gap-3 pb-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium">Create card</p>
-                                <p className="truncate text-xs text-muted-foreground">It will be selected for this transaction.</p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => {
-                                  setShowNewCard(false)
-                                  setNewCardName("")
-                                }}
-                                className="h-9 w-9 shrink-0 rounded-lg p-0"
-                                aria-label="Cancel new card"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                              <div className="relative min-w-0">
-                                <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                  placeholder="Card name"
-                                  value={newCardName}
-                                  onChange={(e) => setNewCardName(e.target.value)}
-                                  className="h-12 rounded-xl border-border/60 pl-10"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault()
-                                      void handleCreateCard()
-                                    }
-                                  }}
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                onClick={() => void handleCreateCard()}
-                                disabled={!newCardName.trim() || isCreatingCard}
-                                className="h-12 rounded-xl px-4"
-                              >
-                                {isCreatingCard ? "Adding..." : "Add card"}
-                              </Button>
-                            </div>
-                          </div>
+                          <InlineCreateCardControl
+                            name={newCardName}
+                            onNameChange={setNewCardName}
+                            onCancel={() => {
+                              setShowNewCard(false)
+                              setNewCardName("")
+                            }}
+                            onSubmit={() => void handleCreateCard()}
+                            isSubmitting={isCreatingCard}
+                            subtitle="It will be selected for this transaction."
+                            surfaceClassName="bg-background"
+                          />
                         ) : (
                           <FormChipRail
                             items={[

@@ -20,7 +20,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - The recurring form intentionally mirrors the money-entry pattern from Add Transaction: Amount, Description, Classification, Timing, Submit.
 - Amount entry is shared with Add Transaction through the same digit-buffered `AmountInput` behavior, including paste handling, keyboard handling, large display sizing, and select-all replacement.
 - The top half of the recurring form follows Amount -> Description -> Tag -> Category -> Card, then schedule-specific fields appear separately.
-- Tags and cards can be created from inside the recurring form and are selected immediately after creation.
+- Tags and cards can be created from inside the recurring form with the shared inline create controls used by Add Transaction; new items are selected immediately after creation.
 - Card selection is optional but stays in the Expense section because it describes the bill.
 - The desktop right rail provides a short helper panel and an "Upcoming this month" list derived from already loaded recurring item data.
 
@@ -40,6 +40,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Mobile spacing was tightened around the header, intro, summary card, list header, and rows so the first recurring item appears sooner.
 - Only one primary Add CTA is visible per layout: mobile uses the header "+ Add" action, while desktop uses the right-rail "Add recurring expense" action.
 - Recurring creation should feel like "Add Transaction + Schedule": amount is the hero field, description uses transaction-style language, tags use mobile chips, category uses segmented buttons, and optional card selection stays with expense classification.
+- Inline tag/card creation should stay consistent with Add Transaction: same naming input, icon picker for tags, keyboard submit behavior, cancel behavior, and immediate selection after save.
 - Field-level validation appears inline near Amount, Description, and Billing day; the sticky footer is reserved for Cancel and Save/Create actions.
 - The submit button uses muted disabled styling until required fields are valid or an edit has changes.
 - Tray content includes extra bottom padding and a safe-area-aware sticky footer so fields remain reachable on iOS and mobile keyboards.
