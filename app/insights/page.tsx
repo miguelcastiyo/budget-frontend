@@ -94,7 +94,7 @@ const weekdayOrder: InsightsDayOfWeekSpendItem["day"][] = [
 const categoryLabels: Record<Category, string> = {
   needs: "Needs",
   wants: "Wants",
-  savings: "Savings & Debts",
+  savings: "Savings",
 }
 
 const categoryBarColors: Record<Category, string> = {
