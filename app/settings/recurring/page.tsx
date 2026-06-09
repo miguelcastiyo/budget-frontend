@@ -74,33 +74,11 @@ interface RecurringFormState {
 
 type RecurringSort = "date_asc" | "date_desc"
 
-const MAX_TAG_CHIP_LABEL_LENGTH = 11
-const TAG_CHIP_LABEL_OVERRIDES: Record<string, string> = {
-  subscriptions: "Subs",
-  subscription: "Subs",
-  transportation: "Transit",
-}
-
 const categoryConfig = {
   needs: { label: "Needs", selectedClassName: "bg-needs/15" },
   wants: { label: "Wants", selectedClassName: "bg-wants/15" },
   savings: { label: "Savings", selectedClassName: "bg-savings/15" },
 } as const
-
-function compactTagLabel(name: string): string {
-  const normalized = name.trim().replace(/\s+/g, " ")
-  const override = TAG_CHIP_LABEL_OVERRIDES[normalized.toLocaleLowerCase()]
-  if (override) {
-    return override
-  }
-
-  if (normalized.length <= MAX_TAG_CHIP_LABEL_LENGTH) {
-    return normalized
-  }
-
-  const firstWord = normalized.split(" ")[0] || normalized
-  return firstWord.length <= MAX_TAG_CHIP_LABEL_LENGTH ? firstWord : firstWord.slice(0, MAX_TAG_CHIP_LABEL_LENGTH)
-}
 
 function formatRecurringAmount(value: string): string {
   if (asNumber(value) <= 0) {
@@ -1185,9 +1163,6 @@ function RecurringForm({
   const amountTextClassName = amountLength > 7
     ? "text-4xl sm:text-5xl md:text-5xl"
     : "text-5xl sm:text-6xl md:text-6xl"
-  const tagChipRailStyle = {
-    gridAutoColumns: "clamp(6.75rem, calc((100% - 1.5rem) / 3.35), 8.75rem)",
-  } satisfies CSSProperties
   const amountErrorId = "recurring-amount-error"
   const descriptionErrorId = "recurring-description-error"
   const billingDayErrorId = "recurring-billing-day-error"
@@ -1583,13 +1558,12 @@ function RecurringForm({
                 {tags.length > 0 ? (
                   <div className="relative min-w-0 overflow-hidden">
                     <div
-                      className="grid min-w-0 grid-flow-col gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                      style={tagChipRailStyle}
+                      className="flex min-w-0 max-w-full gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                     >
                       {tags.map((tag) => {
                         const isSelected = form.tag_id === tag.id
                         const TagIcon = getTagIcon(tag.name, tag.icon_key)
-                        const label = compactTagLabel(tag.name)
+                        const label = tag.name.trim().replace(/\s+/g, " ")
 
                         return (
                           <button
@@ -1600,14 +1574,14 @@ function RecurringForm({
                             title={tag.name}
                             onClick={() => onChange({ ...form, tag_id: tag.id })}
                             className={cn(
-                              "inline-flex h-11 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold transition-colors",
+                              "inline-flex h-11 w-max shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors",
                               isSelected
                                 ? "border-primary bg-primary text-primary-foreground shadow-sm"
                                 : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                             )}
                           >
                             <TagIcon className="h-4 w-4 shrink-0" />
-                            <span className="min-w-0 truncate">{label}</span>
+                            <span className="whitespace-nowrap">{label}</span>
                           </button>
                         )
                       })}
