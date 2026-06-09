@@ -30,6 +30,7 @@ import type {
   UpdateTransactionRequest,
 } from "@/lib/api/types"
 import { Calendar } from "@/components/ui/calendar"
+import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import {
   Popover,
   PopoverContent,
@@ -98,8 +99,6 @@ export function AddTransactionSheet({
   const amountInputRef = useRef<HTMLInputElement>(null)
   const expenseInputRef = useRef<HTMLInputElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const tagChipRailRef = useRef<HTMLDivElement>(null)
-  const tagChipRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const suggestionRequestRef = useRef(0)
   const appliedSuggestionExpenseRef = useRef<string | null>(null)
   const didAutoFocusOnOpenRef = useRef(false)
@@ -666,25 +665,6 @@ export function AddTransactionSheet({
   const NewTagPreviewIcon = selectedNewTagIconOption?.icon ?? AutoNewTagIcon
   const newTagIconLabel = selectedNewTagIconOption?.label ?? "Auto"
 
-  useEffect(() => {
-    if (!tagId || showNewTag) {
-      return
-    }
-
-    const selectedChip = tagChipRefs.current[tagId]
-    if (!selectedChip) {
-      return
-    }
-
-    window.requestAnimationFrame(() => {
-      selectedChip.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "nearest",
-      })
-    })
-  }, [displayedQuickPickTags, showNewTag, tagId])
-
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig =
     !makeRecurring ||
@@ -749,8 +729,8 @@ export function AddTransactionSheet({
             </div>
           </div>
 
-          <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-            <div className="grid gap-4">
+          <div ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+            <div className="grid min-w-0 max-w-full gap-4 overflow-x-hidden">
               <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
                 <label htmlFor="transaction-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
                   Amount
@@ -791,8 +771,8 @@ export function AddTransactionSheet({
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden">
+                <div className="grid min-w-0 max-w-full gap-4 overflow-x-hidden sm:grid-cols-2">
                   <div className="min-w-0 space-y-2 sm:col-span-2">
                     <Label htmlFor="expense" className="text-sm font-medium">
                       Description
@@ -962,44 +942,23 @@ export function AddTransactionSheet({
                         </div>
                       </div>
                     ) : (
-                      <div className="min-w-0">
+                      <div className="min-w-0 max-w-full overflow-hidden">
                         {displayedQuickPickTags.length > 0 ? (
-                          <div className="relative min-w-0 overflow-hidden">
-                            <div
-                              ref={tagChipRailRef}
-                              className="flex min-w-0 max-w-full gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                            >
-                              {displayedQuickPickTags.map((tag) => {
-                                const isSelected = tagId === tag.id
-                                const QuickPickIcon = getTagIcon(tag.name, tag.icon_key)
-                                const label = tag.name.trim().replace(/\s+/g, " ")
-
-                                return (
-                                  <button
-                                    key={tag.id}
-                                    ref={(node) => {
-                                      tagChipRefs.current[tag.id] = node
-                                    }}
-                                    type="button"
-                                    aria-pressed={isSelected}
-                                    aria-label={tag.name}
-                                    title={tag.name}
-                                    onClick={() => setTagId(tag.id)}
-                                    className={cn(
-                                      "inline-flex h-11 w-max shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors",
-                                      isSelected
-                                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                                        : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                    )}
-                                  >
-                                    <QuickPickIcon className="h-4 w-4 shrink-0" />
-                                    <span className="whitespace-nowrap">{label}</span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background via-background/80 to-transparent" aria-hidden="true" />
-                          </div>
+                          <FormChipRail
+                            items={displayedQuickPickTags.map((tag) => {
+                              const QuickPickIcon = getTagIcon(tag.name, tag.icon_key)
+                              return {
+                                value: tag.id,
+                                label: tag.name.trim().replace(/\s+/g, " "),
+                                icon: <QuickPickIcon className="h-4 w-4 shrink-0" />,
+                                ariaLabel: tag.name,
+                                title: tag.name,
+                              } satisfies FormChipRailItem
+                            })}
+                            value={tagId}
+                            onValueChange={setTagId}
+                            ariaLabel="Choose a tag"
+                          />
                         ) : (
                           <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
                             Create a tag to use it for this transaction.
@@ -1009,9 +968,9 @@ export function AddTransactionSheet({
                     )}
                   </div>
 
-                  <div className="space-y-2 sm:col-span-2">
+                  <div className="min-w-0 max-w-full space-y-2 sm:col-span-2">
                     <Label className="text-sm font-medium">Category</Label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid min-w-0 max-w-full grid-cols-3 gap-2">
                       {(["needs", "wants", "savings"] as const).map((cat) => {
                         const config = categoryConfig[cat]
                         const isSelected = category === cat
@@ -1035,9 +994,9 @@ export function AddTransactionSheet({
                     </div>
                   </div>
 
-                  <div className="space-y-2 sm:col-span-2">
+                  <div className="min-w-0 max-w-full space-y-2 sm:col-span-2">
                     <Label className="text-sm font-medium">Date</Label>
-                    <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] gap-2">
+                    <div className="grid min-w-0 max-w-full grid-cols-[auto_auto_minmax(0,1fr)] gap-2">
                       <Button
                         type="button"
                         variant="secondary"
@@ -1091,7 +1050,7 @@ export function AddTransactionSheet({
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border/60 bg-card">
+                <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card">
                   <button
                     type="button"
                     onClick={() => setShowMoreDetails((current) => !current)}
@@ -1108,8 +1067,8 @@ export function AddTransactionSheet({
                   </button>
 
                   {showMoreDetails && (
-                    <div className="space-y-4 border-t border-border/50 p-4">
-                      <div className="space-y-2">
+                    <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden border-t border-border/50 p-4">
+                      <div className="min-w-0 max-w-full space-y-2">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">
                             Card <span className="font-normal text-muted-foreground">(optional)</span>
@@ -1173,19 +1132,38 @@ export function AddTransactionSheet({
                             </div>
                           </div>
                         ) : (
-                          <Select value={cardId || "none"} onValueChange={(value) => setCardId(value === "none" ? "" : value)}>
-                            <SelectTrigger className="h-12 rounded-xl border-border/60">
-                              <SelectValue placeholder={isLoadingTaxonomy ? "Loading cards..." : "Select a card"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No card</SelectItem>
-                              {cards.map((card) => (
-                                <SelectItem key={card.id} value={card.id}>
-                                  {card.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormChipRail
+                            items={[
+                              {
+                                value: "",
+                                label: "No card",
+                                icon: <CreditCard className="h-4 w-4 shrink-0" />,
+                                selectedTone: "neutral",
+                              },
+                              ...cards.map((card) => ({
+                                value: card.id,
+                                label: card.name.trim().replace(/\s+/g, " "),
+                                icon: <CreditCard className="h-4 w-4 shrink-0" />,
+                                ariaLabel: card.name,
+                                title: card.name,
+                              })),
+                              ...(isLoadingTaxonomy && cards.length === 0
+                                ? [{
+                                  value: "__loading",
+                                  label: "Loading cards...",
+                                  selectedTone: "neutral" as const,
+                                }]
+                                : []),
+                            ]}
+                            value={cardId}
+                            onValueChange={(value) => {
+                              if (value !== "__loading") {
+                                setCardId(value)
+                              }
+                            }}
+                            ariaLabel="Choose a card"
+                            fadeClassName="from-card via-card/80 to-transparent"
+                          />
                         )}
                       </div>
 

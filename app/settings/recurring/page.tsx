@@ -6,6 +6,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, CalendarIcon, ChevronLeft, ChevronRight, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -787,7 +788,7 @@ export default function RecurringSettingsPage() {
               Add a monthly bill so it counts toward your budget upfront.
             </DialogDescription>
           </DialogHeader>
-          <div ref={newRecurringScrollRef} className="min-h-0 flex-1 scroll-pt-4 overflow-y-auto">
+          <div ref={newRecurringScrollRef} className="min-h-0 min-w-0 flex-1 scroll-pt-4 overflow-x-hidden overflow-y-auto">
             <RecurringForm
               form={newForm}
               tags={tagOptions}
@@ -826,7 +827,7 @@ export default function RecurringSettingsPage() {
               Update the monthly rule for future budget planning.
             </DialogDescription>
           </DialogHeader>
-          <div ref={editRecurringScrollRef} className="min-h-0 flex-1 scroll-pt-4 overflow-y-auto">
+          <div ref={editRecurringScrollRef} className="min-h-0 min-w-0 flex-1 scroll-pt-4 overflow-x-hidden overflow-y-auto">
             {editingForm && (
               <RecurringForm
                 form={editingForm}
@@ -1365,7 +1366,7 @@ function RecurringForm({
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex-1 space-y-4 px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
+      <div className="min-w-0 max-w-full flex-1 space-y-4 overflow-x-hidden px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
         <FormSection title="Expense">
           <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
             <label htmlFor="recurring-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -1507,40 +1508,23 @@ function RecurringForm({
                 </div>
               </div>
             ) : (
-              <div className="min-w-0">
+              <div className="min-w-0 max-w-full overflow-hidden">
                 {tags.length > 0 ? (
-                  <div className="relative min-w-0 overflow-hidden">
-                    <div
-                      className="flex min-w-0 max-w-full gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    >
-                      {tags.map((tag) => {
-                        const isSelected = form.tag_id === tag.id
-                        const TagIcon = getTagIcon(tag.name, tag.icon_key)
-                        const label = tag.name.trim().replace(/\s+/g, " ")
-
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            aria-pressed={isSelected}
-                            aria-label={tag.name}
-                            title={tag.name}
-                            onClick={() => onChange({ ...form, tag_id: tag.id })}
-                            className={cn(
-                              "inline-flex h-11 w-max shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors",
-                              isSelected
-                                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                                : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                            )}
-                          >
-                            <TagIcon className="h-4 w-4 shrink-0" />
-                            <span className="whitespace-nowrap">{label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background via-background/80 to-transparent" aria-hidden="true" />
-                  </div>
+                  <FormChipRail
+                    items={tags.map((tag) => {
+                      const TagIcon = getTagIcon(tag.name, tag.icon_key)
+                      return {
+                        value: tag.id,
+                        label: tag.name.trim().replace(/\s+/g, " "),
+                        icon: <TagIcon className="h-4 w-4 shrink-0" />,
+                        ariaLabel: tag.name,
+                        title: tag.name,
+                      } satisfies FormChipRailItem
+                    })}
+                    value={form.tag_id}
+                    onValueChange={(value) => onChange({ ...form, tag_id: value })}
+                    ariaLabel="Choose a tag"
+                  />
                 ) : (
                   <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
                     Create a tag to use it for this recurring expense.
@@ -1550,9 +1534,9 @@ function RecurringForm({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="min-w-0 max-w-full space-y-2">
             <Label className="text-sm font-medium">Category</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid min-w-0 max-w-full grid-cols-3 gap-2">
               {(["needs", "wants", "savings"] as const).map((category) => {
                 const config = categoryConfig[category]
                 const isSelected = form.category === category
@@ -1577,7 +1561,7 @@ function RecurringForm({
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="min-w-0 max-w-full space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">
                 Card <span className="font-normal text-muted-foreground">(optional)</span>
@@ -1641,29 +1625,33 @@ function RecurringForm({
                 </div>
               </div>
             ) : (
-              <Select
-                value={form.card_id || "__none"}
-                onValueChange={(value) => onChange({ ...form, card_id: value === "__none" ? "" : value })}
-              >
-                <SelectTrigger className="h-10 rounded-xl border-border/60">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none">No card</SelectItem>
-                  {cards.map((card) => (
-                    <SelectItem key={card.id} value={card.id}>
-                      {card.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormChipRail
+                items={[
+                  {
+                    value: "",
+                    label: "No card",
+                    icon: <CreditCard className="h-4 w-4 shrink-0" />,
+                    selectedTone: "neutral",
+                  },
+                  ...cards.map((card) => ({
+                    value: card.id,
+                    label: card.name.trim().replace(/\s+/g, " "),
+                    icon: <CreditCard className="h-4 w-4 shrink-0" />,
+                    ariaLabel: card.name,
+                    title: card.name,
+                  })),
+                ]}
+                value={form.card_id}
+                onValueChange={(value) => onChange({ ...form, card_id: value })}
+                ariaLabel="Choose a card"
+              />
             )}
           </div>
         </FormSection>
 
         <FormSection title="Schedule" description="Choose when this bill should be added each month.">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+          <div className="grid min-w-0 max-w-full grid-cols-2 gap-3">
+            <div className="min-w-0 space-y-2">
               <Label className="text-sm">Billing rule</Label>
               <Select
                 value={form.billing_type}
@@ -1679,7 +1667,7 @@ function RecurringForm({
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label className="text-sm">Billing day</Label>
               <Input
                 type="number"
@@ -1701,8 +1689,8 @@ function RecurringForm({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid min-w-0 max-w-full gap-4 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label className="text-sm">Starts</Label>
               <MonthPicker
                 value={form.starts_month}
@@ -1711,7 +1699,7 @@ function RecurringForm({
                 className="w-full"
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label className="text-sm">Ends</Label>
               <MonthPicker
                 value={form.ends_month}
