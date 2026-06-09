@@ -1,7 +1,7 @@
 # Settings: Recurring
 
 Status: Current  
-Last reviewed: 2026-06-07
+Last reviewed: 2026-06-08
 
 The Settings -> Recurring page manages monthly recurring expense items.
 
@@ -18,6 +18,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Edit and Delete actions live in the detail sheet; Delete still confirms before mutating data.
 - New and edit use the existing mobile tray / desktop modal pattern, grouped into Expense, Schedule, and Status sections.
 - The recurring form intentionally mirrors the money-entry pattern from Add Transaction: Amount, Description, Classification, Timing, Submit.
+- Amount entry is shared with Add Transaction through the same digit-buffered `AmountInput` behavior, including paste handling, keyboard handling, large display sizing, and select-all replacement.
 - The top half of the recurring form follows Amount -> Description -> Tag -> Category -> Card, then schedule-specific fields appear separately.
 - Tags and cards can be created from inside the recurring form and are selected immediately after creation.
 - Card selection is optional but stays in the Expense section because it describes the bill.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Dialog,
   DialogClose,
@@ -30,6 +30,7 @@ import type {
   UpdateTransactionRequest,
 } from "@/lib/api/types"
 import { Calendar } from "@/components/ui/calendar"
+import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { TagIconPicker } from "@/components/settings/tag-icon-picker"
 import {
@@ -44,8 +45,6 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
-
-const MAX_AMOUNT_DIGITS = 9
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -67,7 +66,6 @@ export function AddTransactionSheet({
   const [date, setDate] = useState<Date>(new Date())
   const [expense, setExpense] = useState("")
   const [amount, setAmount] = useState("")
-  const [amountDigits, setAmountDigits] = useState("")
   const [category, setCategory] = useState<Category>("needs")
   const [isSplit, setIsSplit] = useState(false)
   const [tagId, setTagId] = useState("")
@@ -124,52 +122,6 @@ export function AddTransactionSheet({
     setRecurringBillingType(isLastDayOfMonth(selectedDate) ? "last_day" : "day_of_month")
   }
 
-  const formatAmountDigits = (digits: string): string => {
-    if (digits.length === 0) {
-      return ""
-    }
-
-    const paddedDigits = digits.padStart(4, "0")
-
-    return `${paddedDigits.slice(0, -2)}.${paddedDigits.slice(-2)}`
-  }
-
-  const amountDigitsFromDecimal = (value: string): string => {
-    const normalized = value.trim().replace(/,/g, ".")
-    if (normalized === "") {
-      return ""
-    }
-
-    const [whole = "", fraction = ""] = normalized.split(".")
-    const digits = `${whole.replace(/\D/g, "")}${fraction.replace(/\D/g, "").padEnd(2, "0").slice(0, 2)}`
-
-    return digits.replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
-  }
-
-  const setAmountFromDigits = (digits: string) => {
-    const normalizedDigits = digits.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
-
-    setAmountDigits(normalizedDigits)
-    setAmount(formatAmountDigits(normalizedDigits))
-  }
-
-  const appendAmountDigits = (digits: string) => {
-    if (!digits) {
-      return
-    }
-
-    setAmountFromDigits(`${amountDigits}${digits}`)
-  }
-
-  const amountInputIsFullySelected = (): boolean => {
-    const input = amountInputRef.current
-    if (!input || amount.length === 0) {
-      return false
-    }
-
-    return input.selectionStart === 0 && input.selectionEnd === amount.length
-  }
-
   const focusAmountInput = () => {
     window.requestAnimationFrame(() => {
       amountInputRef.current?.focus()
@@ -217,9 +169,7 @@ export function AddTransactionSheet({
     if (isEditMode && transaction) {
       setDate(parseTransactionDate(transaction.date))
       setExpense(transaction.expense)
-      const nextAmountDigits = amountDigitsFromDecimal(transaction.amount)
-      setAmountDigits(nextAmountDigits)
-      setAmount(formatAmountDigits(nextAmountDigits))
+      setAmount(transaction.amount)
       setCategory(transaction.category)
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
@@ -307,7 +257,6 @@ export function AddTransactionSheet({
     const now = new Date()
     setExpense("")
     setAmount("")
-    setAmountDigits("")
     setCategory("needs")
     setIsSplit(false)
     setTagId("")
@@ -435,82 +384,6 @@ export function AddTransactionSheet({
   const hasEditChanges = !isEditMode || !baselineTransactionPayload
     ? true
     : JSON.stringify(normalizedTransactionPayload) !== JSON.stringify(baselineTransactionPayload) || (makeRecurring && !transactionAlreadyRecurring)
-
-  const handleAmountBeforeInput = (event: React.FormEvent<HTMLInputElement>) => {
-    const nativeEvent = event.nativeEvent as InputEvent
-    const inputType = nativeEvent.inputType
-    const data = nativeEvent.data ?? ""
-
-    if (inputType === "insertText") {
-      event.preventDefault()
-      if (/^\d+$/.test(data)) {
-        appendAmountDigits(data)
-      }
-      return
-    }
-
-    if (inputType === "deleteContentBackward") {
-      event.preventDefault()
-      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
-      return
-    }
-
-    if (inputType === "deleteContentForward") {
-      event.preventDefault()
-      if (amountInputIsFullySelected()) {
-        setAmountFromDigits("")
-      }
-    }
-  }
-
-  const handleAmountKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault()
-      focusExpenseInput()
-      return
-    }
-
-    if (/^\d$/.test(event.key)) {
-      event.preventDefault()
-      appendAmountDigits(event.key)
-      return
-    }
-
-    if (event.key === "Backspace") {
-      event.preventDefault()
-      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
-      return
-    }
-
-    if (event.key === "Delete") {
-      if (amountInputIsFullySelected()) {
-        event.preventDefault()
-        setAmountFromDigits("")
-      }
-      return
-    }
-
-    if (["Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
-      return
-    }
-
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return
-    }
-
-    event.preventDefault()
-  }
-
-  const handleAmountPaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault()
-
-    const pastedDigits = event.clipboardData.getData("text").replace(/\D/g, "")
-    if (!pastedDigits) {
-      return
-    }
-
-    setAmountFromDigits(amountInputIsFullySelected() ? pastedDigits : `${amountDigits}${pastedDigits}`)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -669,14 +542,6 @@ export function AddTransactionSheet({
     recurringBillingType === "last_day" ||
     (Number.isInteger(recurringDayNumber) && recurringDayNumber >= 1 && recurringDayNumber <= 31)
   const optionalDetailsCount = [cardId, isSplit, makeRecurring, transactionAlreadyRecurring].filter(Boolean).length
-  const displayAmount = amount || "00.00"
-  const amountLength = displayAmount.length
-  const amountInputStyle = {
-    width: `${Math.min(Math.max(amountLength + 0.25, 5), 10.5)}ch`,
-  } satisfies CSSProperties
-  const amountTextClassName = amountLength > 7
-    ? "text-4xl sm:text-5xl md:text-5xl"
-    : "text-5xl sm:text-6xl md:text-6xl"
   const submitButtonLabel = (() => {
     if (isSubmitting) {
       return isEditMode ? "Saving..." : "Adding..."
@@ -729,45 +594,15 @@ export function AddTransactionSheet({
 
           <div ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
             <div className="grid min-w-0 max-w-full gap-4 overflow-x-hidden">
-              <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
-                <label htmlFor="transaction-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Amount
-                </label>
-                <div className="mt-3 flex justify-center">
-                  <div className="inline-flex items-baseline gap-2">
-                    <span className={cn("font-semibold leading-none text-muted-foreground", amountTextClassName)}>
-                      $
-                    </span>
-                    <Input
-                      ref={amountInputRef}
-                      id="transaction-amount"
-                      name="transaction_amount"
-                      type="text"
-                      inputMode="numeric"
-                      enterKeyHint="next"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="off"
-                      spellCheck={false}
-                      data-form-type="other"
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      placeholder="00.00"
-                      value={amount}
-                      style={amountInputStyle}
-                      onBeforeInput={handleAmountBeforeInput}
-                      onChange={(e) => setAmountFromDigits(e.target.value)}
-                      onKeyDown={handleAmountKeyDown}
-                      onPaste={handleAmountPaste}
-                      className={cn(
-                        "h-auto min-w-0 max-w-[68vw] border-0 bg-transparent p-0 text-left font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-                        amountTextClassName
-                      )}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
+              <AmountInput
+                ref={amountInputRef}
+                id="transaction-amount"
+                name="transaction_amount"
+                value={amount}
+                onValueChange={setAmount}
+                onEnter={focusExpenseInput}
+                required
+              />
 
               <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden">
                 <div className="grid min-w-0 max-w-full gap-4 overflow-x-hidden sm:grid-cols-2">

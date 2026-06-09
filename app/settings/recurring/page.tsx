@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { ClipboardEvent, CSSProperties, FormEvent, KeyboardEvent, ReactNode } from "react"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, CalendarIcon, ChevronLeft, ChevronRight, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -58,8 +59,6 @@ import { getTagIcon } from "@/lib/tag-icons"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
-
-const MAX_AMOUNT_DIGITS = 9
 
 interface RecurringFormState {
   expense: string
@@ -1157,14 +1156,6 @@ function RecurringForm({
   const amountIsValid = isValidRecurringAmount(form.amount)
   const billingDayIsValid = isValidBillingDay(form)
   const canSubmit = Boolean(canSave && hasExpense && form.tag_id && amountIsValid && billingDayIsValid)
-  const displayAmount = form.amount || "00.00"
-  const amountLength = displayAmount.length
-  const amountInputStyle = {
-    width: `${Math.min(Math.max(amountLength + 0.25, 5), 10.5)}ch`,
-  } satisfies CSSProperties
-  const amountTextClassName = amountLength > 7
-    ? "text-4xl sm:text-5xl md:text-5xl"
-    : "text-5xl sm:text-6xl md:text-6xl"
   const amountErrorId = "recurring-amount-error"
   const descriptionErrorId = "recurring-description-error"
   const billingDayErrorId = "recurring-billing-day-error"
@@ -1173,134 +1164,10 @@ function RecurringForm({
   const showBillingDayError = (submitAttempted || touched.billing_day) && !billingDayIsValid
   const NewTagInputIcon = getTagIcon(newTagName || "Tag", newTagIconKey || null)
 
-  const formatAmountDigits = (digits: string): string => {
-    if (digits.length === 0) {
-      return ""
-    }
-
-    const paddedDigits = digits.padStart(4, "0")
-
-    return `${paddedDigits.slice(0, -2)}.${paddedDigits.slice(-2)}`
-  }
-
-  const amountDigitsFromDecimal = (value: string): string => {
-    const normalized = value.trim().replace(/,/g, ".")
-    if (normalized === "") {
-      return ""
-    }
-
-    const [whole = "", fraction = ""] = normalized.split(".")
-    const digits = `${whole.replace(/\D/g, "")}${fraction.replace(/\D/g, "").padEnd(2, "0").slice(0, 2)}`
-
-    return digits.replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
-  }
-
-  const amountDigits = amountDigitsFromDecimal(form.amount)
-
-  const setAmountFromDigits = (digits: string) => {
-    const normalizedDigits = digits.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS)
-
-    setSubmitAttempted(false)
-    onChange({ ...form, amount: formatAmountDigits(normalizedDigits) })
-  }
-
-  const appendAmountDigits = (digits: string) => {
-    if (!digits) {
-      return
-    }
-
-    setAmountFromDigits(`${amountDigits}${digits}`)
-  }
-
-  const amountInputIsFullySelected = (): boolean => {
-    const input = amountInputRef.current
-    if (!input || form.amount.length === 0) {
-      return false
-    }
-
-    return input.selectionStart === 0 && input.selectionEnd === form.amount.length
-  }
-
   const focusExpenseInput = () => {
     window.requestAnimationFrame(() => {
       expenseInputRef.current?.focus()
     })
-  }
-
-  const handleAmountBeforeInput = (event: FormEvent<HTMLInputElement>) => {
-    const nativeEvent = event.nativeEvent as InputEvent
-    const inputType = nativeEvent.inputType
-    const data = nativeEvent.data ?? ""
-
-    if (inputType === "insertText") {
-      event.preventDefault()
-      if (/^\d+$/.test(data)) {
-        appendAmountDigits(data)
-      }
-      return
-    }
-
-    if (inputType === "deleteContentBackward") {
-      event.preventDefault()
-      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
-      return
-    }
-
-    if (inputType === "deleteContentForward") {
-      event.preventDefault()
-      if (amountInputIsFullySelected()) {
-        setAmountFromDigits("")
-      }
-    }
-  }
-
-  const handleAmountKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      event.preventDefault()
-      focusExpenseInput()
-      return
-    }
-
-    if (/^\d$/.test(event.key)) {
-      event.preventDefault()
-      appendAmountDigits(event.key)
-      return
-    }
-
-    if (event.key === "Backspace") {
-      event.preventDefault()
-      setAmountFromDigits(amountInputIsFullySelected() ? "" : amountDigits.slice(0, -1))
-      return
-    }
-
-    if (event.key === "Delete") {
-      if (amountInputIsFullySelected()) {
-        event.preventDefault()
-        setAmountFromDigits("")
-      }
-      return
-    }
-
-    if (["Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
-      return
-    }
-
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return
-    }
-
-    event.preventDefault()
-  }
-
-  const handleAmountPaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    event.preventDefault()
-
-    const pastedDigits = event.clipboardData.getData("text").replace(/\D/g, "")
-    if (!pastedDigits) {
-      return
-    }
-
-    setAmountFromDigits(amountInputIsFullySelected() ? pastedDigits : `${amountDigits}${pastedDigits}`)
   }
 
   const handleCreateInlineTag = async () => {
@@ -1368,46 +1235,21 @@ function RecurringForm({
     <div className="flex min-h-full flex-col">
       <div className="min-w-0 max-w-full flex-1 space-y-4 overflow-x-hidden px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
         <FormSection title="Expense">
-          <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 sm:px-5">
-            <label htmlFor="recurring-amount" className="block text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Amount
-            </label>
-            <div className="mt-3 flex justify-center">
-              <div className="inline-flex items-baseline gap-2">
-                <span className={cn("font-semibold leading-none text-muted-foreground", amountTextClassName)}>
-                  $
-                </span>
-                <Input
-                  ref={amountInputRef}
-                  id="recurring-amount"
-                  name="recurring_amount"
-                  type="text"
-                  inputMode="numeric"
-                  enterKeyHint="next"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  data-form-type="other"
-                  data-lpignore="true"
-                  data-1p-ignore="true"
-                  value={form.amount}
-                  style={amountInputStyle}
-                  onBeforeInput={handleAmountBeforeInput}
-                  onChange={(e) => setAmountFromDigits(e.target.value)}
-                  onKeyDown={handleAmountKeyDown}
-                  onPaste={handleAmountPaste}
-                  onBlur={() => setTouched((previous) => ({ ...previous, amount: true }))}
-                  placeholder="00.00"
-                  aria-invalid={showAmountError}
-                  aria-describedby={showAmountError ? amountErrorId : undefined}
-                  className={cn(
-                    "h-auto min-w-0 max-w-[68vw] border-0 bg-transparent p-0 text-left font-semibold leading-none tracking-normal shadow-none placeholder:text-muted-foreground/30 focus-visible:ring-0 dark:bg-transparent [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-                    amountTextClassName
-                  )}
-                />
-              </div>
-            </div>
+          <div>
+            <AmountInput
+              ref={amountInputRef}
+              id="recurring-amount"
+              name="recurring_amount"
+              value={form.amount}
+              onValueChange={(amount) => {
+                setSubmitAttempted(false)
+                onChange({ ...form, amount })
+              }}
+              onEnter={focusExpenseInput}
+              onBlur={() => setTouched((previous) => ({ ...previous, amount: true }))}
+              ariaInvalid={showAmountError}
+              ariaDescribedBy={showAmountError ? amountErrorId : undefined}
+            />
             {showAmountError && (
               <p id={amountErrorId} className="mt-2.5 text-center text-xs text-destructive">Amount must be greater than $0.</p>
             )}
