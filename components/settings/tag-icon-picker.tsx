@@ -1,8 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
-import { cn } from "@/lib/utils"
 
 interface TagIconPickerProps {
   tagName: string
@@ -25,6 +25,26 @@ export function TagIconPicker({
   const AutoIcon = getTagIcon(tagName || "Tag", null)
   const PreviewIcon = selectedIconOption?.icon ?? AutoIcon
   const iconLabel = selectedIconOption?.label ?? "Auto"
+  const iconItems: FormChipRailItem[] = [
+    {
+      value: "",
+      label: "Auto",
+      icon: <AutoIcon className="h-4 w-4 shrink-0" />,
+      ariaLabel: "Use automatic icon",
+      title: "Auto icon",
+    },
+    ...TAG_ICON_OPTIONS.map((option) => {
+      const Icon = option.icon
+      return {
+        value: option.key,
+        label: option.label,
+        icon: <Icon className="h-4 w-4" />,
+        ariaLabel: `Use ${option.label} icon`,
+        title: option.label,
+        hideLabel: true,
+      } satisfies FormChipRailItem
+    }),
+  ]
 
   return (
     <div className="min-w-0 space-y-2">
@@ -35,55 +55,15 @@ export function TagIconPicker({
           <span className="truncate">{iconLabel}</span>
         </span>
       </div>
-      <div className={cn("relative min-w-0 max-w-full overflow-hidden", wrapOnDesktop && "sm:overflow-visible")}>
-        <div
-          className={cn(
-            "flex max-w-full gap-2 overflow-x-auto scroll-smooth pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            wrapOnDesktop && "sm:flex-wrap sm:overflow-visible sm:pr-0"
-          )}
-        >
-          <button
-            type="button"
-            aria-pressed={!value}
-            aria-label="Use automatic icon"
-            title="Auto icon"
-            onClick={() => onChange("")}
-            className={cn(
-              "inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
-              !value
-                ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            )}
-          >
-            <AutoIcon className="h-4 w-4 shrink-0" />
-            Auto
-          </button>
-          {TAG_ICON_OPTIONS.map((option) => {
-            const Icon = option.icon
-            const isSelected = value === option.key
-
-            return (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={isSelected}
-                aria-label={`Use ${option.label} icon`}
-                title={option.label}
-                onClick={() => onChange(option.key)}
-                className={cn(
-                  "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors",
-                  isSelected
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "border-border/60 bg-muted/25 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            )
-          })}
-        </div>
-        <div className={cn("pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l", fadeClassName)} aria-hidden="true" />
-      </div>
+      <FormChipRail
+        items={iconItems}
+        value={value}
+        onValueChange={onChange}
+        ariaLabel="Choose a tag icon"
+        fadeClassName={fadeClassName}
+        chipClassName="h-10 font-medium"
+        wrapOnDesktop={wrapOnDesktop}
+      />
     </div>
   )
 }
