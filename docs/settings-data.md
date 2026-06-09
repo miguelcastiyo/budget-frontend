@@ -1,7 +1,7 @@
 # Settings: Data Import / Export
 
 Status: Current
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-09
 
 The Settings -> Data page lets users import transactions from CSV and export transactions to CSV. The experience follows the same modern financial notebook direction as Settings, Budget, and Recurring: calm surfaces, clear copy, guided actions, and limited CTAs.
 
@@ -14,6 +14,8 @@ The Settings -> Data page lets users import transactions from CSV and export tra
 ## CSV Import Flow
 
 No transaction data is written during Upload, Map, Dates, Budget Groups, Spending Tags, or Review. Data is only written after the final import confirmation from the Review step.
+
+The import flow uses the shared `ResponsiveDialog` shell so mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, scroll containment, and safe-area-aware footer spacing stay consistent with other settings flows.
 
 1. Upload
    - Choose a CSV file.

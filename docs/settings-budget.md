@@ -1,7 +1,7 @@
 # Settings: Budget
 
 Status: Current
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-09
 
 The Settings -> Budget page manages the monthly budget basis and category allocation used by the dashboard and insights.
 
@@ -13,7 +13,7 @@ The Settings -> Budget page manages the monthly budget basis and category alloca
 - Desktop uses a two-column layout: the main column shows budget basis and allocation; the secondary column explains how the budget is used and shows compact details.
 - Editing happens through the pencil action on the Monthly budget basis card instead of showing the raw income/configuration form by default.
 - The page intentionally exposes one edit action on the main budget card to avoid duplicate CTAs for the same budget edit flow.
-- Mobile uses the existing tray-style dialog behavior. Desktop uses the same dialog component as a centered modal.
+- Mobile uses the shared `ResponsiveDialog` tray behavior. Desktop uses the same shell as a centered modal.
 - If the selected month inherits a previous budget, copy uses two short lines: `Using your [month] budget.` and `Saving changes will create a new budget starting [month].`
 - If the selected month has its own budget, copy uses: `Editing your [month] budget.` and `Changes apply from [month] forward until another budget starts.`
 - The page avoids user-facing technical terms such as version, resolver, and effective date.
@@ -29,6 +29,7 @@ The Settings -> Budget page manages the monthly budget basis and category alloca
 - `BudgetAllocationSummary` is presentation-only and derives display values from existing budget allocation state and income.
 - `IncomeBreakdownForm` and `BudgetAllocationForm` remain the editable form controls.
 - `MonthSelector` controls the selected budget month and allows future months on this page.
+- `ResponsiveDialog` owns the edit modal/tray shell, including mobile swipe-dismiss, drag handle, close button, scroll body, and safe-area footer spacing.
 
 Budget calculation logic remains in `lib/income-breakdown.ts` and `lib/budget-allocation.ts`. The page continues to use those utilities for monthly income, hourly income, extra income, payload shape, allocation validation, and saved budget behavior. Saves include `effective_month` so the backend can create or replace the selected month’s version.
 

@@ -1,26 +1,15 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
-import { Check, Mail, X } from "lucide-react"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Check, Mail } from "lucide-react"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
-import { cn } from "@/lib/utils"
-import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 
 interface ProfileEditDialogProps {
   open: boolean
@@ -44,14 +33,8 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const [googleButtonWidth, setGoogleButtonWidth] = useState(320)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const hasGoogleClientId = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
   const canEditEmail = profile?.auth_provider === "password"
-  const swipeDismiss = useSwipeDismiss({
-    open,
-    onDismiss: () => handleOpenChange(false),
-    scrollRef: scrollContainerRef,
-  })
 
   useEffect(() => {
     if (!profile || !open) {
@@ -217,30 +200,25 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        {...swipeDismiss}
-        showCloseButton={false}
-        className={cn(
-          "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,42rem)] sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem] sm:rounded-2xl sm:border",
-          mobileDrawerDialogClassName
-        )}
-      >
-        <DialogHeader className="shrink-0 border-b border-border/50 px-5 pb-4 pt-3 text-left sm:px-6 sm:pt-5">
-          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <DialogTitle className="text-xl">Edit Profile</DialogTitle>
-              <DialogDescription>Update your account details and sign-in options.</DialogDescription>
-            </div>
-            <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-          </div>
-        </DialogHeader>
-
-        <div ref={scrollContainerRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Edit Profile"
+      description="Update your account details and sign-in options."
+      desktopClassName="sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem]"
+      contentClassName="sm:max-h-[min(90dvh,42rem)]"
+      headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
+      bodyClassName="space-y-5 px-5 py-5 sm:px-6"
+      footer={
+        <Button
+          className="h-12 w-full rounded-xl"
+          onClick={() => void handleSaveProfile()}
+          disabled={isSaving || !displayName.trim() || !hasProfileChanges}
+        >
+          {isSaving ? "Saving..." : "Save Changes"}
+        </Button>
+      }
+    >
           <div className="space-y-2">
             <Label htmlFor="settings-display-name">Display Name</Label>
             <Input
@@ -396,18 +374,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {success && <p className="text-sm text-success">{success}</p>}
-        </div>
-
-        <DialogFooter className="shrink-0 border-t border-border/50 bg-background/95 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:p-6 sm:pt-4">
-          <Button
-            className="h-12 w-full rounded-xl"
-            onClick={() => void handleSaveProfile()}
-            disabled={isSaving || !displayName.trim() || !hasProfileChanges}
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveDialog>
   )
 }

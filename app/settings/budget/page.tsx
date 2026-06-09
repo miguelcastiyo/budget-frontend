@@ -1,28 +1,20 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Pencil, X } from "lucide-react"
+import { ArrowLeft, Pencil } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { BudgetSettings, BudgetSettingsResolvedResponse } from "@/lib/api/types"
 import { formatMonthLabel, getCurrentMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
-import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import {
   totalAmount,
   totalPercent,
@@ -53,12 +45,6 @@ export default function BudgetSettingsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
   const [showBudgetEditor, setShowBudgetEditor] = useState(false)
-  const editorScrollRef = useRef<HTMLDivElement>(null)
-  const editorSwipeDismiss = useSwipeDismiss({
-    open: showBudgetEditor,
-    onDismiss: () => setShowBudgetEditor(false),
-    scrollRef: editorScrollRef,
-  })
 
   useEffect(() => {
     const loadBudgetSettings = async () => {
@@ -269,52 +255,29 @@ export default function BudgetSettingsPage() {
         </div>
       </main>
 
-      <Dialog open={showBudgetEditor} onOpenChange={setShowBudgetEditor}>
-        <DialogContent
-          {...editorSwipeDismiss}
-          showCloseButton={false}
-          className={cn(
-            "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem] sm:rounded-2xl sm:border",
-            mobileDrawerDialogClassName
-          )}
-        >
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
-              <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <DialogTitle className="truncate text-lg font-semibold sm:text-xl">Edit Budget</DialogTitle>
-                  <DialogDescription className="mt-0.5 truncate text-xs text-muted-foreground">
-                    Update your monthly budget basis and category targets.
-                  </DialogDescription>
-                </div>
-                <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
-                </DialogClose>
-              </div>
-            </div>
-
-            <div ref={editorScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5">
-              {budgetEditor("settings-edit", false)}
-            </div>
-
-            {/* Safe-area padding keeps the tray footer clear of the iOS home indicator while the scroll body has matching bottom breathing room. */}
-            <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-6 sm:pt-4">
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  className="h-12 flex-1 rounded-xl"
-                  onClick={() => setShowBudgetEditor(false)}
-                >
-                  Cancel
-                </Button>
-                <div className="flex-1">{saveBudgetButton}</div>
-              </div>
-            </div>
+      <ResponsiveDialog
+        open={showBudgetEditor}
+        onOpenChange={setShowBudgetEditor}
+        title="Edit Budget"
+        description="Update your monthly budget basis and category targets."
+        desktopClassName="sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem]"
+        contentClassName="sm:max-h-[min(90dvh,44rem)]"
+        bodyClassName="px-4 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              className="h-12 flex-1 rounded-xl"
+              onClick={() => setShowBudgetEditor(false)}
+            >
+              Cancel
+            </Button>
+            <div className="flex-1">{saveBudgetButton}</div>
           </div>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        {budgetEditor("settings-edit", false)}
+      </ResponsiveDialog>
 
       <BottomNav />
     </div>

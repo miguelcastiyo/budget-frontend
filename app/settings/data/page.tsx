@@ -18,23 +18,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { Category, CsvImportAmountStrategy, CsvImportCategoryStrategy, CsvImportDateStrategy, CsvImportField, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, CsvImportTagStrategy, CsvImportTagStrategyEntry, DataRunItem, DataRunStatus, Tag } from "@/lib/api/types"
 import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
-import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 type ExportDateMode = "all" | "custom"
 type ImportStep = "upload" | "map" | "dates" | "categories" | "tags" | "review" | "done"
@@ -952,7 +944,6 @@ function ActivityRow({
 
 export default function DataSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const importDialogScrollRef = useRef<HTMLDivElement>(null)
   const [dataRuns, setDataRuns] = useState<DataRunItem[]>([])
   const [isLoadingRuns, setIsLoadingRuns] = useState(true)
   const [runsError, setRunsError] = useState<string | null>(null)
@@ -1118,12 +1109,6 @@ export default function DataSettingsPage() {
     }
     setIsImportDialogOpen(false)
   }
-  const importDialogSwipeDismiss = useSwipeDismiss({
-    open: isImportDialogOpen,
-    onDismiss: closeImportDialog,
-    scrollRef: importDialogScrollRef,
-  })
-
   const goToPreviousImportStep = () => {
     setImportError(null)
     if (importStep === "done") {
@@ -1626,42 +1611,120 @@ export default function DataSettingsPage() {
         </section>
       </main>
 
-      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
-        if (open) {
-          setIsImportDialogOpen(true)
-        } else {
-          closeImportDialog()
+      <ResponsiveDialog
+        open={isImportDialogOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setIsImportDialogOpen(true)
+          } else {
+            closeImportDialog()
+          }
+        }}
+        title="Import CSV"
+        description={
+          <>
+            {importStep === "upload" && "Choose the CSV file to preview before anything is imported."}
+            {importStep === "map" && "Match CSV headers to Budget fields."}
+            {importStep === "dates" && "Choose a year for dates that do not include one."}
+            {importStep === "categories" && "Map imported labels into Needs, Wants, or Savings."}
+            {importStep === "tags" && "Match imported labels to existing tags or create new ones."}
+            {importStep === "review" && "Review validation results before importing."}
+            {importStep === "done" && "Import complete."}
+          </>
         }
-      }}>
-        <DialogContent
-          {...importDialogSwipeDismiss}
-          className={cn(
-            "!flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] !max-w-none flex-col gap-0 overflow-hidden rounded-2xl border p-0 sm:max-h-[min(820px,calc(100dvh-2rem))] sm:!max-w-5xl",
-            mobileDrawerDialogClassName
-          )}
-          showCloseButton={!isPreviewing && !isValidating && !isImporting}
-        >
-          <DialogHeader className="shrink-0 border-b border-border/70 bg-background/95 p-4 pr-12 text-left backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5 sm:pr-12">
-            <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_26rem] md:items-center">
-              <div className="min-w-0">
-                <DialogTitle>Import CSV</DialogTitle>
-                <DialogDescription>
-                  {importStep === "upload" && "Choose the CSV file to preview before anything is imported."}
-                  {importStep === "map" && "Match CSV headers to Budget fields."}
-                  {importStep === "dates" && "Choose a year for dates that do not include one."}
-                  {importStep === "categories" && "Map imported labels into Needs, Wants, or Savings."}
-                  {importStep === "tags" && "Match imported labels to existing tags or create new ones."}
-                  {importStep === "review" && "Review validation results before importing."}
-                  {importStep === "done" && "Import complete."}
-                </DialogDescription>
-              </div>
-              <ImportStepper stepIndex={importStepIndex} />
+        headerAccessory={<div className="md:w-[26rem]"><ImportStepper stepIndex={importStepIndex} /></div>}
+        showCloseButton={!isPreviewing && !isValidating && !isImporting}
+        closeDisabled={isPreviewing || isValidating || isImporting}
+        desktopClassName="sm:!max-w-5xl"
+        contentClassName="!max-w-none rounded-2xl sm:max-h-[min(820px,calc(100dvh-2rem))]"
+        headerClassName="border-border/70 p-4 sm:p-5"
+        bodyClassName="p-4 pb-28 sm:p-5 sm:pb-28"
+        bodyMaxWidthClassName="mx-auto max-w-4xl space-y-4"
+        footerClassName="border-border/70 sm:p-5"
+        footer={
+          <div className="mx-auto grid max-w-4xl gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 rounded-lg sm:w-auto"
+              disabled={importStep === "upload" || isPreviewing || isValidating || isImporting}
+              onClick={goToPreviousImportStep}
+            >
+              Back
+            </Button>
+            <p className="hidden text-xs text-muted-foreground sm:block">
+              {importStep === "upload" && "No data is written during preview."}
+              {importStep === "map" && (needsDateSetup ? "Date setup comes next." : "Budget group setup comes next.")}
+              {importStep === "dates" && "The selected year applies only to dates missing a year."}
+              {importStep === "categories" && "Spending tag review comes next."}
+              {importStep === "tags" && "Validation checks your CSV without writing data."}
+              {importStep === "review" && "Import writes valid rows only."}
+              {importStep === "done" && "You can start another import or close this dialog."}
+            </p>
+            <div className="grid gap-2 sm:flex sm:justify-end">
+              {importStep === "done" ? (
+                <>
+                  <Button type="button" className="h-11 rounded-lg" onClick={closeImportDialog}>
+                    Done
+                  </Button>
+                  <Button type="button" variant="secondary" className="h-11 rounded-lg" onClick={resetImportState}>
+                    Import another CSV
+                  </Button>
+                </>
+              ) : importStep === "review" ? (
+                <Button
+                  type="button"
+                  className="h-11 rounded-lg"
+                  disabled={!canCommitImport || isImporting}
+                  onClick={() => void handleCommitImport()}
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Importing
+                    </>
+                  ) : (
+                    validationResult ? `Import ${plannedImportCount(validationResult).toLocaleString()} rows` : "Import valid rows"
+                  )}
+                </Button>
+              ) : importStep === "tags" ? (
+                <Button
+                  type="button"
+                  className="h-11 rounded-lg"
+                  disabled={!canValidateImport || isValidating || isImporting}
+                  onClick={() => void handleValidateImport()}
+                >
+                  {isValidating ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Validating
+                    </>
+                  ) : (
+                    "Validate"
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="h-11 rounded-lg"
+                  disabled={
+                    (importStep === "upload" && !importPreview) ||
+                    (importStep === "map" && (!requiredMappingComplete || hasDuplicateMapping)) ||
+                    (importStep === "dates" && !dateSetupComplete) ||
+                    (importStep === "categories" && !categorySetupComplete) ||
+                    isPreviewing ||
+                    isValidating ||
+                    isImporting
+                  }
+                  onClick={goToNextImportStep}
+                >
+                  Continue
+                </Button>
+              )}
             </div>
-          </DialogHeader>
-
-          <div ref={importDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-28 sm:p-5 sm:pb-28">
-            <div className="mx-auto max-w-4xl space-y-4">
+          </div>
+        }
+      >
               {importError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                   {importError}
@@ -1802,94 +1865,7 @@ export default function DataSettingsPage() {
                   {commitResult && <ResultSummary result={commitResult} mode="complete" />}
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="shrink-0 border-t border-border/70 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-5">
-            <div className="mx-auto grid max-w-4xl gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-11 rounded-lg sm:w-auto"
-                disabled={importStep === "upload" || isPreviewing || isValidating || isImporting}
-                onClick={goToPreviousImportStep}
-              >
-                Back
-              </Button>
-              <p className="hidden text-xs text-muted-foreground sm:block">
-                {importStep === "upload" && "No data is written during preview."}
-                {importStep === "map" && (needsDateSetup ? "Date setup comes next." : "Budget group setup comes next.")}
-                {importStep === "dates" && "The selected year applies only to dates missing a year."}
-                {importStep === "categories" && "Spending tag review comes next."}
-                {importStep === "tags" && "Validation checks your CSV without writing data."}
-                {importStep === "review" && "Import writes valid rows only."}
-                {importStep === "done" && "You can start another import or close this dialog."}
-              </p>
-              <div className="grid gap-2 sm:flex sm:justify-end">
-                {importStep === "done" ? (
-                  <>
-                    <Button type="button" className="h-11 rounded-lg" onClick={closeImportDialog}>
-                      Done
-                    </Button>
-                    <Button type="button" variant="secondary" className="h-11 rounded-lg" onClick={resetImportState}>
-                      Import another CSV
-                    </Button>
-                  </>
-                ) : importStep === "review" ? (
-                  <Button
-                    type="button"
-                    className="h-11 rounded-lg"
-                    disabled={!canCommitImport || isImporting}
-                    onClick={() => void handleCommitImport()}
-                  >
-                    {isImporting ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Importing
-                      </>
-                    ) : (
-                      validationResult ? `Import ${plannedImportCount(validationResult).toLocaleString()} rows` : "Import valid rows"
-                    )}
-                  </Button>
-                ) : importStep === "tags" ? (
-                  <Button
-                    type="button"
-                    className="h-11 rounded-lg"
-                    disabled={!canValidateImport || isValidating || isImporting}
-                    onClick={() => void handleValidateImport()}
-                  >
-                    {isValidating ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Validating
-                      </>
-                    ) : (
-                      "Validate"
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    className="h-11 rounded-lg"
-                    disabled={
-                      (importStep === "upload" && !importPreview) ||
-                      (importStep === "map" && (!requiredMappingComplete || hasDuplicateMapping)) ||
-                      (importStep === "dates" && !dateSetupComplete) ||
-                      (importStep === "categories" && !categorySetupComplete) ||
-                      isPreviewing ||
-                      isValidating ||
-                      isImporting
-                    }
-                    onClick={goToNextImportStep}
-                  >
-                    Continue
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      </ResponsiveDialog>
 
       <AlertDialog open={!!rollbackTarget} onOpenChange={(open) => {
         if (!open && !rollingBackImportId) {
