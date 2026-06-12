@@ -403,6 +403,81 @@ export interface DashboardResponse {
   recent_transactions: Transaction[]
 }
 
+export type MonthOverviewStatus = "past" | "current" | "future"
+export type MonthOverviewCategoryStatus = "under" | "near" | "over"
+export type MonthOverviewStatusCardTone = "good" | "neutral" | "warning" | "danger"
+
+export interface MonthOverviewBudget {
+  monthly_income: string | null
+  resolved_effective_month: string | null
+  is_exact_match: boolean
+  has_budget: boolean
+}
+
+export interface MonthOverviewSummary {
+  total_spent: string
+  total_budget: string | null
+  left_this_month: string | null
+  percent_spent: string | null
+}
+
+export interface MonthOverviewMonthProgress {
+  status: MonthOverviewStatus
+  days_in_month: number
+  day_of_month: number
+  days_elapsed: number
+  days_remaining: number
+  percent_elapsed: string
+  daily_available_remaining: string | null
+  projected_month_end_spend: string | null
+}
+
+export interface MonthOverviewCategoryItem {
+  category: Category
+  budget_amount: string
+  actual_spend: string
+  remaining_amount: string
+  percent_used: string
+  status: MonthOverviewCategoryStatus
+}
+
+export interface MonthOverviewTag {
+  tag_id: string
+  tag_name: string
+  icon_key: string | null
+  spend: string
+  percent_of_monthly_spend: string
+}
+
+export interface MonthOverviewRecurringSummary {
+  committed_total: string
+  generated_total: string
+  upcoming_total: string
+  items_count: number
+  generated_count: number
+  upcoming_count: number
+}
+
+export interface MonthOverviewStatusCard {
+  id: string
+  tone: MonthOverviewStatusCardTone
+  title: string
+  value: string
+  detail: string
+}
+
+export interface MonthOverviewResponse {
+  month: string
+  budget: MonthOverviewBudget
+  summary: MonthOverviewSummary
+  month_progress: MonthOverviewMonthProgress
+  categories: MonthOverviewCategoryItem[]
+  tags: MonthOverviewTag[]
+  recurring: MonthOverviewRecurringSummary
+  recent_transactions: Transaction[]
+  status_cards: MonthOverviewStatusCard[]
+}
+
 export interface InsightsMonthlySpendPoint {
   month: string
   total_spend: string

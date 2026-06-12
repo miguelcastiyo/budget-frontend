@@ -32,6 +32,7 @@ import type {
   TagMetricsResponse,
   CategoryMetricsResponse,
   DashboardResponse,
+  MonthOverviewResponse,
   InsightsMetricsResponse,
   MasterApiKeyMetadata,
   CreateMasterApiKeyRequest,
@@ -61,6 +62,7 @@ import type {
 
 const API_BASE = "/api/v1"
 const CSRF_STORAGE_KEY = "budget.csrf_token"
+const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/
 
 class ApiClient {
   private csrfToken: string | null = null
@@ -455,6 +457,14 @@ class ApiClient {
 
   async getDashboard(month: string): Promise<DashboardResponse> {
     return this.request<DashboardResponse>(`/me/dashboard?month=${month}`)
+  }
+
+  async getMonthOverview(month: string): Promise<MonthOverviewResponse> {
+    if (!MONTH_KEY_PATTERN.test(month)) {
+      throw new Error("Month must use YYYY-MM format.")
+    }
+
+    return this.request<MonthOverviewResponse>(`/me/months/${encodeURIComponent(month)}/overview`)
   }
 
   async getInsightsMetrics(dateFrom: string, dateTo: string): Promise<InsightsMetricsResponse> {

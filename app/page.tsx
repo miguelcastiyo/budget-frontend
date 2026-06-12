@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { getCurrentMonthKey, getMonthDateRange, toIsoDate } from "@/lib/date-filters"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { CategoryCard } from "@/components/budget/category-card"
 import { TagBreakdown } from "@/components/budget/tag-breakdown"
 import { TransactionList } from "@/components/budget/transaction-list"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { CategoryMetricsResponse, TagMetricsResponse, Transaction } from "@/lib/api/types"
+import type { CategoryMetricsResponse, MonthOverviewResponse, TagMetricsResponse, Transaction } from "@/lib/api/types"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -38,29 +38,46 @@ function emptyTagMetrics(month: string): TagMetricsResponse {
   }
 }
 
-function getOverviewRecentDateRange(month: string, today = new Date()) {
-  const monthRange = getMonthDateRange(month)
-  if (!monthRange) {
-    return null
+function toCategoryMetrics(overview: MonthOverviewResponse | null, fallbackMonth: string): CategoryMetricsResponse {
+  if (!overview) {
+    return emptyCategoryMetrics(fallbackMonth)
   }
 
-  if (month === getCurrentMonthKey(today)) {
-    return {
-      date_from: monthRange.date_from,
-      date_to: toIsoDate(today),
-    }
+  return {
+    month: overview.month,
+    monthly_income: overview.budget.monthly_income ?? "0.00",
+    categories: overview.categories.map((category) => ({
+      category: category.category,
+      budget_amount: category.budget_amount,
+      actual_spend: category.actual_spend,
+      percent_used: category.percent_used,
+    })),
+  }
+}
+
+function toTagMetrics(overview: MonthOverviewResponse | null, fallbackMonth: string): TagMetricsResponse {
+  if (!overview) {
+    return emptyTagMetrics(fallbackMonth)
   }
 
-  return monthRange
+  return {
+    month: overview.month,
+    total_spend: overview.summary.total_spent,
+    tags: overview.tags.map((tag) => ({
+      tag_id: tag.tag_id,
+      tag_name: tag.tag_name,
+      icon_key: tag.icon_key,
+      spend: tag.spend,
+      percent_of_monthly_spend: tag.percent_of_monthly_spend,
+    })),
+  }
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
-  const [categoryMetrics, setCategoryMetrics] = useState<CategoryMetricsResponse>(emptyCategoryMetrics(currentMonth))
-  const [tagMetrics, setTagMetrics] = useState<TagMetricsResponse>(emptyTagMetrics(currentMonth))
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
+  const [overview, setOverview] = useState<MonthOverviewResponse | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,22 +88,8 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const recentDateRange = getOverviewRecentDateRange(currentMonth)
-      const [dashboard, recentTransactionsPage] = await Promise.all([
-        apiClient.getDashboard(currentMonth),
-        recentDateRange
-          ? apiClient.getTransactions({
-            ...recentDateRange,
-            page: 1,
-            page_size: 10,
-            sort: "date_desc",
-          })
-          : null,
-      ])
-
-      setCategoryMetrics(dashboard.category_metrics)
-      setTagMetrics(dashboard.tag_metrics)
-      setRecentTransactions(recentTransactionsPage?.items ?? dashboard.recent_transactions)
+      const nextOverview = await apiClient.getMonthOverview(currentMonth)
+      setOverview(nextOverview)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -101,6 +104,10 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadDashboardData()
   }, [loadDashboardData])
+
+  const categoryMetrics = toCategoryMetrics(overview, currentMonth)
+  const tagMetrics = toTagMetrics(overview, currentMonth)
+  const recentTransactions = overview?.recent_transactions ?? []
 
   const hasMonthTransactions =
     recentTransactions.length > 0 ||
