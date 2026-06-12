@@ -616,7 +616,7 @@ export function AddTransactionSheet({
                         value={expense}
                         onChange={(e) => setExpense(e.target.value)}
                         enterKeyHint={normalizedAmount && tagId ? "done" : "next"}
-                        className="relative z-10 h-12 rounded-xl border-border/60 bg-transparent focus:border-foreground/20 dark:bg-transparent"
+                        className="relative z-10 h-12 rounded-xl border-border/60 bg-transparent focus-visible:border-ring focus-visible:ring-0 dark:bg-transparent"
                         required
                       />
                       {expenseAutocompleteCompletion && (
