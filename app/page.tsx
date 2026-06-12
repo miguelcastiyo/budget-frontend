@@ -11,67 +11,12 @@ import { TagBreakdown } from "@/components/budget/tag-breakdown"
 import { TransactionList } from "@/components/budget/transaction-list"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { CategoryMetricsResponse, MonthOverviewResponse, TagMetricsResponse, Transaction } from "@/lib/api/types"
+import type { MonthOverviewResponse, Transaction } from "@/lib/api/types"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
-
-function emptyCategoryMetrics(month: string): CategoryMetricsResponse {
-  return {
-    month,
-    monthly_income: "0.00",
-    categories: [
-      { category: "needs", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
-      { category: "wants", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
-      { category: "savings", budget_amount: "0.00", actual_spend: "0.00", percent_used: "0.00" },
-    ],
-  }
-}
-
-function emptyTagMetrics(month: string): TagMetricsResponse {
-  return {
-    month,
-    total_spend: "0.00",
-    tags: [],
-  }
-}
-
-function toCategoryMetrics(overview: MonthOverviewResponse | null, fallbackMonth: string): CategoryMetricsResponse {
-  if (!overview) {
-    return emptyCategoryMetrics(fallbackMonth)
-  }
-
-  return {
-    month: overview.month,
-    monthly_income: overview.budget.monthly_income ?? "0.00",
-    categories: overview.categories.map((category) => ({
-      category: category.category,
-      budget_amount: category.budget_amount,
-      actual_spend: category.actual_spend,
-      percent_used: category.percent_used,
-    })),
-  }
-}
-
-function toTagMetrics(overview: MonthOverviewResponse | null, fallbackMonth: string): TagMetricsResponse {
-  if (!overview) {
-    return emptyTagMetrics(fallbackMonth)
-  }
-
-  return {
-    month: overview.month,
-    total_spend: overview.summary.total_spent,
-    tags: overview.tags.map((tag) => ({
-      tag_id: tag.tag_id,
-      tag_name: tag.tag_name,
-      icon_key: tag.icon_key,
-      spend: tag.spend,
-      percent_of_monthly_spend: tag.percent_of_monthly_spend,
-    })),
-  }
-}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -105,14 +50,14 @@ export default function DashboardPage() {
     void loadDashboardData()
   }, [loadDashboardData])
 
-  const categoryMetrics = toCategoryMetrics(overview, currentMonth)
-  const tagMetrics = toTagMetrics(overview, currentMonth)
+  const categories = overview?.categories ?? []
+  const tags = overview?.tags ?? []
   const recentTransactions = overview?.recent_transactions ?? []
 
   const hasMonthTransactions =
     recentTransactions.length > 0 ||
-    tagMetrics.tags.length > 0 ||
-    categoryMetrics.categories.some((category) => {
+    tags.length > 0 ||
+    categories.some((category) => {
       const amount = Number.parseFloat(category.actual_spend)
       return Number.isFinite(amount) && amount > 0
     })
@@ -157,11 +102,11 @@ export default function DashboardPage() {
 
         <div className="space-y-6 lg:space-y-8">
           <div>
-            <SpendingSummary metrics={categoryMetrics} />
+            <SpendingSummary categories={categories} />
           </div>
 
           <div className="grid grid-cols-3 gap-2 lg:gap-6">
-            {categoryMetrics.categories.map((cat) => (
+            {categories.map((cat) => (
               <CategoryCard
                 key={cat.category}
                 metrics={cat}
@@ -192,7 +137,7 @@ export default function DashboardPage() {
             <TabsContent value="tags" className="mt-0">
               <TagBreakdown
                 className="lg:h-[420px]"
-                metrics={tagMetrics}
+                tags={tags}
                 emptyTitle="No tag activity this month"
                 emptyDescription="Add a transaction to see category and tag patterns."
                 onEmptyAction={() => setShowAddTransaction(true)}

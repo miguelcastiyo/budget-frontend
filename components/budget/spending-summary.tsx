@@ -3,23 +3,23 @@
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/formatters"
-import type { CategoryMetricsResponse } from "@/lib/api/types"
+import type { MonthOverviewCategoryItem } from "@/lib/api/types"
 
 interface SpendingSummaryProps {
-  metrics: CategoryMetricsResponse
+  categories: MonthOverviewCategoryItem[]
 }
 
 function safeNumber(value: number): number {
   return Number.isFinite(value) ? value : 0
 }
 
-export function SpendingSummary({ metrics }: SpendingSummaryProps) {
+export function SpendingSummary({ categories }: SpendingSummaryProps) {
   const [isFlipped, setIsFlipped] = useState(false)
-  const totalSpent = metrics.categories.reduce(
+  const totalSpent = categories.reduce(
     (sum, cat) => sum + safeNumber(parseFloat(cat.actual_spend)),
     0
   )
-  const totalBudget = metrics.categories.reduce(
+  const totalBudget = categories.reduce(
     (sum, cat) => sum + safeNumber(parseFloat(cat.budget_amount)),
     0
   )
@@ -81,7 +81,7 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
                 {(() => {
                   let currentOffset = 0
 
-                  return metrics.categories.map((cat, index) => {
+                  return categories.map((cat, index) => {
                     const catSpend = safeNumber(parseFloat(cat.actual_spend))
                     const catBudget = safeNumber(parseFloat(cat.budget_amount))
                     const catPercentage = (catSpend / safeTotalBudget) * 100
@@ -130,7 +130,7 @@ export function SpendingSummary({ metrics }: SpendingSummaryProps) {
 
             {/* Legend */}
             <div className="flex items-center justify-center gap-5 mt-6">
-              {metrics.categories.map((cat) => {
+              {categories.map((cat) => {
                 const catSpend = safeNumber(parseFloat(cat.actual_spend))
                 const catBudget = safeNumber(parseFloat(cat.budget_amount))
                 const isCategoryOverBudget = catBudget > 0 && catSpend > catBudget

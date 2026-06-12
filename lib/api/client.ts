@@ -29,9 +29,6 @@ import type {
   TransactionSuggestionsResponse,
   CreateTransactionRequest,
   UpdateTransactionRequest,
-  TagMetricsResponse,
-  CategoryMetricsResponse,
-  DashboardResponse,
   MonthOverviewResponse,
   InsightsMetricsResponse,
   MasterApiKeyMetadata,
@@ -444,19 +441,6 @@ class ApiClient {
     return this.request<void>(`/me/transactions/${transactionId}`, {
       method: "DELETE",
     })
-  }
-
-  // Metrics
-  async getTagMetrics(month: string): Promise<TagMetricsResponse> {
-    return this.request<TagMetricsResponse>(`/me/metrics/tags?month=${month}`)
-  }
-
-  async getCategoryMetrics(month: string): Promise<CategoryMetricsResponse> {
-    return this.request<CategoryMetricsResponse>(`/me/metrics/categories?month=${month}`)
-  }
-
-  async getDashboard(month: string): Promise<DashboardResponse> {
-    return this.request<DashboardResponse>(`/me/dashboard?month=${month}`)
   }
 
   async getMonthOverview(month: string): Promise<MonthOverviewResponse> {

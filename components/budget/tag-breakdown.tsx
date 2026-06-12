@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type { TagMetricsResponse } from "@/lib/api/types"
+import type { MonthOverviewTag } from "@/lib/api/types"
 import { formatCurrency } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import { ChevronRight, ChevronsDown } from "lucide-react"
 
 interface TagBreakdownProps {
-  metrics: TagMetricsResponse
+  tags: MonthOverviewTag[]
   onTagClick?: (tagId: string) => void
   className?: string
   style?: CSSProperties
@@ -30,7 +30,7 @@ const tagColors = [
 ]
 
 export function TagBreakdown({
-  metrics,
+  tags,
   onTagClick,
   className,
   style,
@@ -41,8 +41,8 @@ export function TagBreakdown({
 }: TagBreakdownProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const [canScrollDown, setCanScrollDown] = useState(false)
-  const maxSpend = Math.max(1, ...metrics.tags.map(t => parseFloat(t.spend)))
-  const visibleTags = metrics.tags
+  const maxSpend = Math.max(1, ...tags.map(t => parseFloat(t.spend)))
+  const visibleTags = tags
 
   useEffect(() => {
     const node = listRef.current
@@ -68,7 +68,7 @@ export function TagBreakdown({
       observer.disconnect()
       window.removeEventListener("resize", updateScrollState)
     }
-  }, [metrics.tags.length])
+  }, [tags.length])
 
   const handleScrollHintClick = () => {
     const node = listRef.current

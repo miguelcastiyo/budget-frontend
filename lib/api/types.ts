@@ -368,41 +368,6 @@ export interface TransactionSuggestionsResponse {
   items: TransactionSuggestion[]
 }
 
-// Metrics
-export interface TagMetricsItem {
-  tag_id: string
-  tag_name: string
-  icon_key: string | null
-  spend: string
-  percent_of_monthly_spend: string
-}
-
-export interface TagMetricsResponse {
-  month: string
-  total_spend: string
-  tags: TagMetricsItem[]
-}
-
-export interface CategoryMetricsItem {
-  category: Category
-  budget_amount: string
-  actual_spend: string
-  percent_used: string
-}
-
-export interface CategoryMetricsResponse {
-  month: string
-  monthly_income: string
-  categories: CategoryMetricsItem[]
-}
-
-export interface DashboardResponse {
-  month: string
-  category_metrics: CategoryMetricsResponse
-  tag_metrics: TagMetricsResponse
-  recent_transactions: Transaction[]
-}
-
 export type MonthOverviewStatus = "past" | "current" | "future"
 export type MonthOverviewCategoryStatus = "under" | "near" | "over"
 export type MonthOverviewStatusCardTone = "good" | "neutral" | "warning" | "danger"
