@@ -215,6 +215,47 @@ export interface BudgetSettingsResolvedResponse {
   settings: BudgetSettings
 }
 
+export interface BudgetSettingsVersionsResponse {
+  items: BudgetSettingsVersionItem[]
+}
+
+export interface BudgetSettingsVersionItem {
+  effective_month: string
+  applies_from_month: string
+  applies_until_month: string | null
+
+  monthly_income: string
+  income_source_type: IncomeSourceType
+  primary_monthly_income: string | null
+  primary_hourly_rate: string | null
+  primary_weekly_hours: string | null
+
+  side_income_type: SideIncomeType
+  side_income_label: string | null
+  side_monthly_income: string | null
+  side_hourly_rate: string | null
+  side_weekly_hours: string | null
+
+  allocation_mode: AllocationMode
+
+  needs_percent: string | null
+  wants_percent: string | null
+  savings_percent: string | null
+
+  needs_amount: string | null
+  wants_amount: string | null
+  savings_amount: string | null
+
+  resolved_amounts: {
+    needs: string
+    wants: string
+    savings: string
+  }
+
+  created_at: string
+  updated_at: string
+}
+
 export interface BudgetSettingsIncomeInput {
   effective_month?: string
   monthly_income: string

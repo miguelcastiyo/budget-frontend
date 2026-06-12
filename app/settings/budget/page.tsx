@@ -9,9 +9,14 @@ import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { BudgetSettings, BudgetSettingsResolvedResponse } from "@/lib/api/types"
+import type {
+  BudgetSettings,
+  BudgetSettingsResolvedResponse,
+  BudgetSettingsVersionItem,
+} from "@/lib/api/types"
 import { formatMonthLabel, getCurrentMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
@@ -39,31 +44,75 @@ export default function BudgetSettingsPage() {
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey())
   const [budgetResolution, setBudgetResolution] = useState<BudgetSettingsResolvedResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [budgetVersions, setBudgetVersions] = useState<BudgetSettingsVersionItem[]>([])
+  const [isBudgetLoading, setIsBudgetLoading] = useState(true)
+  const [isVersionsLoading, setIsVersionsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [budgetError, setBudgetError] = useState<string | null>(null)
+  const [versionsError, setVersionsError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
   const [showBudgetEditor, setShowBudgetEditor] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+
     const loadBudgetSettings = async () => {
-      setIsLoading(true)
-      setError(null)
+      setIsBudgetLoading(true)
+      setIsVersionsLoading(true)
+      setBudgetError(null)
+      setVersionsError(null)
+      setSaveError(null)
       setSuccess(null)
       setBudgetResolution(null)
-      try {
-        const data = await apiClient.getBudgetSettings(selectedMonth)
-        setBudgetResolution(data)
-        hydrateForm(data.settings)
-      } catch (err) {
-        setError(err instanceof ApiError ? err.error.message : "Unable to load budget settings")
-      } finally {
-        setIsLoading(false)
+      setBudgetVersions([])
+      setIncomeForm(defaultIncomeFormState)
+      setAllocationForm(defaultBudgetAllocationFormState)
+      setLoadedPayloadKey(null)
+      const [budgetResult, versionsResult] = await Promise.allSettled([
+        apiClient.getBudgetSettings(selectedMonth),
+        apiClient.getBudgetSettingsVersions(),
+      ])
+
+      if (cancelled) {
+        return
       }
+
+      if (budgetResult.status === "fulfilled") {
+        setBudgetResolution(budgetResult.value)
+        hydrateForm(budgetResult.value.settings)
+      } else {
+        setBudgetError(
+          budgetResult.reason instanceof ApiError
+            ? budgetResult.reason.error.message
+            : "Unable to load budget settings"
+        )
+      }
+
+      if (versionsResult.status === "fulfilled") {
+        setBudgetVersions(versionsResult.value.items)
+      } else {
+        setVersionsError(
+          versionsResult.reason instanceof ApiError
+            ? versionsResult.reason.error.message
+            : "Unable to load budget versions"
+        )
+      }
+
+      if (cancelled) {
+        return
+      }
+
+      setIsBudgetLoading(false)
+      setIsVersionsLoading(false)
     }
 
     void loadBudgetSettings()
+
+    return () => {
+      cancelled = true
+    }
   }, [selectedMonth])
 
   const hydrateForm = (settings: BudgetSettings) => {
@@ -87,42 +136,41 @@ export default function BudgetSettingsPage() {
   const resolvedMonthLabel = budgetResolution?.resolved_effective_month
     ? formatMonthLabel(budgetResolution.resolved_effective_month) ?? budgetResolution.resolved_effective_month
     : null
-  const canSaveBudget = !isLoading && !isSaving && hasValidIncome && hasValidAllocation && (hasBudgetChanges || canCreateInheritedVersion)
+  const isLoading = isBudgetLoading
+  const canSaveBudget =
+    !isBudgetLoading &&
+    !isSaving &&
+    budgetResolution !== null &&
+    hasValidIncome &&
+    hasValidAllocation &&
+    (hasBudgetChanges || canCreateInheritedVersion)
   const saveLabel = isSaving
     ? "Saving..."
-    : !hasValidIncome || !hasValidAllocation
+    : budgetResolution === null
+      ? "Loading budget"
+      : !hasValidIncome || !hasValidAllocation
       ? "Fix issues before saving"
       : canCreateInheritedVersion
         ? `Save Budget Starting ${selectedMonthLabel}`
         : hasBudgetChanges
           ? `Update ${selectedMonthLabel} Budget`
         : "Saved"
-  const headerSubtitle = isLoading
-    ? "Loading settings"
-    : `${formatCurrency(income)}/month · ${selectedMonthLabel}`
-  const budgetStatusCopy = isLoading && budgetResolution === null
-    ? {
-        current: `Loading budget for ${selectedMonthLabel}.`,
-        consequence: "Targets will update after this month loads.",
-      }
-    : budgetResolution?.resolved_effective_month
-      ? budgetResolution.is_exact_match
-        ? {
-            current: `Editing your ${selectedMonthLabel} budget.`,
-            consequence: `Changes apply from ${selectedMonthLabel} forward until another budget starts.`,
-          }
-        : {
-            current: `Using your ${resolvedMonthLabel} budget.`,
-            consequence: `Saving changes will create a new budget starting ${selectedMonthLabel}.`,
-          }
-      : {
-          current: `No saved budget applies to ${selectedMonthLabel} yet.`,
-          consequence: `Saving will create a new budget starting ${selectedMonthLabel}.`,
-        }
+  const headerSubtitle = isBudgetLoading
+    ? "Loading selected month"
+    : budgetResolution === null
+      ? selectedMonthLabel
+      : `${formatCurrency(income)}/month · ${selectedMonthLabel}`
+  const budgetStatusCopy = getBudgetStatusCopy(
+    selectedMonthLabel,
+    resolvedMonthLabel,
+    budgetResolution,
+    isBudgetLoading,
+    budgetError
+  )
 
   const handleSave = async () => {
     setIsSaving(true)
-    setError(null)
+    setSaveError(null)
     setSuccess(null)
 
     try {
@@ -138,10 +186,21 @@ export default function BudgetSettingsPage() {
         is_exact_match: true,
         settings: response,
       })
+      try {
+        const versions = await apiClient.getBudgetSettingsVersions()
+        setBudgetVersions(versions.items)
+        setVersionsError(null)
+      } catch (versionsErr) {
+        setVersionsError(
+          versionsErr instanceof ApiError
+            ? versionsErr.error.message
+            : "Unable to refresh budget versions"
+        )
+      }
       setSuccess("Budget saved")
       setShowBudgetEditor(false)
     } catch (err) {
-      setError(err instanceof ApiError ? err.error.message : "Unable to save budget")
+      setSaveError(err instanceof ApiError ? err.error.message : "Unable to save budget")
     } finally {
       setIsSaving(false)
     }
@@ -230,7 +289,9 @@ export default function BudgetSettingsPage() {
 
       {/* Extra mobile bottom padding keeps the final card scrollable above the fixed nav and iOS home indicator. */}
       <main className="mx-auto max-w-lg space-y-3 px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-3 sm:space-y-4 sm:px-5 sm:pt-5 lg:max-w-6xl lg:px-8 lg:pb-0 lg:pt-8">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {budgetError && <p className="text-sm text-destructive">{budgetError}</p>}
+        {versionsError && <p className="text-sm text-muted-foreground">{versionsError}</p>}
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
 
         <section className="rounded-2xl border border-border/60 bg-card px-3 py-3 shadow-sm sm:p-5">
@@ -242,17 +303,35 @@ export default function BudgetSettingsPage() {
           <div className="space-y-3 sm:space-y-4">
             <BudgetSummaryCard
               income={income}
-              isLoading={isLoading}
+              isLoading={isBudgetLoading}
+              error={budgetError}
               onEdit={() => setShowBudgetEditor(true)}
             />
-            <BudgetAllocationCard allocationForm={allocationForm} income={income} />
+            <BudgetAllocationCard
+              allocationForm={allocationForm}
+              income={income}
+              isLoading={isBudgetLoading}
+              error={budgetError}
+            />
           </div>
 
           <aside className="space-y-4">
             <BudgetUsageCard />
-            <BudgetDetailsCard incomeForm={incomeForm} allocationForm={allocationForm} income={income} />
+            <BudgetDetailsCard
+              incomeForm={incomeForm}
+              allocationForm={allocationForm}
+              income={income}
+              isLoading={isBudgetLoading}
+              error={budgetError}
+            />
           </aside>
         </div>
+
+        <BudgetTimelineCard
+          items={budgetVersions}
+          isLoading={isVersionsLoading}
+          error={versionsError}
+        />
       </main>
 
       <ResponsiveDialog
@@ -299,13 +378,56 @@ function BudgetStatusCopy({
   )
 }
 
+function getBudgetStatusCopy(
+  selectedMonthLabel: string,
+  resolvedMonthLabel: string | null,
+  budgetResolution: BudgetSettingsResolvedResponse | null,
+  isBudgetLoading: boolean,
+  budgetError: string | null
+) {
+  if (budgetError) {
+    return {
+      current: "Unable to load the selected month.",
+      consequence: "Choose another month or try again after the request succeeds.",
+    }
+  }
+
+  if (isBudgetLoading && budgetResolution === null) {
+    return {
+      current: `Loading budget for ${selectedMonthLabel}.`,
+      consequence: "Targets will update after this month loads.",
+    }
+  }
+
+  if (budgetResolution?.resolved_effective_month) {
+    if (budgetResolution.is_exact_match) {
+      return {
+        current: `This is an exact budget for ${selectedMonthLabel}.`,
+        consequence: `Saving keeps this month's budget in place unless you change the month.`,
+      }
+    }
+
+    return {
+      current: `This month is using the budget from ${resolvedMonthLabel ?? selectedMonthLabel}.`,
+      consequence: `Saving changes will create a new budget starting ${selectedMonthLabel}.`,
+    }
+  }
+
+  return {
+    current: "No budget has been created for this month yet.",
+    consequence: `Saving will create a new budget starting ${selectedMonthLabel}.`,
+  }
+}
+
 function BudgetSummaryCard({
   income,
   isLoading,
+  error,
   onEdit,
 }: {
   income: number
   isLoading: boolean
+  error: string | null
   onEdit: () => void
 }) {
   return (
@@ -314,17 +436,21 @@ function BudgetSummaryCard({
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">Monthly budget basis</p>
           <p className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-            {isLoading ? "--" : formatCurrency(income)}
-            {!isLoading && <span className="text-base font-medium text-muted-foreground"> / month</span>}
+            {isLoading || error ? "--" : formatCurrency(income)}
+            {!isLoading && error === null && <span className="text-base font-medium text-muted-foreground"> / month</span>}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">Used by dashboard targets and insights.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {error
+              ? "This month could not be loaded."
+              : "Used by dashboard targets and insights."}
+          </p>
         </div>
         <Button
           variant="ghost"
           size="icon"
           className="-mr-2 -mt-2 rounded-full text-muted-foreground hover:text-foreground"
           onClick={onEdit}
-          disabled={isLoading}
+          disabled={isLoading || error !== null}
           aria-label="Edit budget"
         >
           <Pencil className="h-4 w-4" />
@@ -337,9 +463,13 @@ function BudgetSummaryCard({
 function BudgetAllocationCard({
   allocationForm,
   income,
+  isLoading,
+  error,
 }: {
   allocationForm: BudgetAllocationFormState
   income: number
+  isLoading: boolean
+  error: string | null
 }) {
   return (
     <Card className="border-0 p-4 shadow-sm sm:p-5">
@@ -347,7 +477,13 @@ function BudgetAllocationCard({
         <h2 className="font-semibold">Budget allocation</h2>
         <p className="mt-1 text-sm text-muted-foreground">Category targets for the selected budget basis.</p>
       </div>
-      <BudgetAllocationSummary allocationForm={allocationForm} income={income} />
+      {error ? (
+        <p className="text-sm text-muted-foreground">Budget details are unavailable until the selected month loads.</p>
+      ) : isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading allocation targets.</p>
+      ) : (
+        <BudgetAllocationSummary allocationForm={allocationForm} income={income} />
+      )}
     </Card>
   )
 }
@@ -367,10 +503,14 @@ function BudgetDetailsCard({
   incomeForm,
   allocationForm,
   income,
+  isLoading,
+  error,
 }: {
   incomeForm: IncomeFormState
   allocationForm: BudgetAllocationFormState
   income: number
+  isLoading: boolean
+  error: string | null
 }) {
   const primaryIncome = incomeForm.incomeSourceType === "monthly"
     ? asNumber(incomeForm.primaryMonthlyIncome)
@@ -383,14 +523,107 @@ function BudgetDetailsCard({
   return (
     <Card className="border-0 p-5 shadow-sm">
       <h2 className="text-sm font-semibold">Budget details</h2>
-      <div className="mt-4 space-y-3 text-sm">
-        <DetailRow label="Budget basis" value={incomeForm.incomeSourceType === "monthly" ? "Monthly" : "Hourly"} />
-        <DetailRow label="Main income" value={formatCurrency(primaryIncome)} />
-        <DetailRow label="Extra income" value={incomeForm.sideIncomeType === "none" ? "None" : formatCurrency(extraIncome)} />
-        <DetailRow label="Allocation" value={allocationDetail} />
-      </div>
+      {error ? (
+        <p className="mt-4 text-sm text-muted-foreground">Load the selected month to view budget details.</p>
+      ) : isLoading ? (
+        <p className="mt-4 text-sm text-muted-foreground">Loading budget details.</p>
+      ) : (
+        <div className="mt-4 space-y-3 text-sm">
+          <DetailRow label="Budget basis" value={incomeForm.incomeSourceType === "monthly" ? "Monthly" : "Hourly"} />
+          <DetailRow label="Main income" value={formatCurrency(primaryIncome)} />
+          <DetailRow label="Extra income" value={incomeForm.sideIncomeType === "none" ? "None" : formatCurrency(extraIncome)} />
+          <DetailRow label="Allocation" value={allocationDetail} />
+        </div>
+      )}
     </Card>
   )
+}
+
+function BudgetTimelineCard({
+  items,
+  isLoading,
+  error,
+}: {
+  items: BudgetSettingsVersionItem[]
+  isLoading: boolean
+  error: string | null
+}) {
+  return (
+    <Card className="border-0 p-4 shadow-sm sm:p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="font-semibold">Budget timeline</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Read-only history of budget versions and the months they cover.
+          </p>
+        </div>
+        <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
+          {isLoading ? "Loading" : `${items.length} versions`}
+        </Badge>
+      </div>
+
+      {error ? (
+        <p className="mt-4 text-sm text-muted-foreground">The timeline could not be loaded.</p>
+      ) : isLoading ? (
+        <p className="mt-4 text-sm text-muted-foreground">Loading budget versions.</p>
+      ) : items.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No budget versions have been created yet.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.map((item) => (
+            <BudgetTimelineItem key={`${item.effective_month}-${item.created_at}`} item={item} />
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function BudgetTimelineItem({ item }: { item: BudgetSettingsVersionItem }) {
+  const effectiveMonthLabel = formatMonthLabel(item.effective_month) ?? item.effective_month
+  const rangeLabel = formatBudgetVersionRange(item.applies_from_month, item.applies_until_month)
+  const allocationLabel = item.allocation_mode === "percent" ? "Percent" : "Amount"
+  const percentSplit =
+    item.allocation_mode === "percent" && item.needs_percent && item.wants_percent && item.savings_percent
+      ? `${Number(item.needs_percent).toFixed(0)} / ${Number(item.wants_percent).toFixed(0)} / ${Number(item.savings_percent).toFixed(0)}`
+      : null
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{effectiveMonthLabel}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
+        </div>
+        <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
+          {allocationLabel}
+        </Badge>
+      </div>
+
+      <div className="mt-3 space-y-2 text-sm">
+        <p className="text-muted-foreground">Income: {formatCurrency(item.monthly_income)}</p>
+        <p className="font-medium">
+          Needs {formatCurrency(item.resolved_amounts.needs)} · Wants {formatCurrency(item.resolved_amounts.wants)} · Savings{" "}
+          {formatCurrency(item.resolved_amounts.savings)}
+        </p>
+        {percentSplit && <p className="text-muted-foreground">Percent split: {percentSplit}</p>}
+      </div>
+    </div>
+  )
+}
+
+function formatBudgetVersionRange(appliesFromMonth: string, appliesUntilMonth: string | null) {
+  const fromLabel = formatMonthLabel(appliesFromMonth) ?? appliesFromMonth
+  if (appliesUntilMonth === null) {
+    return `${fromLabel} - Present`
+  }
+
+  const untilLabel = formatMonthLabel(appliesUntilMonth) ?? appliesUntilMonth
+  if (appliesFromMonth === appliesUntilMonth) {
+    return `Applies ${fromLabel} only`
+  }
+
+  return `${fromLabel} - ${untilLabel}`
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
