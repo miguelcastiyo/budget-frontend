@@ -136,6 +136,11 @@ export default function BudgetSettingsPage() {
   const resolvedMonthLabel = budgetResolution?.resolved_effective_month
     ? formatMonthLabel(budgetResolution.resolved_effective_month) ?? budgetResolution.resolved_effective_month
     : null
+  const nextVersion = getNextVersionAfterMonth(budgetVersions, selectedMonth)
+  const nextVersionLabel = nextVersion ? formatMonthLabel(nextVersion.effective_month) ?? nextVersion.effective_month : null
+  const selectedVersion = budgetResolution
+    ? budgetVersions.find((version) => versionAppliesToMonth(version, selectedMonth)) ?? null
+    : null
   const isLoading = isBudgetLoading
   const canSaveBudget =
     !isBudgetLoading &&
@@ -151,7 +156,9 @@ export default function BudgetSettingsPage() {
       : !hasValidIncome || !hasValidAllocation
       ? "Fix issues before saving"
       : canCreateInheritedVersion
-        ? `Save Budget Starting ${selectedMonthLabel}`
+        ? hasBudgetChanges
+          ? `Save Budget Starting ${selectedMonthLabel}`
+          : `Create ${selectedMonthLabel} Budget`
         : hasBudgetChanges
           ? `Update ${selectedMonthLabel} Budget`
         : "Saved"
@@ -165,8 +172,14 @@ export default function BudgetSettingsPage() {
     resolvedMonthLabel,
     budgetResolution,
     isBudgetLoading,
-    budgetError
+    budgetError,
+    nextVersionLabel
   )
+  const budgetUsageCopy = getBudgetUsageCopy({
+    selectedMonthLabel,
+    budgetResolution,
+    nextVersionLabel,
+  })
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -316,7 +329,7 @@ export default function BudgetSettingsPage() {
           </div>
 
           <aside className="space-y-4">
-            <BudgetUsageCard />
+            <BudgetUsageCard copy={budgetUsageCopy} />
             <BudgetDetailsCard
               incomeForm={incomeForm}
               allocationForm={allocationForm}
@@ -331,6 +344,8 @@ export default function BudgetSettingsPage() {
           items={budgetVersions}
           isLoading={isVersionsLoading}
           error={versionsError}
+          selectedMonthLabel={selectedMonthLabel}
+          selectedVersionId={selectedVersion?.effective_month ?? null}
         />
       </main>
 
@@ -383,7 +398,8 @@ function getBudgetStatusCopy(
   resolvedMonthLabel: string | null,
   budgetResolution: BudgetSettingsResolvedResponse | null,
   isBudgetLoading: boolean,
-  budgetError: string | null
+  budgetError: string | null,
+  nextVersionLabel: string | null
 ) {
   if (budgetError) {
     return {
@@ -403,20 +419,46 @@ function getBudgetStatusCopy(
     if (budgetResolution.is_exact_match) {
       return {
         current: `This is an exact budget for ${selectedMonthLabel}.`,
-        consequence: `Saving keeps this month's budget in place unless you change the month.`,
+        consequence: `Editing this budget will update the ${selectedMonthLabel} version.`,
       }
     }
 
     return {
       current: `This month is using the budget from ${resolvedMonthLabel ?? selectedMonthLabel}.`,
-      consequence: `Saving changes will create a new budget starting ${selectedMonthLabel}.`,
+      consequence: nextVersionLabel
+        ? `Editing this month will create a budget for ${selectedMonthLabel} through the month before ${nextVersionLabel}.`
+        : `Editing this month will create a new budget starting ${selectedMonthLabel}.`,
     }
   }
 
   return {
     current: "No budget has been created for this month yet.",
-    consequence: `Saving will create a new budget starting ${selectedMonthLabel}.`,
+    consequence: `Editing this month will create a new budget starting ${selectedMonthLabel}.`,
   }
+}
+
+function getBudgetUsageCopy({
+  selectedMonthLabel,
+  budgetResolution,
+  nextVersionLabel,
+}: {
+  selectedMonthLabel: string
+  budgetResolution: BudgetSettingsResolvedResponse | null
+  nextVersionLabel: string | null
+}) {
+  if (!budgetResolution) {
+    return "Load the selected month to see how this budget is used."
+  }
+
+  if (budgetResolution.is_exact_match) {
+    return "This budget powers dashboard targets, spending progress, and insights for months that use this version."
+  }
+
+  if (nextVersionLabel) {
+    return `Editing ${selectedMonthLabel} will apply through ${selectedMonthLabel} because another budget starts in ${nextVersionLabel}.`
+  }
+
+  return "Editing this month creates a new budget from the selected month forward."
 }
 
 function BudgetSummaryCard({
@@ -488,13 +530,11 @@ function BudgetAllocationCard({
   )
 }
 
-function BudgetUsageCard() {
+function BudgetUsageCard({ copy }: { copy: string }) {
   return (
     <Card className="border-0 p-5 shadow-sm">
       <h2 className="text-sm font-semibold">How this budget is used</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Your monthly budget powers dashboard targets, spending progress, and insights. Changes apply from the selected month forward until another budget starts.
-      </p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{copy}</p>
     </Card>
   )
 }
@@ -543,11 +583,17 @@ function BudgetTimelineCard({
   items,
   isLoading,
   error,
+  selectedMonthLabel,
+  selectedVersionId,
 }: {
   items: BudgetSettingsVersionItem[]
   isLoading: boolean
   error: string | null
+  selectedMonthLabel: string
+  selectedVersionId: string | null
 }) {
+  const versionCountLabel = items.length === 1 ? "1 VERSION" : `${items.length} VERSIONS`
+
   return (
     <Card className="border-0 p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-4">
@@ -558,7 +604,7 @@ function BudgetTimelineCard({
           </p>
         </div>
         <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
-          {isLoading ? "Loading" : `${items.length} versions`}
+          {isLoading ? "Loading" : versionCountLabel}
         </Badge>
       </div>
 
@@ -571,7 +617,12 @@ function BudgetTimelineCard({
       ) : (
         <div className="mt-4 space-y-3">
           {items.map((item) => (
-            <BudgetTimelineItem key={`${item.effective_month}-${item.created_at}`} item={item} />
+            <BudgetTimelineItem
+              key={`${item.effective_month}-${item.created_at}`}
+              item={item}
+              selectedMonthLabel={selectedMonthLabel}
+              isAppliedToSelectedMonth={selectedVersionId === item.effective_month}
+            />
           ))}
         </div>
       )}
@@ -579,7 +630,15 @@ function BudgetTimelineCard({
   )
 }
 
-function BudgetTimelineItem({ item }: { item: BudgetSettingsVersionItem }) {
+function BudgetTimelineItem({
+  item,
+  selectedMonthLabel,
+  isAppliedToSelectedMonth,
+}: {
+  item: BudgetSettingsVersionItem
+  selectedMonthLabel: string
+  isAppliedToSelectedMonth: boolean
+}) {
   const effectiveMonthLabel = formatMonthLabel(item.effective_month) ?? item.effective_month
   const rangeLabel = formatBudgetVersionRange(item.applies_from_month, item.applies_until_month)
   const allocationLabel = item.allocation_mode === "percent" ? "Percent" : "Amount"
@@ -595,9 +654,16 @@ function BudgetTimelineItem({ item }: { item: BudgetSettingsVersionItem }) {
           <p className="text-sm font-semibold text-foreground">{effectiveMonthLabel}</p>
           <p className="mt-1 text-xs text-muted-foreground">{rangeLabel}</p>
         </div>
-        <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
-          {allocationLabel}
-        </Badge>
+        <div className="flex flex-wrap justify-end gap-2">
+          {isAppliedToSelectedMonth && (
+            <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
+              Applied to {selectedMonthLabel}
+            </Badge>
+          )}
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
+            {allocationLabel}
+          </Badge>
+        </div>
       </div>
 
       <div className="mt-3 space-y-2 text-sm">
@@ -620,10 +686,28 @@ function formatBudgetVersionRange(appliesFromMonth: string, appliesUntilMonth: s
 
   const untilLabel = formatMonthLabel(appliesUntilMonth) ?? appliesUntilMonth
   if (appliesFromMonth === appliesUntilMonth) {
-    return `Applies ${fromLabel} only`
+    return `${fromLabel} only`
   }
 
   return `${fromLabel} - ${untilLabel}`
+}
+
+function versionAppliesToMonth(version: BudgetSettingsVersionItem, selectedMonth: string): boolean {
+  return (
+    version.applies_from_month <= selectedMonth &&
+    (version.applies_until_month === null || selectedMonth <= version.applies_until_month)
+  )
+}
+
+function getNextVersionAfterMonth(
+  versions: BudgetSettingsVersionItem[],
+  selectedMonth: string
+): BudgetSettingsVersionItem | null {
+  return (
+    [...versions]
+      .filter((version) => version.effective_month > selectedMonth)
+      .sort((a, b) => a.effective_month.localeCompare(b.effective_month))[0] ?? null
+  )
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

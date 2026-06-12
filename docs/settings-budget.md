@@ -19,7 +19,9 @@ The Settings -> Budget page manages the monthly budget basis and category alloca
 - Exact month copy uses: `This is an exact budget for [month].`
 - Inherited month copy uses: `This month is using the budget from [month].`
 - Empty-month copy uses: `No budget has been created for this month yet.`
+- The selected-month copy now also explains the save impact, including when the edit will update an exact version, create a new version that ends before the next one, or create a new version starting the selected month.
 - The page includes a read-only Budget Timeline section that lists version history, apply ranges, income, allocation mode, and resolved category amounts.
+- The active timeline version is marked with an `Applied to [month]` badge so the current version is easy to spot.
 - The page avoids user-facing technical terms such as version, resolver, and effective date in the primary copy, but the timeline section is intentionally more explicit because it explains how month resolution works.
 - Mobile adds extra safe-area-aware bottom padding so the allocation card can scroll fully above the fixed bottom navigation and iOS home indicator.
 
@@ -49,6 +51,7 @@ The page now uses `GET /me/budget-settings?month=YYYY-MM` for selected-month res
 - Existing calculation logic and API payload behavior were preserved.
 - Month-aware API metadata is used to distinguish inherited budgets from exact month matches.
 - The read-only budget timeline uses backend-resolved amounts instead of recalculating category totals on the client.
+- Timeline cards use the selected month badge to connect the top summary to the active budget version.
 - The mobile allocation summary keeps the allocation bar, then switches the three targets into stacked label/value rows to avoid cramped cards on narrow screens.
 - The visual direction remains a modern financial notebook: calm surfaces, compact settings-style hierarchy, subtle borders, and restrained copy.
 
@@ -73,8 +76,10 @@ The page now uses `GET /me/budget-settings?month=YYYY-MM` for selected-month res
 - Save changes.
 - Change the selected month and confirm inherited/exact budget copy updates.
 - Confirm the selected-month status copy uses the exact, inherited, and empty-month phrasing above.
+- Confirm the selected-month save-impact copy matches whether the month is exact or inherited and whether a future version exists.
 - Confirm the Budget Timeline loads independently from the selected month resolution.
 - Confirm the Budget Timeline shows the correct apply range and resolved amounts.
+- Confirm the active timeline version gets an `Applied to [month]` badge.
 - Confirm a timeline failure still leaves the selected budget view usable.
 - Save an inherited month and confirm the CTA includes the selected month.
 - Cancel without saving.
