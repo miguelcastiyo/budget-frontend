@@ -1,7 +1,7 @@
 # Settings: Recurring
 
 Status: Current  
-Last reviewed: 2026-06-09
+Last reviewed: 2026-06-13
 
 The Settings -> Recurring page manages monthly recurring expense items.
 
@@ -15,9 +15,11 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Recurring-specific details stay visible as compact chips: tag, card when available, billing schedule, and active/inactive status.
 - The list can be sorted locally by newest or oldest projected date without changing backend behavior.
 - Tapping or clicking a recurring row opens a detail sheet, matching the transaction row interaction pattern.
-- Edit and Delete actions live in the detail sheet; Delete still confirms before mutating data.
+- Detail now uses the shared `ResponsiveDialog` shell so the read-only tray matches create/edit behavior on mobile and desktop.
+- Edit and Delete actions live in the detail tray; Delete still confirms before mutating data.
 - New and edit use the existing mobile tray / desktop modal pattern, grouped into Expense, Schedule, and Status sections.
 - New and edit use the shared `ResponsiveDialog` shell for mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, and scroll containment.
+- Delete confirmation now uses the shared `ResponsiveConfirmDialog` shell so destructive confirmation matches the rest of Settings.
 - The recurring form intentionally mirrors the money-entry pattern from Add Transaction: Amount, Description, Classification, Timing, Submit.
 - Amount entry is shared with Add Transaction through the same digit-buffered `AmountInput` behavior, including paste handling, keyboard handling, large display sizing, and select-all replacement.
 - The top half of the recurring form follows Amount -> Description -> Tag -> Category -> Card, then schedule-specific fields appear separately.
@@ -56,7 +58,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Open the month picker, change the year, choose a month, and use Current month.
 - Tap a recurring row and confirm the detail sheet opens and closes.
 - Edit an existing item from the detail sheet.
-- Delete an existing item from the detail sheet and confirmation dialog.
+- Delete an existing item from the detail tray and confirmation tray.
 - Focus Amount and confirm the input remains reachable with the software keyboard open.
 - Focus Description and confirm the input remains reachable with the software keyboard open.
 - Select a tag chip and confirm the horizontal rail remains readable.

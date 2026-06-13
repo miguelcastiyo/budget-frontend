@@ -5,28 +5,12 @@ import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
+import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { Label } from "@/components/ui/label"
 import type { MasterApiKeyMetadata } from "@/lib/api/types"
 import { ArrowLeft, Plus, Key, Trash2, Copy, Check, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
 
 function formatDate(dateStr: string | null): string {
@@ -228,117 +212,115 @@ export default function ApiKeysSettingsPage() {
         )}
       </main>
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Create API Key</DialogTitle>
-            <DialogDescription>
-              Give your API key a name to help you identify it later.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="keyName">Name</Label>
-              <Input
-                id="keyName"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="e.g., Development Key"
-                className="h-12 rounded-xl"
-              />
-            </div>
-          </div>
-          <DialogFooter>
+      <ResponsiveDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        title="Create API Key"
+        description="Give your API key a name to help you identify it later."
+        desktopClassName="sm:w-[min(calc(100dvw-2rem),32rem)] sm:max-w-[32rem]"
+        headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
+        bodyClassName="space-y-4 px-5 py-5 sm:px-6"
+        footerClassName="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-4"
+        footer={
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               onClick={() => setShowCreateDialog(false)}
-              className="rounded-xl"
+              className="h-12 rounded-xl px-4"
             >
               Cancel
             </Button>
             <Button
+              type="button"
               onClick={() => void handleCreateKey()}
               disabled={!newKeyName.trim() || isMutating}
-              className="rounded-xl"
+              className="h-12 rounded-xl"
             >
-              Create Key
+              {isMutating ? "Creating..." : "Create Key"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showNewKeyDialog} onOpenChange={(open) => {
-        if (!open) {
-          setShowNewKeyDialog(false)
-          setCreatedKey(null)
-          setShowKey(false)
-        }
-      }}>
-        <DialogContent className="rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>API Key Created</DialogTitle>
-            <DialogDescription>
-              Copy your API key now. You will not be able to see it again.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="flex items-center gap-2 p-3 bg-secondary rounded-xl">
-              <code className="flex-1 text-sm font-mono break-all">
-                {showKey ? createdKey : createdKey?.replace(/./g, "•")}
-              </code>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="rounded-full flex-shrink-0"
-                onClick={() => setShowKey(!showKey)}
-              >
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="rounded-full flex-shrink-0"
-                onClick={() => void handleCopyKey()}
-              >
-                {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-              </Button>
-            </div>
           </div>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                setShowNewKeyDialog(false)
-                setCreatedKey(null)
-                setShowKey(false)
-              }}
-              className="rounded-xl w-full"
-            >
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <div className="space-y-2">
+          <Label htmlFor="keyName">Name</Label>
+          <Input
+            id="keyName"
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            placeholder="e.g., Development Key"
+            className="h-12 rounded-xl"
+          />
+        </div>
+      </ResponsiveDialog>
 
-      <AlertDialog open={!!deleteKeyId} onOpenChange={(open) => !open && setDeleteKeyId(null)}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke API Key?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently revoke this API key. Any applications using this key will no longer be able to authenticate.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleDeleteKey()}
-              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isMutating}
-            >
-              Revoke Key
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResponsiveDialog
+        open={showNewKeyDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowNewKeyDialog(false)
+            setCreatedKey(null)
+            setShowKey(false)
+          }
+        }}
+        title="API Key Created"
+        description="Copy your API key now. You will not be able to see it again."
+        desktopClassName="sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem]"
+        headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
+        bodyClassName="px-5 py-5 sm:px-6"
+        footerClassName="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-4"
+        footer={
+          <Button
+            type="button"
+            onClick={() => {
+              setShowNewKeyDialog(false)
+              setCreatedKey(null)
+              setShowKey(false)
+            }}
+            className="h-12 w-full rounded-xl"
+          >
+            Done
+          </Button>
+        }
+      >
+        <div className="flex items-center gap-2 rounded-xl bg-secondary p-3">
+          <code className="flex-1 break-all text-sm font-mono">
+            {showKey ? createdKey : createdKey?.replace(/./g, "•")}
+          </code>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="rounded-full flex-shrink-0"
+            onClick={() => setShowKey(!showKey)}
+          >
+            {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="rounded-full flex-shrink-0"
+            onClick={() => void handleCopyKey()}
+          >
+            {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+          </Button>
+        </div>
+      </ResponsiveDialog>
+
+      <ResponsiveConfirmDialog
+        open={!!deleteKeyId}
+        onOpenChange={(open) => {
+          if (!open && !isMutating) {
+            setDeleteKeyId(null)
+          }
+        }}
+        title="Revoke API Key?"
+        description="This will permanently revoke this API key. Any applications using this key will no longer be able to authenticate."
+        confirmLabel={isMutating ? "Revoking..." : "Revoke Key"}
+        confirmVariant="destructive"
+        confirmDisabled={isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleDeleteKey()}
+      />
 
       <BottomNav />
     </div>

@@ -5,19 +5,10 @@ import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import type { Card as CardType } from "@/lib/api/types"
 import { ArrowLeft, Check, CreditCard, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
 import Link from "next/link"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -369,26 +360,21 @@ export default function CardsSettingsPage() {
         </Card>
       </main>
 
-      <AlertDialog open={!!deleteCardId} onOpenChange={(open) => !open && setDeleteCardId(null)}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove card?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the card from your available card list. Existing transactions that already use this card will not be changed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleDeleteCard()}
-              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isMutating}
-            >
-              Remove card
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResponsiveConfirmDialog
+        open={!!deleteCardId}
+        onOpenChange={(open) => {
+          if (!open && !isMutating) {
+            setDeleteCardId(null)
+          }
+        }}
+        title="Remove card?"
+        description="This removes the card from your available card list. Existing transactions that already use this card will not be changed."
+        confirmLabel={isMutating ? "Removing..." : "Remove card"}
+        confirmVariant="destructive"
+        confirmDisabled={isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleDeleteCard()}
+      />
 
       <BottomNav />
     </div>

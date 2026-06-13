@@ -1,20 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { ArrowLeft, CalendarIcon, CheckCircle, Clock, Mail, Plus, Shield, UserPlus, X, XCircle } from "lucide-react"
+import { ArrowLeft, CalendarIcon, CheckCircle, Clock, Mail, Plus, Shield, UserPlus, XCircle } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -22,9 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { CreateInviteRequest, InviteResponse } from "@/lib/api/types"
-import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 
 type InviteRole = CreateInviteRequest["role"]
 type InviteStatusFilter = "all" | InviteResponse["status"]
@@ -115,7 +108,6 @@ export default function InvitesSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const createDialogScrollRef = useRef<HTMLDivElement>(null)
 
   const isOwner = profile?.role === "owner"
 
@@ -202,11 +194,6 @@ export default function InvitesSettingsPage() {
     setShowCreateDialog(false)
     resetForm()
   }
-  const createDialogSwipeDismiss = useSwipeDismiss({
-    open: showCreateDialog,
-    onDismiss: closeCreateDialog,
-    scrollRef: createDialogScrollRef,
-  })
 
   const selectedExpiryDate = parseLocalDateTime(expiresAt)
   const selectedExpiryTime = expiresAt.slice(11, 16) || "17:00"
@@ -378,7 +365,7 @@ export default function InvitesSettingsPage() {
         )}
       </main>
 
-      <Dialog
+      <ResponsiveDialog
         open={showCreateDialog}
         onOpenChange={(open) => {
           if (open) {
@@ -387,197 +374,168 @@ export default function InvitesSettingsPage() {
             closeCreateDialog()
           }
         }}
+        title="Create Invite"
+        description={`${role === "admin" ? "Admin access" : "Member access"} · Expires ${selectedExpiryDate ? format(selectedExpiryDate, "MMM d, h:mm a") : "not set"}`}
+        desktopClassName="sm:w-[min(calc(100dvw-2rem),38rem)] sm:max-w-[38rem]"
+        headerClassName="px-4 pb-3 pt-2 sm:px-6 sm:py-4"
+        bodyClassName="px-4 py-4 sm:px-6 sm:py-5"
+        footerClassName="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-6 sm:pt-4"
+        footer={
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={closeCreateDialog}
+              className="h-12 rounded-xl px-4"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!canCreate || isMutating}
+              className="h-12 rounded-xl text-base font-semibold"
+              onClick={() => void handleCreateInvite()}
+            >
+              {isMutating ? "Sending..." : "Send Invite"}
+            </Button>
+          </div>
+        }
       >
-        <DialogContent
-          {...createDialogSwipeDismiss}
-          showCloseButton={false}
-          className={cn(
-            "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:w-[min(calc(100dvw-2rem),38rem)] sm:max-w-[38rem] sm:rounded-2xl sm:border",
-            mobileDrawerDialogClassName
-          )}
-        >
-          <form
-            className="flex min-h-0 flex-1 flex-col"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void handleCreateInvite()
-            }}
-          >
-            <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
-              <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <DialogTitle className="truncate text-lg font-semibold sm:text-xl">Create Invite</DialogTitle>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {role === "admin" ? "Admin access" : "Member access"} · Expires {selectedExpiryDate ? format(selectedExpiryDate, "MMM d, h:mm a") : "not set"}
-                  </p>
-                </div>
-                <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
-                </DialogClose>
-              </div>
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="inviteeName">Name</Label>
+              <Input
+                id="inviteeName"
+                value={inviteeName}
+                onChange={(event) => setInviteeName(event.target.value)}
+                placeholder="Alex Morgan"
+                className="h-12 rounded-xl"
+              />
             </div>
-
-            <div ref={createDialogScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-              <div className="space-y-5">
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="inviteeName">Name</Label>
-                    <Input
-                      id="inviteeName"
-                      value={inviteeName}
-                      onChange={(event) => setInviteeName(event.target.value)}
-                      placeholder="Alex Morgan"
-                      className="h-12 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="inviteEmail">Email</Label>
-                    <Input
-                      id="inviteEmail"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="alex@example.com"
-                      className="h-12 rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["member", "admin"] as const).map((roleOption) => (
-                      <button
-                        key={roleOption}
-                        type="button"
-                        onClick={() => setRole(roleOption)}
-                        className={cn(
-                          "h-11 rounded-xl text-sm font-medium capitalize transition-colors",
-                          role === roleOption
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "bg-muted/60 text-foreground hover:bg-muted"
-                        )}
-                      >
-                        {roleOption}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label>Expiration</Label>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {selectedExpiryDate ? format(selectedExpiryDate, "EEE, MMM d · h:mm a") : "Select expiry"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {EXPIRY_PRESETS.map((preset) => (
-                      <Button
-                        key={preset.days}
-                        type="button"
-                        variant="secondary"
-                        className="h-10 rounded-xl px-2 text-sm"
-                        onClick={() => setExpiresAt(dateTimeLocalDaysFromNow(preset.days))}
-                      >
-                        {preset.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-11 min-w-0 justify-start rounded-xl border-border/60 px-3 font-normal hover:border-foreground/20"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">
-                            {selectedExpiryDate ? format(selectedExpiryDate, "MMMM d, yyyy") : "Pick date"}
-                          </span>
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedExpiryDate ?? undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              updateExpiryDate(date)
-                            }
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <div className="grid grid-cols-3 gap-2">
-                      {EXPIRY_TIME_OPTIONS.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => updateExpiryTime(option.value)}
-                          className={cn(
-                            "h-11 rounded-xl px-3 text-sm font-medium transition-colors",
-                            selectedExpiryTime === option.value
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "bg-muted/60 text-foreground hover:bg-muted"
-                          )}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="inviteSubject">Email Subject</Label>
-                  <Input
-                    id="inviteSubject"
-                    value={emailSubject}
-                    onChange={(event) => setEmailSubject(event.target.value)}
-                    maxLength={160}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="inviteBody">Email Body</Label>
-                  <Textarea
-                    id="inviteBody"
-                    value={emailBody}
-                    onChange={(event) => setEmailBody(event.target.value)}
-                    maxLength={5000}
-                    className="min-h-32 rounded-xl"
-                  />
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="inviteEmail">Email</Label>
+              <Input
+                id="inviteEmail"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="alex@example.com"
+                className="h-12 rounded-xl"
+              />
             </div>
+          </div>
 
-            <div className="shrink-0 border-t border-border/50 bg-background/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:p-6 sm:pt-4">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-                <Button
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["member", "admin"] as const).map((roleOption) => (
+                <button
+                  key={roleOption}
                   type="button"
-                  variant="ghost"
-                  onClick={closeCreateDialog}
-                  className="h-12 rounded-xl px-4"
+                  onClick={() => setRole(roleOption)}
+                  className={cn(
+                    "h-11 rounded-xl text-sm font-medium capitalize transition-colors",
+                    role === roleOption
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted/60 text-foreground hover:bg-muted"
+                  )}
                 >
-                  Cancel
-                </Button>
+                  {roleOption}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label>Expiration</Label>
+              <span className="truncate text-xs text-muted-foreground">
+                {selectedExpiryDate ? format(selectedExpiryDate, "EEE, MMM d · h:mm a") : "Select expiry"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {EXPIRY_PRESETS.map((preset) => (
                 <Button
-                  type="submit"
-                  disabled={!canCreate || isMutating}
-                  className="h-12 rounded-xl text-base font-semibold"
+                  key={preset.days}
+                  type="button"
+                  variant="secondary"
+                  className="h-10 rounded-xl px-2 text-sm"
+                  onClick={() => setExpiresAt(dateTimeLocalDaysFromNow(preset.days))}
                 >
-                  {isMutating ? "Sending..." : "Send Invite"}
+                  {preset.label}
                 </Button>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 min-w-0 justify-start rounded-xl border-border/60 px-3 font-normal hover:border-foreground/20"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">
+                      {selectedExpiryDate ? format(selectedExpiryDate, "MMMM d, yyyy") : "Pick date"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={selectedExpiryDate ?? undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        updateExpiryDate(date)
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <div className="grid grid-cols-3 gap-2">
+                {EXPIRY_TIME_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => updateExpiryTime(option.value)}
+                    className={cn(
+                      "h-11 rounded-xl px-3 text-sm font-medium transition-colors",
+                      selectedExpiryTime === option.value
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted/60 text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="inviteSubject">Email Subject</Label>
+            <Input
+              id="inviteSubject"
+              value={emailSubject}
+              onChange={(event) => setEmailSubject(event.target.value)}
+              maxLength={160}
+              className="h-12 rounded-xl"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inviteBody">Email Body</Label>
+            <Textarea
+              id="inviteBody"
+              value={emailBody}
+              onChange={(event) => setEmailBody(event.target.value)}
+              maxLength={5000}
+              className="min-h-32 rounded-xl"
+            />
+          </div>
+        </div>
+      </ResponsiveDialog>
 
       <BottomNav />
     </div>

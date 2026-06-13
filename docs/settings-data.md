@@ -1,7 +1,7 @@
 # Settings: Data Import / Export
 
 Status: Current
-Last reviewed: 2026-06-09
+Last reviewed: 2026-06-13
 
 The Settings -> Data page lets users import transactions from CSV and export transactions to CSV. The experience follows the same modern financial notebook direction as Settings, Budget, and Recurring: calm surfaces, clear copy, guided actions, and limited CTAs.
 
@@ -16,6 +16,8 @@ The Settings -> Data page lets users import transactions from CSV and export tra
 No transaction data is written during Upload, Map, Dates, Budget Groups, Spending Tags, or Review. Data is only written after the final import confirmation from the Review step.
 
 The import flow uses the shared `ResponsiveDialog` shell so mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, scroll containment, and safe-area-aware footer spacing stay consistent with other settings flows.
+
+Rollback confirmation now uses the shared `ResponsiveConfirmDialog` shell so destructive follow-up actions also stay in the same mobile tray / desktop modal system.
 
 1. Upload
    - Choose a CSV file.
@@ -63,6 +65,7 @@ The import flow uses the shared `ResponsiveDialog` shell so mobile tray behavior
 - Confirm selects and inputs remain reachable with the keyboard open.
 - Confirm closing the tray returns to a usable Data page.
 - Confirm bottom navigation does not interfere while the modal/tray is open.
+- Confirm rollback opens as a tray on mobile and as a modal on desktop.
 - Confirm export all time and custom date range still work.
 
 ## Design Decisions

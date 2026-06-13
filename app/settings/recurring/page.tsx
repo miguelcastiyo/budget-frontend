@@ -14,13 +14,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
+import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { Switch } from "@/components/ui/switch"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   Popover,
   PopoverContent,
@@ -33,16 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { asNumber, toDecimalString } from "@/lib/income-breakdown"
@@ -56,8 +41,6 @@ import type {
 } from "@/lib/api/types"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
-import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
 
 interface RecurringFormState {
@@ -826,26 +809,21 @@ export default function RecurringSettingsPage() {
         }}
       />
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete recurring expense?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This stops future automatic monthly entries. Existing transactions stay unchanged.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleDelete()}
-              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isMutating}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResponsiveConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => {
+          if (!open && !isMutating) {
+            setDeleteId(null)
+          }
+        }}
+        title="Delete recurring expense?"
+        description="This stops future automatic monthly entries. Existing transactions stay unchanged."
+        confirmLabel={isMutating ? "Deleting..." : "Delete"}
+        confirmVariant="destructive"
+        confirmDisabled={isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleDelete()}
+      />
 
       <BottomNav />
     </div>
@@ -958,13 +936,6 @@ function RecurringDetailDialog({
   onEdit,
   onDelete,
 }: RecurringDetailDialogProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const swipeDismiss = useSwipeDismiss({
-    open,
-    onDismiss: () => onOpenChange(false),
-    scrollRef,
-  })
-
   if (!item) {
     return null
   }
@@ -972,91 +943,89 @@ function RecurringDetailDialog({
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        {...swipeDismiss}
-        showCloseButton
-        className={cn(
-          "flex max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem] sm:rounded-2xl sm:border",
-          mobileDrawerDialogClassName
-        )}
-      >
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 sm:px-7 sm:py-7">
-          <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-2 sm:hidden")} aria-hidden="true" />
-          <div className="flex items-start gap-3 pr-8 sm:gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
-              <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate text-lg font-semibold sm:text-xl">{item.expense}</DialogTitle>
-              <DialogDescription className="mt-0.5 text-xl font-semibold text-foreground sm:mt-1 sm:text-2xl">
-                {formatCurrency(item.amount)} / month
-              </DialogDescription>
-            </div>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={item.expense}
+      description={`${formatCurrency(item.amount)} / month`}
+      desktopClassName="sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem]"
+      headerClassName="px-4 pb-3 pt-2 sm:px-7 sm:pb-4 sm:pt-5"
+      bodyClassName="px-4 py-4 sm:px-7 sm:py-6"
+      footerClassName="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7 sm:pt-4 sm:pb-6"
+      footer={
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="order-2 h-11 rounded-xl sm:h-12"
+            onClick={() => onEdit(item)}
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12"
+            onClick={() => onDelete(item)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
+            <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
           </div>
-
-          <div className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
-            <div className="rounded-2xl bg-secondary/50 p-3 sm:p-5">
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <DetailRow
-                  className="col-span-2"
-                  icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
-                  label="Schedule"
-                  value={formatBillingSchedule(item)}
-                  detail={`Next: ${formatProjectedDateLong(item.projected_date_for_month)}`}
-                />
-                <DetailRow
-                  icon={<Folder className="h-5 w-5 text-muted-foreground" />}
-                  label="Category"
-                  value={categoryConfig[item.category].label}
-                />
-                <DetailRow
-                  icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />}
-                  label="Tag"
-                  value={item.tag.name}
-                />
-                <DetailRow
-                  icon={<CreditCard className="h-5 w-5 text-muted-foreground" />}
-                  label="Card"
-                  value={item.card?.name ?? "No card"}
-                />
-                <DetailRow
-                  icon={<Repeat className="h-5 w-5 text-muted-foreground" />}
-                  label="Status"
-                  value={item.is_active ? "Active" : "Inactive"}
-                />
-                <DetailRow
-                  className="col-span-2"
-                  icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
-                  label="Active months"
-                  value={`Starts ${formatAddedMonth(item.starts_month)}`}
-                  detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                className="order-2 h-11 rounded-xl sm:h-12"
-                onClick={() => onEdit(item)}
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12"
-                onClick={() => onDelete(item)}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-muted-foreground">Recurring bill details</p>
+            <p className="mt-1 text-sm text-muted-foreground">Review schedule, budget group, and card assignment before making changes.</p>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="rounded-2xl bg-secondary/50 p-3 sm:p-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <DetailRow
+              className="col-span-2"
+              icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
+              label="Schedule"
+              value={formatBillingSchedule(item)}
+              detail={`Next: ${formatProjectedDateLong(item.projected_date_for_month)}`}
+            />
+            <DetailRow
+              icon={<Folder className="h-5 w-5 text-muted-foreground" />}
+              label="Category"
+              value={categoryConfig[item.category].label}
+            />
+            <DetailRow
+              icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />}
+              label="Tag"
+              value={item.tag.name}
+            />
+            <DetailRow
+              icon={<CreditCard className="h-5 w-5 text-muted-foreground" />}
+              label="Card"
+              value={item.card?.name ?? "No card"}
+            />
+            <DetailRow
+              icon={<Repeat className="h-5 w-5 text-muted-foreground" />}
+              label="Status"
+              value={item.is_active ? "Active" : "Inactive"}
+            />
+            <DetailRow
+              className="col-span-2"
+              icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />}
+              label="Active months"
+              value={`Starts ${formatAddedMonth(item.starts_month)}`}
+              detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"}
+            />
+          </div>
+        </div>
+      </div>
+    </ResponsiveDialog>
   )
 }
 

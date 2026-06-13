@@ -5,20 +5,11 @@ import type { ComponentType, DragEvent, RefObject } from "react"
 import Link from "next/link"
 import { ArrowLeft, CalendarIcon, CheckCircle2, CreditCard, Database, Download, FileUp, Loader2, Tags, Upload, XCircle } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
+import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -1867,19 +1858,23 @@ export default function DataSettingsPage() {
               )}
       </ResponsiveDialog>
 
-      <AlertDialog open={!!rollbackTarget} onOpenChange={(open) => {
-        if (!open && !rollingBackImportId) {
-          setRollbackTarget(null)
-          setRollbackError(null)
-        }
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rollback import?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the transactions created by this import. Tags and cards will stay.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+      <ResponsiveConfirmDialog
+        open={!!rollbackTarget}
+        onOpenChange={(open) => {
+          if (!open && !rollingBackImportId) {
+            setRollbackTarget(null)
+            setRollbackError(null)
+          }
+        }}
+        title="Rollback import?"
+        description="This will remove the transactions created by this import. Tags and cards will stay."
+        confirmLabel={rollingBackImportId ? "Rolling back..." : "Rollback import"}
+        confirmVariant="destructive"
+        confirmDisabled={!!rollingBackImportId}
+        closeDisabled={!!rollingBackImportId}
+        onConfirm={() => void handleRollbackImport()}
+      >
+        <>
           {rollbackTarget && (
             <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
               <p className="truncate font-medium">{rollbackTarget.source_filename || "CSV import"}</p>
@@ -1889,28 +1884,8 @@ export default function DataSettingsPage() {
             </div>
           )}
           {rollbackError && <p className="text-sm text-destructive">{rollbackError}</p>}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!rollingBackImportId}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={!!rollingBackImportId}
-              onClick={(event) => {
-                event.preventDefault()
-                void handleRollbackImport()
-              }}
-            >
-              {rollingBackImportId ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Rolling back
-                </>
-              ) : (
-                "Rollback import"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        </>
+      </ResponsiveConfirmDialog>
 
       <BottomNav />
     </div>
