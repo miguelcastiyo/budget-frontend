@@ -29,6 +29,8 @@ const tagColors = [
   "bg-chart-5",
 ]
 
+const DEFAULT_VISIBLE_TAG_COUNT = 5
+
 export function TagBreakdown({
   tags,
   onTagClick,
@@ -41,8 +43,10 @@ export function TagBreakdown({
 }: TagBreakdownProps) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const [canScrollDown, setCanScrollDown] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const maxSpend = Math.max(1, ...tags.map(t => parseFloat(t.spend)))
-  const visibleTags = tags
+  const hasHiddenTags = tags.length > DEFAULT_VISIBLE_TAG_COUNT
+  const visibleTags = isExpanded ? tags : tags.slice(0, DEFAULT_VISIBLE_TAG_COUNT)
 
   useEffect(() => {
     const node = listRef.current
@@ -56,6 +60,7 @@ export function TagBreakdown({
       setCanScrollDown(overflow && canScrollFurtherDown)
     }
 
+    node.scrollTop = 0
     updateScrollState()
 
     node.addEventListener("scroll", updateScrollState)
@@ -68,7 +73,11 @@ export function TagBreakdown({
       observer.disconnect()
       window.removeEventListener("resize", updateScrollState)
     }
-  }, [tags.length])
+  }, [visibleTags.length])
+
+  useEffect(() => {
+    setIsExpanded(false)
+  }, [tags])
 
   const handleScrollHintClick = () => {
     const node = listRef.current
@@ -156,6 +165,19 @@ export function TagBreakdown({
               <ChevronsDown className="w-4 h-4 animate-pulse" />
             </button>
           )}
+        </div>
+      )}
+      {hasHiddenTags && (
+        <div className="border-t border-border/50 px-4 py-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full rounded-full"
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            {isExpanded ? "Show Less" : `Show ${tags.length - DEFAULT_VISIBLE_TAG_COUNT} More`}
+          </Button>
         </div>
       )}
     </Card>
