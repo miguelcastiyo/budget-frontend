@@ -79,3 +79,13 @@ When a route grows beyond simple page orchestration, extract feature-local modul
 - Put feature constants, pure helpers, and flow utilities in `_lib/`.
 
 The route file should stay focused on composing state, handlers, and top-level layout.
+
+## API Modules
+
+Keep frontend API code split by domain under `lib/api/` instead of adding every endpoint to one file.
+
+- Keep request, CSRF, blob/form-data, and error handling in a shared core module.
+- Add domain modules such as `auth`, `profile`, `transactions`, `recurring`, or `import-export` for endpoint groups.
+- Keep `lib/api/client.ts` as the stable composition layer that assembles the exported `apiClient`.
+
+This keeps endpoint ownership clear and reduces churn when one feature area changes.
