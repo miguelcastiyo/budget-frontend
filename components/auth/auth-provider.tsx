@@ -4,18 +4,21 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { AuthUser, Profile, ThemePreference } from "@/lib/api/types"
+import type { AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
 import { isPublicPath } from "@/lib/auth-routes"
 
 const CSRF_STORAGE_KEY = "budget.csrf_token"
 
 interface AuthContextValue {
   profile: Profile | null
+  setupStatus: SetupStatus | null
   isAuthenticated: boolean
   needsOnboarding: boolean
   isLoading: boolean
   refreshProfile: () => Promise<void>
+  refreshSetupStatus: () => Promise<void>
   setProfile: (profile: Profile | null) => void
+  setSetupStatus: (setupStatus: SetupStatus | null) => void
   setAuthenticatedUser: (user: AuthUser) => void
   signOut: () => Promise<void>
 }
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { setTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const setAuthenticatedUser = useCallback((user: AuthUser) => {
@@ -67,11 +71,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     try {
-      const me = await apiClient.getProfile()
+      const [me, nextSetupStatus] = await Promise.all([
+        apiClient.getProfile(),
+        apiClient.getSetupStatus(),
+      ])
       setProfile(me)
+      setSetupStatus(nextSetupStatus)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setProfile(null)
+        setSetupStatus(null)
+        return
+      }
+
+      throw error
+    }
+  }, [])
+
+  const refreshSetupStatus = useCallback(async () => {
+    try {
+      const nextSetupStatus = await apiClient.getSetupStatus()
+      setSetupStatus(nextSetupStatus)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setProfile(null)
+        setSetupStatus(null)
         return
       }
 
@@ -94,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isPublicPath(pathname) && !hasStoredSessionHint()) {
         if (active) {
           setProfile(null)
+          setSetupStatus(null)
           setIsLoading(false)
         }
         return
@@ -104,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         if (active) {
           setProfile(null)
+          setSetupStatus(null)
         }
       } finally {
         if (active) {
@@ -136,19 +162,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } finally {
       setProfile(null)
+      setSetupStatus(null)
     }
   }, [])
 
   const value = useMemo<AuthContextValue>(() => ({
     profile,
+    setupStatus,
     isAuthenticated: !!profile,
-    needsOnboarding: !!profile && !profile.onboarding_complete,
+    needsOnboarding: !!profile && !!setupStatus && !setupStatus.budget_profile_complete,
     isLoading,
     refreshProfile,
+    refreshSetupStatus,
     setProfile,
+    setSetupStatus,
     setAuthenticatedUser,
     signOut,
-  }), [profile, isLoading, refreshProfile, setAuthenticatedUser, signOut])
+  }), [profile, setupStatus, isLoading, refreshProfile, refreshSetupStatus, setAuthenticatedUser, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

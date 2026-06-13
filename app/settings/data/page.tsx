@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ComponentType, DragEvent, RefObject } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, CalendarIcon, CheckCircle2, CreditCard, Database, Download, FileUp, Loader2, Tags, Upload, XCircle } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Button } from "@/components/ui/button"
@@ -934,6 +935,8 @@ function ActivityRow({
 }
 
 export default function DataSettingsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dataRuns, setDataRuns] = useState<DataRunItem[]>([])
   const [isLoadingRuns, setIsLoadingRuns] = useState(true)
@@ -989,6 +992,15 @@ export default function DataSettingsPage() {
   useEffect(() => {
     void loadDataRuns()
   }, [loadDataRuns])
+
+  useEffect(() => {
+    if (searchParams.get("start_import") !== "1") {
+      return
+    }
+
+    openImportDialog()
+    router.replace("/settings/data")
+  }, [router, searchParams])
 
   const resetImportState = () => {
     setImportFile(null)

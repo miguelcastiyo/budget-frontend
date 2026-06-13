@@ -20,6 +20,9 @@ export interface UserPreferences {
   appearance: {
     theme: ThemePreference
   }
+  onboarding: {
+    dismissed: boolean
+  }
 }
 
 // Profile
@@ -56,6 +59,42 @@ export interface UpdateUserPreferencesRequest {
   appearance?: {
     theme?: ThemePreference
   }
+  onboarding?: {
+    dismissed?: boolean
+  }
+}
+
+export interface SetupTask {
+  key: "add_first_transaction" | "add_recurring_expenses" | "import_transactions"
+  label: string
+  status: "available" | "completed"
+  completed: boolean
+}
+
+export interface SetupStatus {
+  budget_profile_complete: boolean
+  has_transactions: boolean
+  has_recurring_expenses: boolean
+  has_imported_data: boolean
+  first_transaction_added: boolean
+  first_recurring_expense_added: boolean
+  first_import_completed: boolean
+  onboarding_dismissed: boolean
+  recommended_next_action:
+    | "complete_budget_profile"
+    | "add_first_transaction"
+    | "add_recurring_expenses"
+    | "import_transactions"
+    | "none"
+  setup_tasks: SetupTask[]
+}
+
+export interface UpdateOnboardingStateRequest {
+  onboarding_dismissed: boolean
+}
+
+export interface UpdateOnboardingStateResponse {
+  onboarding_dismissed: boolean
 }
 
 export interface SettingsSummaryResponse {

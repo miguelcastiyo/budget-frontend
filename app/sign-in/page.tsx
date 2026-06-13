@@ -118,7 +118,7 @@ function inviteErrorCopy(errorState: InviteErrorState, fallback: string | null) 
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { setAuthenticatedUser } = useAuth()
+  const { setAuthenticatedUser, setSetupStatus } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showEmailForm, setShowEmailForm] = useState(false)
@@ -208,9 +208,11 @@ function SignInPageContent() {
     [error, inviteError]
   )
 
-  const completeAuth = (result: Awaited<ReturnType<typeof apiClient.signInWithPassword>>) => {
+  const completeAuth = async (result: Awaited<ReturnType<typeof apiClient.signInWithPassword>>) => {
     setAuthenticatedUser(result.user)
-    router.push(result.user.onboarding_complete ? "/" : "/onboarding")
+    const nextSetupStatus = await apiClient.getSetupStatus()
+    setSetupStatus(nextSetupStatus)
+    router.push(nextSetupStatus.budget_profile_complete ? "/" : "/onboarding")
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -224,7 +226,7 @@ function SignInPageContent() {
         password,
         client_type: "web",
       })
-      completeAuth(result)
+      await completeAuth(result)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message || "Unable to sign in")
@@ -249,7 +251,7 @@ function SignInPageContent() {
         password: invitePassword,
         client_type: "web",
       })
-      completeAuth(result)
+      await completeAuth(result)
     } catch (err) {
       if (err instanceof ApiError) {
         setInviteError(getInviteErrorState(err))
@@ -293,7 +295,7 @@ function SignInPageContent() {
             client_type: "web",
           })
 
-      completeAuth(result)
+      await completeAuth(result)
     } catch (err) {
       if (err instanceof ApiError) {
         if (isInviteFlow) {
@@ -444,11 +446,11 @@ function SignInPageContent() {
     }
 
     const secondaryToggleLabel = isGooglePrimaryInvitePath
-      ? (showSecondaryInvitePath ? "Hide password setup" : "Use a password instead")
+      ? (showSecondaryInvitePath ? "Hide Google setup" : "Use Google instead")
       : (showSecondaryInvitePath ? "Hide Google setup" : "Use Google instead")
 
     const secondaryToggleDescription = isGooglePrimaryInvitePath
-      ? "Prefer to create a password for this invited email?"
+      ? "You can create a password for this invited email, or use Google with the same address."
       : "If this invited email is tied to Google, you can still use Google sign-in instead."
 
     return (
@@ -463,7 +465,7 @@ function SignInPageContent() {
             </h1>
             <p className="text-sm leading-6 text-muted-foreground sm:text-[15px]">
               {isGooglePrimaryInvitePath
-                ? "This invited Gmail account is set up for Google sign-in first. Continue with the same Gmail address to create your Budget account."
+                ? "Create a password for this invited email, or continue with the same Gmail address if you prefer Google sign-in."
                 : "This invited account is set up for password creation first. Create a password for the invited email to finish your Budget account setup."}
             </p>
           </div>
@@ -500,14 +502,14 @@ function SignInPageContent() {
             />
           </div>
 
-          {isGooglePrimaryInvitePath ? renderInviteGoogleSection("Continue with Google") : renderInvitePasswordSection()}
+          {renderInvitePasswordSection()}
 
-          {(isGooglePrimaryInvitePath || googleClientIdConfigured) && (
+          {googleClientIdConfigured && (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <Separator className="flex-1" />
                 <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  Secondary option
+                  Alternate option
                 </span>
                 <Separator className="flex-1" />
               </div>
@@ -533,18 +535,16 @@ function SignInPageContent() {
               <div className="flex items-center gap-3">
                 <Separator className="flex-1" />
                 <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {isGooglePrimaryInvitePath ? "Password setup" : "Google sign-in"}
+                  Google sign-in
                 </span>
                 <Separator className="flex-1" />
               </div>
 
-              {isGooglePrimaryInvitePath ? renderInvitePasswordSection() : renderInviteGoogleSection("Continue with Google")}
+              {renderInviteGoogleSection("Continue with Google")}
             </>
           )}
 
-          {!isGooglePrimaryInvitePath && (
-            <div className="sticky bottom-0 -mx-4 border-t border-transparent bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] sm:hidden" />
-          )}
+          <div className="sticky bottom-0 -mx-4 border-t border-transparent bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] sm:hidden" />
         </AuthCard>
       </AuthScreenShell>
     )

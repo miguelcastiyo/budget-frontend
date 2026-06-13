@@ -1,7 +1,10 @@
 import type {
   Profile,
+  SetupStatus,
   UserPreferences,
   UpdateProfileRequest,
+  UpdateOnboardingStateRequest,
+  UpdateOnboardingStateResponse,
   UpdateUserPreferencesRequest,
   AuthSessionResponse,
   PasswordSignInRequest,
@@ -246,6 +249,17 @@ class ApiClient {
 
   async updateProfile(data: UpdateProfileRequest): Promise<Profile> {
     return this.request<Profile>("/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  }
+
+  async getSetupStatus(): Promise<SetupStatus> {
+    return this.request<SetupStatus>("/me/setup-status")
+  }
+
+  async updateOnboardingState(data: UpdateOnboardingStateRequest): Promise<UpdateOnboardingStateResponse> {
+    return this.request<UpdateOnboardingStateResponse>("/me/onboarding-state", {
       method: "PATCH",
       body: JSON.stringify(data),
     })

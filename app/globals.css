@@ -46,6 +46,8 @@
   --sidebar-accent-foreground: #1F2327;
   --sidebar-border: #DED8CC;
   --sidebar-ring: #6F8064;
+  --bottom-nav-height: 4.75rem;
+  --bottom-nav-page-gap: 1.5rem;
 }
 
 .auth-light {
@@ -182,7 +184,7 @@
 
 @layer utilities {
   .pb-mobile-nav {
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--bottom-nav-height) + var(--bottom-nav-page-gap) + env(safe-area-inset-bottom, 0px));
   }
 
   .pt-safe-header {

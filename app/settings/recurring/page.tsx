@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { format } from "date-fns"
 import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, CalendarIcon, ChevronLeft, ChevronRight, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2, X } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
@@ -355,6 +356,8 @@ function MonthPicker({
 }
 
 export default function RecurringSettingsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [month, setMonth] = useState(getCurrentMonthKey())
   const [recurringSort, setRecurringSort] = useState<RecurringSort>("date_asc")
   const [data, setData] = useState<RecurringExpensesResponse | null>(null)
@@ -412,6 +415,15 @@ export default function RecurringSettingsPage() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (searchParams.get("start") !== "1") {
+      return
+    }
+
+    setShowNew(true)
+    router.replace("/settings/recurring")
+  }, [router, searchParams])
 
   const tagOptions = useMemo(() => tags, [tags])
   const activeItemsCount = useMemo(

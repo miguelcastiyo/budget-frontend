@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { ArrowRight, PencilLine } from "lucide-react"
 import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
 import { Card } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { formatCurrency } from "@/lib/formatters"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useAuth } from "@/components/auth/auth-provider"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 import {
   budgetSettingsPayload,
   defaultBudgetAllocationFormState,
@@ -19,7 +21,6 @@ import {
   type BudgetAllocationFormState,
 } from "@/lib/budget-allocation"
 import {
-  calculateHourlyMonthlyIncome,
   calculateMonthlyIncome,
   calculateMonthlyIncomeString,
   defaultIncomeFormState,
@@ -30,21 +31,24 @@ import {
 } from "@/lib/income-breakdown"
 import type { BudgetSettings } from "@/lib/api/types"
 
-type OnboardingStep = "profile" | "income" | "allocation" | "review"
+type OnboardingStep = "income" | "allocation" | "review"
 
-const steps: OnboardingStep[] = ["profile", "income", "allocation", "review"]
+const steps: OnboardingStep[] = ["income", "allocation", "review"]
 
 export default function OnboardingPage() {
   const router = useRouter()
   const { profile, refreshProfile, needsOnboarding } = useAuth()
 
-  const [step, setStep] = useState<OnboardingStep>("profile")
+  const [step, setStep] = useState<OnboardingStep>("income")
   const [displayName, setDisplayName] = useState("")
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
+  const [showAdvancedAllocation, setShowAdvancedAllocation] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const budgetMonthLabel = formatBudgetMonth(getCurrentMonthKey())
+  const budgetMonthName = formatBudgetMonthName(getCurrentMonthKey())
 
   useEffect(() => {
     if (profile) {
@@ -90,16 +94,29 @@ export default function OnboardingPage() {
   const hydrateBudgetForm = (settings: BudgetSettings) => {
     setIncomeForm(hydrateIncomeForm(settings))
     setAllocationForm(hydrateBudgetAllocationForm(settings))
+    setShowAdvancedAllocation(false)
   }
 
   const income = useMemo(() => calculateMonthlyIncome(incomeForm), [incomeForm])
   const currentStepIndex = steps.indexOf(step)
+  const requiresDisplayName = (profile?.display_name.trim() ?? "") === ""
   const hasValidName = displayName.trim().length > 0
   const hasValidIncome = isIncomeFormValid(incomeForm)
   const hasValidAllocation = isBudgetAllocationValid(allocationForm, income)
   const canContinue =
-    step === "profile" ? hasValidName : step === "income" ? hasValidIncome : step === "allocation" ? hasValidAllocation : true
-  const canSave = hasValidName && hasValidIncome && hasValidAllocation && !isSaving
+    step === "income"
+      ? hasValidIncome && (!requiresDisplayName || hasValidName)
+      : step === "allocation"
+        ? hasValidAllocation
+        : true
+  const canSave = (!requiresDisplayName || hasValidName) && hasValidIncome && hasValidAllocation && !isSaving
+
+  const needsTarget = useMemo(() => allocationTarget(income, allocationForm, "needs"), [income, allocationForm])
+  const wantsTarget = useMemo(() => allocationTarget(income, allocationForm, "wants"), [income, allocationForm])
+  const savingsTarget = useMemo(() => allocationTarget(income, allocationForm, "savings"), [income, allocationForm])
+  const needsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "needs"), [income, allocationForm])
+  const wantsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "wants"), [income, allocationForm])
+  const savingsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "savings"), [income, allocationForm])
 
   const goNext = () => {
     if (!canContinue) {
@@ -124,13 +141,19 @@ export default function OnboardingPage() {
     setError(null)
 
     try {
-      await apiClient.updateProfile({ display_name: displayName.trim() })
-      await apiClient.updateBudgetSettings(budgetSettingsPayload(incomeForm, allocationForm))
+      if (displayName.trim() && displayName.trim() !== profile?.display_name) {
+        await apiClient.updateProfile({ display_name: displayName.trim() })
+      }
+
+      await apiClient.updateBudgetSettings({
+        ...budgetSettingsPayload(incomeForm, allocationForm),
+        effective_month: getCurrentMonthKey(),
+      })
 
       await refreshProfile()
       router.replace("/")
     } catch (err) {
-      setError(err instanceof ApiError ? err.error.message : "Unable to complete onboarding")
+      setError(err instanceof ApiError ? err.error.message : "Unable to create your first budget")
     } finally {
       setIsSaving(false)
     }
@@ -138,157 +161,282 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="max-w-lg mx-auto px-5 py-10 space-y-6">
-        <div className="text-center space-y-2">
-          <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">
-            Step {currentStepIndex + 1} of {steps.length}
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">Set up your budget profile</h1>
-          <p className="text-muted-foreground">{stepLabel(step)}</p>
-        </div>
+      <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,rgba(130,148,108,0.16),transparent_55%),linear-gradient(180deg,rgba(188,157,102,0.10),transparent_75%)]" />
+      <main className="relative mx-auto max-w-2xl px-5 py-8 sm:px-6 sm:py-10">
+        <div className="space-y-6">
+          <div className="space-y-3 text-center">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Step {currentStepIndex + 1} of {steps.length}
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              {titleForStep(step)}
+            </h1>
+            <p className="mx-auto max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+              {descriptionForStep(step)}
+            </p>
+          </div>
 
-        {error && (
-          <p className="text-sm text-destructive text-center p-2 bg-destructive/10 rounded-lg">{error}</p>
-        )}
+          {error && (
+            <p className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
 
-        {step === "profile" && (
-          <Card className="p-5 border-0 shadow-sm">
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
-              <Input
-                id="displayName"
-                type="text"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                className="h-12 rounded-xl"
-                placeholder="How should we call you?"
+          {step === "income" && (
+            <Card className="space-y-6 rounded-[1.75rem] border-border/70 bg-card/95 p-5 shadow-sm sm:p-6">
+              <div className="rounded-2xl border border-border/70 bg-muted/25 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">First budget page</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Start with the income your budget needs right now. You can refine this later.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <PencilLine className="size-4 text-muted-foreground" />
+                  <Label htmlFor="displayName">{requiresDisplayName ? "Display name" : "Display name (optional)"}</Label>
+                </div>
+                <Input
+                  id="displayName"
+                  type="text"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="h-12 rounded-xl"
+                  placeholder="How should we call you?"
+                  disabled={isLoading || isSaving}
+                />
+              </div>
+
+              <IncomeBreakdownForm
+                value={incomeForm}
+                onChange={setIncomeForm}
                 disabled={isLoading || isSaving}
+                idPrefix="onboarding-income"
               />
-            </div>
-          </Card>
-        )}
+            </Card>
+          )}
 
-        {step === "income" && (
-          <Card className="p-5 border-0 shadow-sm">
-            <IncomeBreakdownForm
-              value={incomeForm}
-              onChange={setIncomeForm}
-              disabled={isLoading || isSaving}
-              idPrefix="onboarding-income"
-            />
-          </Card>
-        )}
+          {step === "allocation" && (
+            <Card className="space-y-6 rounded-[1.75rem] border-border/70 bg-card/95 p-5 shadow-sm sm:p-6">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Simple budget split</p>
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">We&apos;ll start with 50 / 30 / 20</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      You can adjust this anytime. {formatCurrency(income)} is ready to split across your month.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => setShowAdvancedAllocation((current) => !current)}
+                    disabled={isLoading || isSaving}
+                  >
+                    {showAdvancedAllocation ? "Hide custom controls" : "Customize split"}
+                  </Button>
+                </div>
+              </div>
 
-        {step === "allocation" && (
-          <Card className="p-5 border-0 shadow-sm">
-            <div className="mb-4">
-              <h2 className="font-semibold">Budget Allocation</h2>
-              <p className="text-sm text-muted-foreground">{formatCurrency(income)} per month</p>
-            </div>
-            <BudgetAllocationForm
-              value={allocationForm}
-              income={income}
-              onChange={setAllocationForm}
-              disabled={isLoading || isSaving}
-            />
-          </Card>
-        )}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <AllocationPreviewCard
+                  label="Needs"
+                  percent={needsPercentDisplay}
+                  amount={formatCurrency(needsTarget)}
+                  toneClassName="bg-needs/10 text-needs"
+                />
+                <AllocationPreviewCard
+                  label="Wants"
+                  percent={wantsPercentDisplay}
+                  amount={formatCurrency(wantsTarget)}
+                  toneClassName="bg-wants/10 text-wants"
+                />
+                <AllocationPreviewCard
+                  label="Savings"
+                  percent={savingsPercentDisplay}
+                  amount={formatCurrency(savingsTarget)}
+                  toneClassName="bg-savings/10 text-savings"
+                />
+              </div>
 
-        {step === "review" && (
-          <Card className="p-5 border-0 shadow-sm space-y-4">
-            <ReviewRow label="Name" value={displayName.trim()} />
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Income</p>
-              <ReviewRow label="Primary" value={primaryIncomeReviewLabel(incomeForm)} />
-              {incomeForm.sideIncomeType !== "none" && (
-                <ReviewRow label={sideIncomeReviewTitle(incomeForm)} value={sideIncomeReviewLabel(incomeForm)} />
+              {showAdvancedAllocation && (
+                <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <BudgetAllocationForm
+                    value={allocationForm}
+                    income={income}
+                    onChange={setAllocationForm}
+                    disabled={isLoading || isSaving}
+                  />
+                </div>
               )}
-              <ReviewRow label="Monthly total" value={formatCurrency(calculateMonthlyIncomeString(incomeForm))} />
-            </div>
-            <ReviewRow label="Budget split" value={budgetSplitLabel(allocationForm)} />
-          </Card>
-        )}
+            </Card>
+          )}
 
-        <div className="flex gap-3">
-          {currentStepIndex > 0 && (
-            <Button variant="outline" className="h-12 flex-1 rounded-xl" onClick={goBack} disabled={isSaving}>
-              Back
-            </Button>
+          {step === "review" && (
+            <Card className="space-y-5 rounded-[1.75rem] border-border/70 bg-card/95 p-5 shadow-sm sm:p-6">
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Review and create budget</p>
+                <h2 className="text-2xl font-semibold">Your first month is ready</h2>
+                <p className="text-sm text-muted-foreground">
+                  This saves a budget for {budgetMonthLabel}. The dashboard will guide your next step.
+                </p>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-border/70 bg-muted/20 p-4 sm:p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ReviewBlock label="Display name" value={displayName.trim() || "Not set"} />
+                  <ReviewBlock label="Monthly income" value={formatCurrency(calculateMonthlyIncomeString(incomeForm))} />
+                  <ReviewBlock label="Needs target" value={`${needsPercentDisplay}% · ${formatCurrency(needsTarget)}`} />
+                  <ReviewBlock label="Wants target" value={`${wantsPercentDisplay}% · ${formatCurrency(wantsTarget)}`} />
+                  <ReviewBlock label="Savings target" value={`${savingsPercentDisplay}% · ${formatCurrency(savingsTarget)}`} />
+                  <ReviewBlock label="Income setup" value={incomeSummary(incomeForm)} />
+                </div>
+              </div>
+            </Card>
           )}
-          {step === "review" ? (
-            <Button className="h-12 flex-1 rounded-xl" onClick={() => void handleFinish()} disabled={!canSave || isLoading}>
-              {isSaving ? "Saving..." : "Finish Setup"}
-            </Button>
-          ) : (
-            <Button className="h-12 flex-1 rounded-xl" onClick={goNext} disabled={!canContinue || isLoading || isSaving}>
-              Continue
-            </Button>
-          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {currentStepIndex > 0 && (
+              <Button variant="outline" className="h-12 rounded-xl sm:flex-1" onClick={goBack} disabled={isSaving}>
+                Back
+              </Button>
+            )}
+            {step === "review" ? (
+              <Button className="h-12 rounded-xl sm:flex-1" onClick={() => void handleFinish()} disabled={!canSave || isLoading}>
+                {isSaving ? "Saving budget..." : `Save ${budgetMonthName} Budget`}
+              </Button>
+            ) : (
+              <Button className="h-12 rounded-xl sm:flex-1" onClick={goNext} disabled={!canContinue || isLoading || isSaving}>
+                Continue <ArrowRight className="size-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </main>
     </div>
   )
 }
 
-function stepLabel(step: OnboardingStep): string {
-  if (step === "profile") {
-    return "Start with your name."
-  }
+function titleForStep(step: OnboardingStep): string {
   if (step === "income") {
-    return "Estimate your average monthly income."
+    return "Open your first budget page"
   }
   if (step === "allocation") {
-    return "Split your income into budget categories."
+    return "Split the month simply"
   }
-  return "Review your setup."
+  return "Create your budget"
 }
 
-function budgetSplitLabel(allocationForm: BudgetAllocationFormState): string {
+function descriptionForStep(step: OnboardingStep): string {
+  if (step === "income") {
+    return "Start with your take-home income. You can refine it later."
+  }
+  if (step === "allocation") {
+    return "Start with 50 / 30 / 20, or customize the split."
+  }
+  return "Review your first month before saving it."
+}
+
+function allocationTarget(
+  income: number,
+  allocationForm: BudgetAllocationFormState,
+  key: "needs" | "wants" | "savings"
+): number {
+  if (allocationForm.allocationMode === "amount") {
+    return Number.parseFloat(
+      key === "needs"
+        ? allocationForm.needsAmount
+        : key === "wants"
+          ? allocationForm.wantsAmount
+          : allocationForm.savingsAmount
+    ) || 0
+  }
+
+  const percent = Number.parseFloat(
+    key === "needs"
+      ? allocationForm.needsPercent
+      : key === "wants"
+        ? allocationForm.wantsPercent
+        : allocationForm.savingsPercent
+  ) || 0
+
+  return (income * percent) / 100
+}
+
+function allocationPercentDisplay(
+  income: number,
+  allocationForm: BudgetAllocationFormState,
+  key: "needs" | "wants" | "savings"
+): string {
   if (allocationForm.allocationMode === "percent") {
-    return `${toDecimalString(allocationForm.needsPercent)}% / ${toDecimalString(allocationForm.wantsPercent)}% / ${toDecimalString(allocationForm.savingsPercent)}%`
+    return toDecimalString(
+      key === "needs"
+        ? allocationForm.needsPercent
+        : key === "wants"
+          ? allocationForm.wantsPercent
+          : allocationForm.savingsPercent
+    )
   }
 
-  return `${formatCurrency(allocationForm.needsAmount)} / ${formatCurrency(allocationForm.wantsAmount)} / ${formatCurrency(allocationForm.savingsAmount)}`
-}
-
-function primaryIncomeReviewLabel(incomeForm: IncomeFormState): string {
-  if (incomeForm.incomeSourceType === "monthly") {
-    return `${formatCurrency(incomeForm.primaryMonthlyIncome)} monthly`
+  if (income <= 0) {
+    return "0.00"
   }
 
-  return hourlyReviewLabel(
-    incomeForm.primaryHourlyRate,
-    incomeForm.primaryWeeklyHours,
-    calculateHourlyMonthlyIncome(incomeForm.primaryHourlyRate, incomeForm.primaryWeeklyHours)
-  )
+  return toDecimalString((allocationTarget(income, allocationForm, key) / income) * 100)
 }
 
-function sideIncomeReviewTitle(incomeForm: IncomeFormState): string {
-  const label = incomeForm.sideIncomeLabel.trim()
-  return label || "Side income"
+function incomeSummary(incomeForm: IncomeFormState): string {
+  const sideIncome = incomeForm.sideIncomeType === "none" ? "No extra income" : "Includes extra income"
+  return `${incomeForm.incomeSourceType === "monthly" ? "Monthly pay" : "Hourly pay"} · ${sideIncome}`
 }
 
-function sideIncomeReviewLabel(incomeForm: IncomeFormState): string {
-  if (incomeForm.sideIncomeType === "monthly") {
-    return `${formatCurrency(incomeForm.sideMonthlyIncome)} monthly`
-  }
+function formatBudgetMonth(month: string): string {
+  const [year, monthNumber] = month.split("-")
+  const parsed = new Date(Number(year), Number(monthNumber) - 1, 1)
 
-  return hourlyReviewLabel(
-    incomeForm.sideHourlyRate,
-    incomeForm.sideWeeklyHours,
-    calculateHourlyMonthlyIncome(incomeForm.sideHourlyRate, incomeForm.sideWeeklyHours)
-  )
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
 }
 
-function hourlyReviewLabel(hourlyRate: string, weeklyHours: string, monthlyIncome: number): string {
-  return `${formatCurrency(hourlyRate)}/hr x ${toDecimalString(weeklyHours)} hrs/week = ${formatCurrency(monthlyIncome)}/mo`
+function formatBudgetMonthName(month: string): string {
+  const [year, monthNumber] = month.split("-")
+  const parsed = new Date(Number(year), Number(monthNumber) - 1, 1)
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+  })
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+function AllocationPreviewCard({
+  label,
+  percent,
+  amount,
+  toneClassName,
+}: {
+  label: string
+  percent: string
+  amount: string
+  toneClassName: string
+}) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium text-right">{value}</p>
+    <div className="rounded-2xl border border-border/70 bg-background/85 p-4">
+      <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${toneClassName}`}>
+        {percent}%
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{label}</p>
+      <p className="text-xl font-semibold">{amount}</p>
+    </div>
+  )
+}
+
+function ReviewBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium text-foreground">{value}</p>
     </div>
   )
 }
