@@ -209,6 +209,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
       contentClassName="sm:max-h-[min(90dvh,42rem)]"
       headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
       bodyClassName="space-y-5 px-5 py-5 sm:px-6"
+      footerClassName="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-4"
       footer={
         <Button
           className="h-12 w-full rounded-xl"
@@ -231,13 +232,13 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
           <div className="space-y-2">
             <Label htmlFor="settings-email">Email</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input id="settings-email" value={email} disabled className="h-12 flex-1 rounded-xl" />
               {canEditEmail && (
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl sm:self-auto"
                   onClick={() => {
                     setShowEmailChange((current) => !current)
                     setShowVerification(false)
