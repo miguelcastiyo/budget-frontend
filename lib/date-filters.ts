@@ -5,6 +5,14 @@ export interface DateRangeFilter {
   date_to: string
 }
 
+const DEFAULT_LOCALE = "en-US"
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/
+
+function isValidDate(value: Date): boolean {
+  return !Number.isNaN(value.getTime())
+}
+
 export function toIsoDate(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -44,7 +52,7 @@ export const transactionExportPresets: { value: Preset; label: string }[] = tran
 )
 
 export function parseIsoDate(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (!ISO_DATE_PATTERN.test(value)) {
     return null
   }
 
@@ -66,8 +74,39 @@ export function parseIsoDate(value: string): Date | null {
   return parsed
 }
 
+export function parseDateValue(value: string): Date | null {
+  const localDate = parseIsoDate(value)
+  if (localDate) {
+    return localDate
+  }
+
+  const parsed = new Date(value)
+  return isValidDate(parsed) ? parsed : null
+}
+
+export function parseMonthKey(value: string): Date | null {
+  if (!MONTH_KEY_PATTERN.test(value)) {
+    return null
+  }
+
+  const [yearRaw, monthRaw] = value.split("-")
+  const year = Number(yearRaw)
+  const monthIndex = Number(monthRaw) - 1
+  const parsed = new Date(year, monthIndex, 1)
+
+  if (
+    !isValidDate(parsed) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== monthIndex
+  ) {
+    return null
+  }
+
+  return parsed
+}
+
 export function getMonthDateRange(month: string): DateRangeFilter | null {
-  if (!/^\d{4}-\d{2}$/.test(month)) {
+  if (!MONTH_KEY_PATTERN.test(month)) {
     return null
   }
 
@@ -89,22 +128,38 @@ export function getMonthDateRange(month: string): DateRangeFilter | null {
 }
 
 export function formatMonthLabel(month: string): string | null {
-  if (!/^\d{4}-\d{2}$/.test(month)) {
+  const parsed = parseMonthKey(month)
+  if (!parsed) {
     return null
   }
 
-  const [yearRaw, monthRaw] = month.split("-")
-  const year = Number(yearRaw)
-  const monthIndex = Number(monthRaw) - 1
-
-  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
-    return null
-  }
-
-  return new Date(year, monthIndex, 1).toLocaleDateString("en-US", {
+  return parsed.toLocaleDateString(DEFAULT_LOCALE, {
     month: "long",
     year: "numeric",
   })
+}
+
+export function formatMonthValue(month: string, options: Intl.DateTimeFormatOptions): string | null {
+  const parsed = parseMonthKey(month)
+  return parsed ? parsed.toLocaleDateString(DEFAULT_LOCALE, options) : null
+}
+
+export function formatDateValue(
+  value: string,
+  options: Intl.DateTimeFormatOptions,
+  fallback = value
+): string {
+  const parsed = parseDateValue(value)
+  return parsed ? parsed.toLocaleDateString(DEFAULT_LOCALE, options) : fallback
+}
+
+export function formatDateTimeValue(
+  value: string,
+  options: Intl.DateTimeFormatOptions,
+  fallback = value
+): string {
+  const parsed = parseDateValue(value)
+  return parsed ? parsed.toLocaleString(DEFAULT_LOCALE, options) : fallback
 }
 
 export function getPresetDateRange(preset: Preset | "all"): Partial<DateRangeFilter> {

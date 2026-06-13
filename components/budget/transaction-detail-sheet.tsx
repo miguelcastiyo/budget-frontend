@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
+import { formatDateValue } from "@/lib/date-filters"
 
 interface TransactionDetailSheetProps {
   transaction: Transaction | null
@@ -36,12 +37,7 @@ interface TransactionDetailSheetProps {
 }
 
 function formatDate(dateStr: string): string {
-  const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  const date = isoDateMatch
-    ? new Date(Number(isoDateMatch[1]), Number(isoDateMatch[2]) - 1, Number(isoDateMatch[3]))
-    : new Date(dateStr)
-
-  return date.toLocaleDateString("en-US", {
+  return formatDateValue(dateStr, {
     weekday: "long",
     year: "numeric",
     month: "long",

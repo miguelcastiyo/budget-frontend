@@ -140,9 +140,19 @@ assertDeepEqual(leapMonth, { date_from: "2024-02-01", date_to: "2024-02-29" }, "
 assertEqual(dateFilters.getMonthDateRange("2024-13"), null, "month range rejects invalid months")
 assertEqual(dateFilters.formatMonthLabel("2026-05"), "May 2026", "month label formats valid months")
 assertEqual(dateFilters.formatMonthLabel("2026-99"), null, "month label rejects invalid months")
+assertEqual(dateFilters.formatMonthValue("2026-05", { month: "short" }), "May", "month value formatter renders month keys")
 assertEqual(dateFilters.toIsoDate(new Date(2026, 0, 5)), "2026-01-05", "toIsoDate uses local calendar date")
 assertEqual(dateFilters.parseIsoDate("2026-02-29"), null, "parseIsoDate rejects invalid calendar dates")
 assertEqual(dateFilters.parseIsoDate("2024-02-29").getFullYear(), 2024, "parseIsoDate accepts leap day")
+assertEqual(dateFilters.parseMonthKey("2026-05").getMonth(), 4, "parseMonthKey parses valid month keys")
+assertEqual(dateFilters.parseMonthKey("2026-15"), null, "parseMonthKey rejects invalid month keys")
+assertEqual(dateFilters.parseDateValue("2026-01-05").getDate(), 5, "parseDateValue preserves local calendar dates")
+assertEqual(dateFilters.formatDateValue("2026-01-05", { month: "short", day: "numeric", year: "numeric" }), "Jan 5, 2026", "date value formatter renders date-only values")
+assertEqual(
+  dateFilters.formatDateTimeValue("2026-01-05T14:30:00Z", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }),
+  "Jan 5, 2026, 2:30 PM",
+  "date time formatter renders timestamps"
+)
 
 assertEqual(formatters.formatCurrency("1234.5"), "$1,234.50", "currency formatter renders dollars")
 assertEqual(formatters.formatCategory("savings"), "Savings", "category formatter renders savings label")

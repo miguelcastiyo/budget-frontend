@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { CategoryCard } from "@/components/budget/category-card"
 import { TagBreakdown } from "@/components/budget/tag-breakdown"
@@ -165,7 +165,7 @@ export default function DashboardPage() {
         <div className="space-y-6 lg:space-y-8">
           {shouldShowFirstMonthActionCard && (
             <FirstMonthActionCard
-              month={new Date(`${currentMonth}-01T00:00:00`).toLocaleDateString("en-US", { month: "long" })}
+              month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth}
               isDismissing={isDismissingFirstRun}
               onAddTransaction={() => setShowAddTransaction(true)}
               onDismiss={() => void handleDismissFirstRun()}

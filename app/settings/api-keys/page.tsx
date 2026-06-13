@@ -12,14 +12,11 @@ import type { MasterApiKeyMetadata } from "@/lib/api/types"
 import { ArrowLeft, Plus, Key, Trash2, Copy, Check, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { formatDateValue } from "@/lib/date-filters"
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Never"
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+  return formatDateValue(dateStr, { month: "short", day: "numeric", year: "numeric" })
 }
 
 function statusLabel(status: MasterApiKeyMetadata["status"]): string {

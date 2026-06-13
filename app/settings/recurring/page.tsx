@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { formatDateValue, formatMonthValue, getCurrentMonthKey, parseMonthKey } from "@/lib/date-filters"
 import { asNumber, toDecimalString } from "@/lib/income-breakdown"
 import type {
   Category,
@@ -134,20 +134,11 @@ function isValidBillingDay(form: RecurringFormState): boolean {
 }
 
 function formatProjectedDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) {
-    return date
-  }
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return formatDateValue(date, { month: "short", day: "numeric" })
 }
 
 function formatRecurringGroupDate(date: string): string {
-  const parsed = new Date(`${date}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) {
-    return date
-  }
-
-  return parsed.toLocaleDateString("en-US", {
+  return formatDateValue(date, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -155,8 +146,7 @@ function formatRecurringGroupDate(date: string): string {
 }
 
 function formatAddedMonth(month: string): string {
-  const parsed = parseMonthValue(month)
-  return parsed ? format(parsed, "MMMM yyyy") : month
+  return formatMonthValue(month, { month: "long", year: "numeric" }) ?? month
 }
 
 function formatBillingSchedule(item: RecurringExpense): string {
@@ -192,27 +182,6 @@ function sortRecurringItems(items: RecurringExpense[], sort: RecurringSort): Rec
   })
 }
 
-function parseMonthValue(month: string): Date | null {
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    return null
-  }
-
-  const [yearRaw, monthRaw] = month.split("-")
-  const year = Number(yearRaw)
-  const monthIndex = Number(monthRaw) - 1
-  const parsed = new Date(year, monthIndex, 1)
-
-  if (
-    Number.isNaN(parsed.getTime()) ||
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== monthIndex
-  ) {
-    return null
-  }
-
-  return parsed
-}
-
 function monthValueFromParts(year: number, monthIndex: number): string {
   return `${year}-${String(monthIndex + 1).padStart(2, "0")}`
 }
@@ -241,10 +210,10 @@ function MonthPicker({
   allowClear = false,
   disabled = false,
 }: MonthPickerProps) {
-  const selectedMonth = parseMonthValue(value)
+  const selectedMonth = parseMonthKey(value)
   const displayLabel = selectedMonth ? format(selectedMonth, "MMMM yyyy") : placeholder
   const currentMonthValue = getCurrentMonthKey()
-  const initialYear = selectedMonth?.getFullYear() ?? parseMonthValue(currentMonthValue)?.getFullYear() ?? new Date().getFullYear()
+  const initialYear = selectedMonth?.getFullYear() ?? parseMonthKey(currentMonthValue)?.getFullYear() ?? new Date().getFullYear()
   const [visibleYear, setVisibleYear] = useState(initialYear)
 
   useEffect(() => {
@@ -329,7 +298,7 @@ function MonthPicker({
             variant="ghost"
             className="mt-3 h-9 w-full rounded-xl text-sm text-muted-foreground"
             onClick={() => {
-              const currentMonth = parseMonthValue(currentMonthValue)
+              const currentMonth = parseMonthKey(currentMonthValue)
               setVisibleYear(currentMonth?.getFullYear() ?? new Date().getFullYear())
               onChange(currentMonthValue)
             }}
@@ -929,12 +898,7 @@ function RecurringItemRow({
 }
 
 function formatProjectedDateLong(date: string): string {
-  const parsed = new Date(`${date}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) {
-    return date
-  }
-
-  return parsed.toLocaleDateString("en-US", {
+  return formatDateValue(date, {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -6,6 +6,7 @@ import type { ReactNode } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
+import { formatDateValue, parseDateValue } from "@/lib/date-filters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/lib/api/types"
@@ -32,10 +33,10 @@ interface TransactionListProps {
 }
 
 function formatDate(dateStr: string): string {
-  const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  const date = isoDateMatch
-    ? new Date(Number(isoDateMatch[1]), Number(isoDateMatch[2]) - 1, Number(isoDateMatch[3]))
-    : new Date(dateStr)
+  const date = parseDateValue(dateStr)
+  if (!date) {
+    return dateStr
+  }
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
@@ -47,10 +48,10 @@ function formatDate(dateStr: string): string {
     return "Yesterday"
   }
   
-  return date.toLocaleDateString("en-US", { 
+  return formatDateValue(dateStr, {
     weekday: "short",
-    month: "short", 
-    day: "numeric" 
+    month: "short",
+    day: "numeric",
   })
 }
 

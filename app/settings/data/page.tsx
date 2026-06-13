@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { Category, CsvImportAmountStrategy, CsvImportCategoryStrategy, CsvImportDateStrategy, CsvImportField, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, CsvImportTagStrategy, CsvImportTagStrategyEntry, DataRunItem, DataRunStatus, Tag } from "@/lib/api/types"
-import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
+import { formatDateTimeValue, formatDateValue, parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 
@@ -118,30 +118,6 @@ function defaultTagValueMap(preview: CsvImportPreviewResponse, tagHeader: string
       existing ? { mode: "existing", tag_id: existing.id } : { mode: "new", name: item.value },
     ]
   }))
-}
-
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
-
-function formatDateOnly(value: string | null): string {
-  if (!value) {
-    return "All time"
-  }
-
-  const [yearRaw, monthRaw, dayRaw] = value.split("-")
-  const date = new Date(Number(yearRaw), Number(monthRaw) - 1, Number(dayRaw))
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 function statusLabel(status: DataRunStatus): string {
@@ -858,7 +834,7 @@ function ActivityRow({
 }) {
   const rangeLabel = item.type === "export"
     ? item.date_from && item.date_to
-      ? `${formatDateOnly(item.date_from)} - ${formatDateOnly(item.date_to)}`
+      ? `${formatDateValue(item.date_from, { month: "short", day: "numeric", year: "numeric" })} - ${formatDateValue(item.date_to, { month: "short", day: "numeric", year: "numeric" })}`
       : "All time"
     : item.source_filename || "CSV import"
 
@@ -881,7 +857,7 @@ function ActivityRow({
             </span>
           </div>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{rangeLabel}</p>
-          <p className="mt-1 text-xs text-muted-foreground lg:hidden">{formatDateTime(item.created_at)}</p>
+          <p className="mt-1 text-xs text-muted-foreground lg:hidden">{formatDateTimeValue(item.created_at, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
           {item.type === "import" && (
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground lg:hidden">
               <span>{item.imported_rows ?? 0} imported</span>
@@ -919,7 +895,7 @@ function ActivityRow({
         </div>
         </div>
         <div className="hidden text-right text-xs text-muted-foreground lg:block">
-          <p>{formatDateTime(item.created_at)}</p>
+          <p>{formatDateTimeValue(item.created_at, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
           {item.type === "import" && (
             <div className="mt-2 flex justify-end gap-3">
               <span>{item.imported_rows ?? 0} imported</span>
@@ -1492,7 +1468,7 @@ export default function DataSettingsPage() {
                           className="h-11 w-full justify-start rounded-lg border-border/60 px-3 font-normal hover:border-foreground/20"
                         >
                           <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{selectedExportFromDate ? formatDateOnly(exportCustomFrom) : "Select start date"}</span>
+                          <span className="truncate">{selectedExportFromDate ? formatDateValue(exportCustomFrom, { month: "short", day: "numeric", year: "numeric" }) : "Select start date"}</span>
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -1520,7 +1496,7 @@ export default function DataSettingsPage() {
                           className="h-11 w-full justify-start rounded-lg border-border/60 px-3 font-normal hover:border-foreground/20"
                         >
                           <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{selectedExportToDate ? formatDateOnly(exportCustomTo) : "Select end date"}</span>
+                          <span className="truncate">{selectedExportToDate ? formatDateValue(exportCustomTo, { month: "short", day: "numeric", year: "numeric" }) : "Select end date"}</span>
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -1891,7 +1867,7 @@ export default function DataSettingsPage() {
             <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
               <p className="truncate font-medium">{rollbackTarget.source_filename || "CSV import"}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {rollbackTarget.imported_rows ?? 0} imported on {formatDateTime(rollbackTarget.created_at)}
+                {rollbackTarget.imported_rows ?? 0} imported on {formatDateTimeValue(rollbackTarget.created_at, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
             </div>
           )}

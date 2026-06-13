@@ -42,6 +42,7 @@ import { CalendarIcon, ChevronDown, Plus, X, CreditCard } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { parseDateValue } from "@/lib/date-filters"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
@@ -103,13 +104,7 @@ export function AddTransactionSheet({
   const didAutoFocusOnOpenRef = useRef(false)
 
   const parseTransactionDate = (dateStr: string): Date => {
-    const isoDateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (isoDateMatch) {
-      return new Date(Number(isoDateMatch[1]), Number(isoDateMatch[2]) - 1, Number(isoDateMatch[3]))
-    }
-
-    const parsed = new Date(dateStr)
-    return Number.isNaN(parsed.getTime()) ? new Date() : parsed
+    return parseDateValue(dateStr) ?? new Date()
   }
 
   const isLastDayOfMonth = (value: Date): boolean => {

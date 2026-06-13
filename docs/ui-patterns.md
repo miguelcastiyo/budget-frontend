@@ -58,3 +58,14 @@ Use page-specific `DialogContent` or `SheetContent` directly only when the layou
 - Prefer passing existing footer actions into the shell instead of duplicating sticky footer classes.
 - Prefer `mobileSize="compact"` for short create/edit/detail flows where the content would otherwise leave large empty vertical space.
 - If a future iOS tray issue appears, fix the shell first and then audit remaining direct modal implementations.
+
+## Date Helpers
+
+Use shared helpers from `lib/date-filters.ts` for UI-facing date parsing and display instead of page-local `new Date(...)` formatting.
+
+- Use `parseIsoDate` for strict `YYYY-MM-DD` values.
+- Use `parseDateValue` when the backend can return either date-only or timestamp values.
+- Use `parseMonthKey` and `formatMonthValue` for `YYYY-MM` month keys.
+- Use `formatDateValue` and `formatDateTimeValue` for display strings so date-only values stay local-calendar-safe.
+
+This keeps month keys, transaction dates, import/export timestamps, and settings screens on one parsing path and avoids timezone drift from ad hoc browser parsing.
