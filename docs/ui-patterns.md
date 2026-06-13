@@ -69,3 +69,13 @@ Use shared helpers from `lib/date-filters.ts` for UI-facing date parsing and dis
 - Use `formatDateValue` and `formatDateTimeValue` for display strings so date-only values stay local-calendar-safe.
 
 This keeps month keys, transaction dates, import/export timestamps, and settings screens on one parsing path and avoids timezone drift from ad hoc browser parsing.
+
+## Feature Structure
+
+When a route grows beyond simple page orchestration, extract feature-local modules next to the route instead of keeping domain helpers and presentational sections inside `page.tsx`.
+
+- Put shared presentational pieces in `_components/`.
+- Put route-specific state loaders or async orchestration helpers in `_hooks/`.
+- Put feature constants, pure helpers, and flow utilities in `_lib/`.
+
+The route file should stay focused on composing state, handlers, and top-level layout.
