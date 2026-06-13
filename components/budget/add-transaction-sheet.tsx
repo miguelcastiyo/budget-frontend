@@ -909,14 +909,14 @@ export function AddTransactionSheet({
                           </div>
 
                           {makeRecurring && (
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-2">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <div className="min-w-0 space-y-2">
                                 <Label className="text-xs text-muted-foreground">Billing rule</Label>
                                 <Select
                                   value={recurringBillingType}
                                   onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
                                 >
-                                  <SelectTrigger className="h-10 rounded-xl border-border/60">
+                                  <SelectTrigger className="h-10 min-w-0 rounded-xl border-border/60">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -925,7 +925,7 @@ export function AddTransactionSheet({
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="space-y-2">
+                              <div className="min-w-0 space-y-2">
                                 <Label className="text-xs text-muted-foreground">Billing day</Label>
                                 <Input
                                   type="number"
