@@ -3,11 +3,11 @@
 import { Card } from "@/components/ui/card"
 import { SpendingRing } from "./spending-ring"
 import { formatCurrency, formatCategory } from "@/lib/formatters"
-import type { CategoryMetricsItem } from "@/lib/api/types"
+import type { MonthOverviewCategoryItem } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
 interface CategoryCardProps {
-  metrics: CategoryMetricsItem
+  metrics: MonthOverviewCategoryItem
   onClick?: () => void
   compactOnMobile?: boolean
 }
