@@ -700,6 +700,13 @@ export interface InvitesResponse {
   items: InviteResponse[]
 }
 
+export interface InvitePreviewResponse {
+  invite_id: string
+  invitee_name: string
+  email: string
+  preferred_auth_provider: "google" | "password"
+}
+
 export interface AcceptInvitePasswordRequest {
   invite_token: string
   display_name: string

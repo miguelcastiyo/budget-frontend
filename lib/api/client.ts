@@ -45,6 +45,7 @@ import type {
   CreateInviteRequest,
   InviteResponse,
   InvitesResponse,
+  InvitePreviewResponse,
   AcceptInvitePasswordRequest,
   AcceptInviteGoogleRequest,
   RequestEmailChangeRequest,
@@ -214,6 +215,10 @@ class ApiClient {
 
   async getInvites(): Promise<InvitesResponse> {
     return this.request<InvitesResponse>("/auth/invitations")
+  }
+
+  async getInvitePreview(inviteToken: string): Promise<InvitePreviewResponse> {
+    return this.request<InvitePreviewResponse>(`/auth/invitations/preview?invite_token=${encodeURIComponent(inviteToken)}`)
   }
 
   async acceptInvitePassword(data: AcceptInvitePasswordRequest): Promise<AuthSessionResponse> {

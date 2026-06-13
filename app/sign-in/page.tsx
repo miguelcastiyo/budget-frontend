@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { ApiError, apiClient } from "@/lib/api/client"
+import type { InvitePreviewResponse } from "@/lib/api/types"
 
 type InviteErrorState = "invalid" | "expired" | "accepted" | "mismatched-google" | "generic" | null
 
@@ -126,11 +127,16 @@ function SignInPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<InviteErrorState>(null)
+  const [invitePreview, setInvitePreview] = useState<InvitePreviewResponse | null>(null)
+  const [isInvitePreviewLoading, setIsInvitePreviewLoading] = useState(false)
+  const [showSecondaryInvitePath, setShowSecondaryInvitePath] = useState(false)
   const [googleButtonWidth, setGoogleButtonWidth] = useState(320)
   const googleClientIdConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
   const inviteToken = searchParams.get("invite_token")?.trim() || ""
-  const invitedEmail = searchParams.get("invited_email")?.trim() || searchParams.get("email")?.trim() || ""
   const isInviteFlow = inviteToken.length > 0
+  const invitedEmail = invitePreview?.email ?? ""
+  const invitePrimaryAuthProvider = invitePreview?.preferred_auth_provider ?? "password"
+  const isGooglePrimaryInvitePath = invitePrimaryAuthProvider === "google"
 
   useEffect(() => {
     const updateGoogleButtonWidth = () => {
@@ -147,6 +153,55 @@ function SignInPageContent() {
       window.removeEventListener("resize", updateGoogleButtonWidth)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isInviteFlow) {
+      setInvitePreview(null)
+      setIsInvitePreviewLoading(false)
+      setShowSecondaryInvitePath(false)
+      return
+    }
+
+    let isActive = true
+    setIsInvitePreviewLoading(true)
+    setInviteError(null)
+    setError(null)
+    setShowSecondaryInvitePath(false)
+
+    void apiClient.getInvitePreview(inviteToken)
+      .then((preview) => {
+        if (!isActive) {
+          return
+        }
+
+        setInvitePreview(preview)
+        setDisplayName((previous) => (previous.trim() === "" ? preview.invitee_name : previous))
+      })
+      .catch((err) => {
+        if (!isActive) {
+          return
+        }
+
+        setInvitePreview(null)
+        if (err instanceof ApiError) {
+          setInviteError(getInviteErrorState(err))
+          setError(err.error.message || "Unable to load invitation")
+          return
+        }
+
+        setInviteError("generic")
+        setError("Unable to load invitation")
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsInvitePreviewLoading(false)
+        }
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [inviteToken, isInviteFlow])
 
   const inviteErrorMessage = useMemo(
     () => inviteErrorCopy(inviteError, error),
@@ -256,7 +311,146 @@ function SignInPageContent() {
     }
   }
 
+  const renderInviteGoogleSection = (ctaLabel: string) => (
+    <div className="space-y-3">
+      {googleClientIdConfigured && displayName.trim() !== "" ? (
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
+            onError={() => {
+              setInviteError("generic")
+              setError("Google sign-in was canceled or failed.")
+            }}
+            theme="outline"
+            text="signup_with"
+            shape="pill"
+            size="large"
+            width={googleButtonWidth}
+            containerProps={{
+              className: "flex w-full justify-center",
+            }}
+          />
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          className="h-12 w-full rounded-2xl text-base"
+          onClick={() => {
+            if (!googleClientIdConfigured) {
+              setInviteError("generic")
+              setError("Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in.")
+              return
+            }
+            setError("Enter your name before continuing with Google.")
+          }}
+          disabled={isLoading}
+        >
+          {ctaLabel}
+        </Button>
+      )}
+
+      <p className="px-1 text-center text-xs leading-5 text-muted-foreground">
+        Use the same Google email address that received the invitation.
+      </p>
+    </div>
+  )
+
+  const renderInvitePasswordSection = () => (
+    <form onSubmit={handleInvitePasswordAccept} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="invite-email">Email</Label>
+        <div className="relative">
+          <LockKeyhole className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id="invite-email"
+            type="email"
+            value={invitedEmail}
+            readOnly
+            aria-readonly="true"
+            className="h-12 rounded-xl border-border/70 bg-muted/30 pr-3 pl-9 text-base text-muted-foreground"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="invite-password">Create password</Label>
+        <Input
+          id="invite-password"
+          type="password"
+          placeholder="Create a strong password"
+          value={invitePassword}
+          onChange={(e) => setInvitePassword(e.target.value)}
+          className="h-12 rounded-xl border-border/70 bg-background text-base"
+          autoComplete="new-password"
+          disabled={isLoading}
+          required
+        />
+      </div>
+
+      <div className="sticky bottom-0 -mx-4 border-t border-border/70 bg-card/95 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0 sm:backdrop-blur-none">
+        <Button
+          type="submit"
+          className="h-12 w-full rounded-xl text-base"
+          disabled={isLoading || displayName.trim() === "" || invitePassword.length === 0}
+        >
+          {isLoading ? "Creating account..." : "Set password"}
+        </Button>
+      </div>
+    </form>
+  )
+
   if (isInviteFlow) {
+    if (isInvitePreviewLoading) {
+      return (
+        <SignInLoadingFallback
+          title="Preparing your invitation"
+          body="Checking the invited account and loading the right setup path."
+        />
+      )
+    }
+
+    if (!invitePreview) {
+      return (
+        <AuthScreenShell>
+          <AuthCard>
+            <AuthBrand />
+
+            <div className="space-y-2 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Account setup</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[2rem]">
+                We couldn&apos;t load this invitation
+              </h1>
+            </div>
+
+            {inviteErrorMessage && (
+              <div className="rounded-2xl border border-destructive/20 bg-destructive/8 px-4 py-4 text-sm text-destructive">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-medium">{inviteErrorMessage.title}</p>
+                    <p className="leading-6">{inviteErrorMessage.body}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Link href="/sign-in" className="text-center text-sm font-medium text-primary hover:underline">
+              Back to sign in
+            </Link>
+          </AuthCard>
+        </AuthScreenShell>
+      )
+    }
+
+    const secondaryToggleLabel = isGooglePrimaryInvitePath
+      ? (showSecondaryInvitePath ? "Hide password setup" : "Use a password instead")
+      : (showSecondaryInvitePath ? "Hide Google setup" : "Use Google instead")
+
+    const secondaryToggleDescription = isGooglePrimaryInvitePath
+      ? "Prefer to create a password for this invited email?"
+      : "If this invited email is tied to Google, you can still use Google sign-in instead."
+
     return (
       <AuthScreenShell>
         <AuthCard>
@@ -268,21 +462,16 @@ function SignInPageContent() {
               You&apos;ve been invited
             </h1>
             <p className="text-sm leading-6 text-muted-foreground sm:text-[15px]">
-              Create your Budget account to continue. Invited users can continue with Google or create a password,
-              and password setup signs you in immediately.
+              {isGooglePrimaryInvitePath
+                ? "This invited Gmail account is set up for Google sign-in first. Continue with the same Gmail address to create your Budget account."
+                : "This invited account is set up for password creation first. Create a password for the invited email to finish your Budget account setup."}
             </p>
           </div>
 
-          {invitedEmail ? (
-            <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invited email</p>
-              <p className="mt-1 break-all text-sm font-medium text-foreground">{invitedEmail}</p>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
-              This invite link contains the account email. Continue with Google or create a password to finish setup.
-            </div>
-          )}
+          <div className="rounded-2xl border border-border/70 bg-muted/25 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invited email</p>
+            <p className="mt-1 break-all text-sm font-medium text-foreground">{invitedEmail}</p>
+          </div>
 
           {inviteErrorMessage && (
             <div className="rounded-2xl border border-destructive/20 bg-destructive/8 px-4 py-4 text-sm text-destructive">
@@ -311,100 +500,51 @@ function SignInPageContent() {
             />
           </div>
 
-          <div className="space-y-3">
-            {googleClientIdConfigured && displayName.trim() !== "" ? (
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
-                  onError={() => {
-                    setInviteError("generic")
-                    setError("Google sign-in was canceled or failed.")
-                  }}
-                  theme="outline"
-                  text="signup_with"
-                  shape="pill"
-                  size="large"
-                  width={googleButtonWidth}
-                  containerProps={{
-                    className: "flex w-full justify-center",
-                  }}
-                />
+          {isGooglePrimaryInvitePath ? renderInviteGoogleSection("Continue with Google") : renderInvitePasswordSection()}
+
+          {(isGooglePrimaryInvitePath || googleClientIdConfigured) && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Secondary option
+                </span>
+                <Separator className="flex-1" />
               </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 w-full rounded-2xl text-base"
-                onClick={() => {
-                  if (!googleClientIdConfigured) {
-                    setInviteError("generic")
-                    setError("Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable Google sign-in.")
-                    return
-                  }
-                  setError("Enter your name before continuing with Google.")
-                }}
-                disabled={isLoading}
-              >
-                Continue with Google
-              </Button>
-            )}
 
-            <p className="px-1 text-center text-xs leading-5 text-muted-foreground">
-              Use the same Google email address that received the invitation.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Or set a password
-            </span>
-            <Separator className="flex-1" />
-          </div>
-
-          <form onSubmit={handleInvitePasswordAccept} className="space-y-4">
-            {invitedEmail && (
-              <div className="space-y-2">
-                <Label htmlFor="invite-email">Email</Label>
-                <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    value={invitedEmail}
-                    readOnly
-                    aria-readonly="true"
-                    className="h-12 rounded-xl border-border/70 bg-muted/30 pr-3 pl-9 text-base text-muted-foreground"
-                  />
-                </div>
+              <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">{secondaryToggleDescription}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-3 h-11 w-full justify-between rounded-2xl px-4 text-sm"
+                  onClick={() => setShowSecondaryInvitePath((previous) => !previous)}
+                  disabled={isLoading}
+                >
+                  <span>{secondaryToggleLabel}</span>
+                  <ArrowRight className={`size-4 transition-transform ${showSecondaryInvitePath ? "rotate-90" : ""}`} />
+                </Button>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="invite-password">Create password</Label>
-              <Input
-                id="invite-password"
-                type="password"
-                placeholder="Create a strong password"
-                value={invitePassword}
-                onChange={(e) => setInvitePassword(e.target.value)}
-                className="h-12 rounded-xl border-border/70 bg-background text-base"
-                autoComplete="new-password"
-                disabled={isLoading}
-                required
-              />
             </div>
+          )}
 
-            <div className="sticky bottom-0 -mx-4 border-t border-border/70 bg-card/95 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0 sm:backdrop-blur-none">
-              <Button
-                type="submit"
-                className="h-12 w-full rounded-xl text-base"
-                disabled={isLoading || displayName.trim() === "" || invitePassword.length === 0}
-              >
-                {isLoading ? "Creating account..." : "Set password"}
-              </Button>
-            </div>
-          </form>
+          {showSecondaryInvitePath && (
+            <>
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {isGooglePrimaryInvitePath ? "Password setup" : "Google sign-in"}
+                </span>
+                <Separator className="flex-1" />
+              </div>
+
+              {isGooglePrimaryInvitePath ? renderInvitePasswordSection() : renderInviteGoogleSection("Continue with Google")}
+            </>
+          )}
+
+          {!isGooglePrimaryInvitePath && (
+            <div className="sticky bottom-0 -mx-4 border-t border-transparent bg-transparent px-4 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] sm:hidden" />
+          )}
         </AuthCard>
       </AuthScreenShell>
     )
@@ -532,7 +672,13 @@ function SignInPageContent() {
   )
 }
 
-function SignInLoadingFallback() {
+function SignInLoadingFallback({
+  title = "Preparing your sign-in flow",
+  body = "Checking your link and loading the right account setup path.",
+}: {
+  title?: string
+  body?: string
+}) {
   return (
     <AuthScreenShell>
       <AuthCard>
@@ -540,8 +686,8 @@ function SignInLoadingFallback() {
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <Spinner className="size-6 text-primary" />
           <div className="space-y-1">
-            <p className="text-base font-medium text-foreground">Preparing your sign-in flow</p>
-            <p className="text-sm text-muted-foreground">Checking your link and loading the right account setup path.</p>
+            <p className="text-base font-medium text-foreground">{title}</p>
+            <p className="text-sm text-muted-foreground">{body}</p>
           </div>
         </div>
       </AuthCard>
