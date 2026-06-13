@@ -15,7 +15,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Recurring-specific details stay visible as compact chips: tag, card when available, billing schedule, and active/inactive status.
 - The list can be sorted locally by newest or oldest projected date without changing backend behavior.
 - Tapping or clicking a recurring row opens a detail sheet, matching the transaction row interaction pattern.
-- Detail now uses the shared `ResponsiveDialog` shell so the read-only tray matches create/edit behavior on mobile and desktop.
+- Detail now uses the shared `ResponsiveDialog` shell with `mobileSize="compact"` so the read-only tray stays tighter than the longer create/edit forms while keeping the same shared behavior.
 - Edit and Delete actions live in the detail tray; Delete still confirms before mutating data.
 - New and edit use the existing mobile tray / desktop modal pattern, grouped into Expense, Schedule, and Status sections.
 - New and edit use the shared `ResponsiveDialog` shell for mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, and scroll containment.

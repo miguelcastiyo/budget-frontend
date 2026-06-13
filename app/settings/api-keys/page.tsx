@@ -217,6 +217,7 @@ export default function ApiKeysSettingsPage() {
         onOpenChange={setShowCreateDialog}
         title="Create API Key"
         description="Give your API key a name to help you identify it later."
+        mobileSize="compact"
         desktopClassName="sm:w-[min(calc(100dvw-2rem),32rem)] sm:max-w-[32rem]"
         headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
         bodyClassName="space-y-4 px-5 py-5 sm:px-6"
@@ -265,6 +266,7 @@ export default function ApiKeysSettingsPage() {
         }}
         title="API Key Created"
         description="Copy your API key now. You will not be able to see it again."
+        mobileSize="compact"
         desktopClassName="sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem]"
         headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
         bodyClassName="px-5 py-5 sm:px-6"

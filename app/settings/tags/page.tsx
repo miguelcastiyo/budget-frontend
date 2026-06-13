@@ -316,6 +316,7 @@ export default function TagsSettingsPage() {
         }}
         title="Create tag"
         description="Choose a name and icon."
+        mobileSize="compact"
         desktopClassName="sm:w-[min(calc(100dvw-2rem),35rem)] sm:max-w-[35rem]"
         headerClassName="px-4 pb-3 pt-2 sm:px-5 sm:py-4"
         bodyClassName="px-4 py-4 sm:px-5"
@@ -373,6 +374,7 @@ export default function TagsSettingsPage() {
         }}
         title="Edit tag"
         description={editingTag?.name ?? "Update name and icon"}
+        mobileSize="compact"
         desktopClassName="sm:w-[min(calc(100dvw-2rem),35rem)] sm:max-w-[35rem]"
         headerClassName="px-4 pb-3 pt-2 sm:px-5 sm:py-4"
         bodyClassName="px-4 py-4 sm:px-5"

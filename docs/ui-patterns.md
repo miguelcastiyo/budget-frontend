@@ -16,6 +16,11 @@ Use `components/ui/responsive-dialog.tsx` for modal flows that should behave as:
 - safe-area-aware footer spacing for iOS
 - the standard drag handle and close button
 
+Mobile size modes:
+
+- `mobileSize="full"` for longer forms and multi-step flows that should claim a full working surface on mobile.
+- `mobileSize="compact"` for short forms and lightweight detail trays that should hug content and only grow taller when needed.
+
 Current users:
 
 - Settings -> Budget edit flow
@@ -51,4 +56,5 @@ Use page-specific `DialogContent` or `SheetContent` directly only when the layou
 - Keep business logic in the page or feature component; `ResponsiveDialog` should only own layout, scroll, close, and mobile tray behavior.
 - Keep destructive mutation logic in the page or feature component; `ResponsiveConfirmDialog` should only own presentation and dismissal behavior.
 - Prefer passing existing footer actions into the shell instead of duplicating sticky footer classes.
+- Prefer `mobileSize="compact"` for short create/edit/detail flows where the content would otherwise leave large empty vertical space.
 - If a future iOS tray issue appears, fix the shell first and then audit remaining direct modal implementations.

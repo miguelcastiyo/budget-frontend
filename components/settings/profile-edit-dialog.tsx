@@ -205,10 +205,11 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
       onOpenChange={handleOpenChange}
       title="Edit Profile"
       description="Update your account details and sign-in options."
+      mobileSize="compact"
       desktopClassName="sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem]"
       contentClassName="sm:max-h-[min(90dvh,42rem)]"
       headerClassName="px-5 pb-4 pt-3 sm:px-6 sm:pt-5"
-      bodyClassName="space-y-5 px-5 py-5 sm:px-6"
+      bodyClassName="space-y-6 px-5 py-5 sm:space-y-7 sm:px-6"
       footerClassName="px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-4"
       footer={
         <Button

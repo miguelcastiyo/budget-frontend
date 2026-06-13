@@ -8,8 +8,8 @@ The Settings -> API Keys page manages personal API keys for Budget development a
 ## Current experience
 
 - Mobile uses the compact Settings layout with an icon-only create action and stacked key cards.
-- Create API Key uses the shared `ResponsiveDialog` shell so mobile opens as a bottom tray and desktop opens as a centered modal.
-- The post-create reveal step also uses `ResponsiveDialog`, preserving the one-time key visibility warning while keeping the footer reachable on mobile.
+- Create API Key uses the shared `ResponsiveDialog` shell with `mobileSize="compact"` so the mobile tray fits the short form cleanly.
+- The post-create reveal step also uses `ResponsiveDialog` with `mobileSize="compact"`, preserving the one-time key visibility warning while avoiding unnecessary empty vertical space on mobile.
 - Revoke confirmation uses the shared `ResponsiveConfirmDialog` shell so destructive confirmation matches the rest of Settings.
 - Key status display, copy, show/hide behavior, and revoke behavior are unchanged.
 

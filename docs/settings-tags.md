@@ -8,7 +8,7 @@ The Settings -> Tags page manages the available tag library used to organize tra
 ## Current experience
 
 - Mobile uses the existing compact settings flow with a single-column page, icon-only create action, direct edit/remove row actions, and bottom tray create/edit forms.
-- Create and edit now use the shared `ResponsiveDialog` shell so mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, scroll containment, and safe-area footer spacing stay aligned with other Settings flows.
+- Create and edit now use the shared `ResponsiveDialog` shell with `mobileSize="compact"` so short tag forms hug their content on mobile instead of expanding into a tall tray.
 - Remove confirmation now uses the shared `ResponsiveConfirmDialog` shell so destructive actions also follow the same mobile tray / desktop modal pattern.
 - Desktop uses a wider management surface, an explicit "New tag" action, compact rows, and an overflow menu for row actions.
 - The list card includes a simple header with the current tag count.

@@ -30,6 +30,7 @@ interface ResponsiveDialogProps {
   footerClassName?: string
   desktopClassName?: string
   bodyMaxWidthClassName?: string
+  mobileSize?: "full" | "compact"
 }
 
 export function ResponsiveDialog({
@@ -48,6 +49,7 @@ export function ResponsiveDialog({
   footerClassName,
   desktopClassName = "sm:w-[min(calc(100dvw-2rem),38rem)] sm:max-w-[38rem]",
   bodyMaxWidthClassName,
+  mobileSize = "full",
 }: ResponsiveDialogProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const swipeDismiss = useSwipeDismiss({
@@ -62,7 +64,10 @@ export function ResponsiveDialog({
         {...swipeDismiss}
         showCloseButton={false}
         className={cn(
-          "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:rounded-2xl sm:border",
+          "flex w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:rounded-2xl sm:border",
+          mobileSize === "full"
+            ? "h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)]"
+            : "h-auto max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)]",
           desktopClassName,
           mobileDrawerDialogClassName,
           contentClassName
@@ -101,7 +106,11 @@ export function ResponsiveDialog({
 
         <div
           ref={scrollRef}
-          className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5", bodyClassName)}
+          className={cn(
+            "min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5",
+            mobileSize === "full" ? "flex-1" : "flex-initial",
+            bodyClassName
+          )}
         >
           <div className={cn(bodyMaxWidthClassName)}>{children}</div>
         </div>

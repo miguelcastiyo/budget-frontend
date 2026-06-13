@@ -948,6 +948,7 @@ function RecurringDetailDialog({
       onOpenChange={onOpenChange}
       title={item.expense}
       description={`${formatCurrency(item.amount)} / month`}
+      mobileSize="compact"
       desktopClassName="sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem]"
       headerClassName="px-4 pb-3 pt-2 sm:px-7 sm:pb-4 sm:pt-5"
       bodyClassName="px-4 py-4 sm:px-7 sm:py-6"
