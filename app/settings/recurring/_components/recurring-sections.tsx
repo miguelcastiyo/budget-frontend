@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { format } from "date-fns"
 import { CalendarIcon, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2 } from "lucide-react"
@@ -19,7 +19,14 @@ import type { Card as CardType, RecurringBillingType, RecurringExpense, Tag } fr
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
-import { getRecurringDisplayStatus, getRecurringDisplayStatusLabel, type RecurringDisplayStatus } from "../_lib/recurring-status"
+import { getRecurringDisplayStatus, getRecurringDisplayStatusLabel } from "../_lib/recurring-status"
+import {
+  formatBillingSchedulePreview,
+  formatScheduledChangePreview,
+  getNextScheduledVersion,
+  getOccurrenceStatusLabel,
+  getRecurringOccurrenceStatus,
+} from "../_lib/recurring-series"
 import {
   categoryConfig,
   emptyForm,
@@ -561,8 +568,20 @@ interface RecurringDetailDialogProps {
   selectedMonth: string
   seriesItems: RecurringExpense[]
   isSeriesLoading: boolean
+  mode: "details" | "schedule_change"
+  scheduleChangeAmount: string
+  scheduleChangeEffectiveMonth: string
+  scheduleChangeBillingType: RecurringBillingType
+  scheduleChangeBillingDay: string
+  isMutating: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
+  onScheduleChangeAmountChange: (value: string) => void
+  onScheduleChangeEffectiveMonthChange: (value: string) => void
+  onScheduleChangeBillingTypeChange: (value: RecurringBillingType) => void
+  onScheduleChangeBillingDayChange: (value: string) => void
+  onScheduleChangeBack: () => void
+  onScheduleChangeSubmit: () => void
   onEdit: (item: RecurringExpense) => void
   onScheduleChange: (item: RecurringExpense) => void
   onDelete: (item: RecurringExpense) => void
@@ -570,25 +589,16 @@ interface RecurringDetailDialogProps {
 
 export function RecurringItemRow({
   item,
-  selectedMonth,
+  subtitle,
+  showScheduledChange = false,
   onOpen,
 }: {
   item: RecurringExpense
-  selectedMonth: string
+  subtitle: string
+  showScheduledChange?: boolean
   onOpen: () => void
 }) {
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
-  const status = getRecurringDisplayStatus(item, selectedMonth)
-  const statusLabel = getRecurringDisplayStatusLabel(status)
-  const statusClasses = getRecurringStatusClasses(status)
-  const secondaryMetadata = useMemo(() => {
-    const line = ["Monthly", `Due ${formatProjectedDate(item.projected_date_for_month)}`]
-    if (item.card?.name) {
-      line.push(item.card.name)
-    }
-    return line
-  }, [item.card?.name, item.projected_date_for_month])
-  const tertiaryMetadata = [categoryConfig[item.category].label, item.tag.name, statusLabel]
 
   return (
     <button
@@ -605,14 +615,10 @@ export function RecurringItemRow({
         <div className="flex min-w-0 items-start justify-between gap-3">
           <p className="truncate text-sm font-semibold sm:text-[15px]">{item.expense}</p>
         </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">{secondaryMetadata.join(" · ")}</p>
-        <div className="mt-1 flex items-center gap-1.5 overflow-hidden text-[11px] text-muted-foreground sm:text-xs">
-          <span className="truncate">{tertiaryMetadata[0]}</span>
-          <span aria-hidden="true">·</span>
-          <span className="truncate">{tertiaryMetadata[1]}</span>
-          <span aria-hidden="true">·</span>
-          <span className={cn("truncate font-medium", statusClasses)}>{tertiaryMetadata[2]}</span>
-        </div>
+        <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">{subtitle}</p>
+        {showScheduledChange ? (
+          <p className="mt-1 truncate text-[11px] font-medium text-muted-foreground sm:text-xs">Scheduled change ahead</p>
+        ) : null}
       </div>
 
       <div className="min-w-[4.25rem] shrink-0 text-right sm:min-w-[4.75rem]">
@@ -629,8 +635,20 @@ export function RecurringDetailDialog({
   selectedMonth,
   seriesItems,
   isSeriesLoading,
+  mode,
+  scheduleChangeAmount,
+  scheduleChangeEffectiveMonth,
+  scheduleChangeBillingType,
+  scheduleChangeBillingDay,
+  isMutating,
   open,
   onOpenChange,
+  onScheduleChangeAmountChange,
+  onScheduleChangeEffectiveMonthChange,
+  onScheduleChangeBillingTypeChange,
+  onScheduleChangeBillingDayChange,
+  onScheduleChangeBack,
+  onScheduleChangeSubmit,
   onEdit,
   onScheduleChange,
   onDelete,
@@ -641,174 +659,186 @@ export function RecurringDetailDialog({
 
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
   const status = getRecurringDisplayStatus(item, selectedMonth)
+  const currentVersionDetail = item.ends_month ? `Active through ${formatAddedMonth(item.ends_month)}` : "Active with no end month"
+  const nextScheduledItem = getNextScheduledVersion(seriesItems, selectedMonth)
+  const occurrenceStatus = getRecurringOccurrenceStatus(item, selectedMonth)
+  const schedulePreview = formatScheduledChangePreview(item, {
+    amount: formatRecurringAmount(scheduleChangeAmount || item.amount),
+    effectiveMonth: scheduleChangeEffectiveMonth,
+    billingType: scheduleChangeBillingType,
+    billingDay: scheduleChangeBillingType === "last_day" ? null : Number.parseInt(scheduleChangeBillingDay || "1", 10) || 1,
+  })
+  const title = mode === "schedule_change" ? "Schedule change" : item.expense
+  const description = mode === "schedule_change"
+    ? `${item.expense} is currently ${formatCurrency(item.amount)} and ${formatBillingSchedulePreview(item.billing_type, item.billing_day)}.`
+    : `${formatCurrency(item.amount)} / month`
 
   return (
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={item.expense}
-      description={`${formatCurrency(item.amount)} / month`}
+      title={title}
+      description={description}
       mobileSize="compact"
       desktopClassName="sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem]"
       headerClassName="px-4 pb-3 pt-2 sm:px-7 sm:pb-4 sm:pt-5"
       bodyClassName="px-4 py-4 sm:px-7 sm:py-6"
       footerClassName="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7 sm:pt-4 sm:pb-6"
+      headerAccessory={mode === "schedule_change" ? (
+        <Button type="button" variant="ghost" className="h-9 rounded-full px-3 text-sm" onClick={onScheduleChangeBack}>
+          <ChevronLeft className="h-4 w-4" />
+          Back
+        </Button>
+      ) : undefined}
       footer={
-        <div className="space-y-3">
-          <Button type="button" className="h-11 w-full rounded-xl sm:h-12" onClick={() => onScheduleChange(item)}>
-            Schedule change
-          </Button>
-          <div className="grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" className="order-2 h-11 rounded-xl sm:h-12" onClick={() => onEdit(item)}>
-              <Pencil className="h-4 w-4" />
-              Edit
+        mode === "schedule_change" ? (
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:justify-end">
+            <Button type="button" variant="ghost" className="h-11 rounded-xl px-4" onClick={onScheduleChangeBack}>
+              Cancel
             </Button>
-            <Button type="button" variant="outline" className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12" onClick={() => onDelete(item)}>
-              <Trash2 className="h-4 w-4" />
-              Delete
+            <Button type="button" className="h-11 rounded-xl" onClick={onScheduleChangeSubmit} disabled={isMutating}>
+              {isMutating ? "Scheduling..." : "Schedule change"}
             </Button>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <Button type="button" className="h-11 w-full rounded-xl sm:h-12" onClick={() => onScheduleChange(item)}>
+              Schedule change
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button type="button" variant="outline" className="order-2 h-11 rounded-xl sm:h-12" onClick={() => onEdit(item)}>
+                <Pencil className="h-4 w-4" />
+                Edit current version
+              </Button>
+              <Button type="button" variant="outline" className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12" onClick={() => onDelete(item)}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        )
       }
     >
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex items-start gap-3 sm:gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
-            <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-muted-foreground">Recurring bill details</p>
-            <p className="mt-1 text-sm text-muted-foreground">Review schedule, budget group, and card assignment before making changes.</p>
-          </div>
-        </div>
+      {mode === "schedule_change" ? (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Create a new version starting in {formatAddedMonth(scheduleChangeEffectiveMonth)}.
+          </p>
 
-        <div className="rounded-2xl bg-secondary/50 p-3 sm:p-5">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            <DetailRow className="col-span-2" icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />} label="Schedule" value={formatBillingSchedule(item)} detail={`Next: ${formatProjectedDateLong(item.projected_date_for_month)}`} />
-            <DetailRow icon={<Folder className="h-5 w-5 text-muted-foreground" />} label="Category" value={categoryConfig[item.category].label} />
-            <DetailRow icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />} label="Tag" value={item.tag.name} />
-            <DetailRow icon={<CreditCard className="h-5 w-5 text-muted-foreground" />} label="Card" value={item.card?.name ?? "No card"} />
-            <DetailRow icon={<Repeat className="h-5 w-5 text-muted-foreground" />} label="Status" value={getRecurringDisplayStatusLabel(status)} />
-            <DetailRow className="col-span-2" icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />} label="Active months" value={`Starts ${formatAddedMonth(item.starts_month)}`} detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"} />
-          </div>
-        </div>
-
-        {(isSeriesLoading || seriesItems.length > 1) && (
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold">History</h3>
-            {isSeriesLoading ? (
-              <p className="text-sm text-muted-foreground">Loading price history…</p>
-            ) : (
-              <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/10 p-3">
-                {seriesItems.map((seriesItem) => (
-                  <p key={seriesItem.id} className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{formatCurrency(seriesItem.amount)}</span>
-                    {" · "}
-                    {formatAddedMonth(seriesItem.starts_month)}
-                    {" – "}
-                    {seriesItem.ends_month ? formatAddedMonth(seriesItem.ends_month) : "Present"}
-                  </p>
-                ))}
-              </div>
-            )}
+            <Label htmlFor="schedule-change-amount" className="text-sm font-medium">New amount</Label>
+            <AmountInput
+              id="schedule-change-amount"
+              name="schedule_change_amount"
+              value={scheduleChangeAmount}
+              onValueChange={onScheduleChangeAmountChange}
+            />
           </div>
-        )}
-      </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="schedule-change-month" className="text-sm font-medium">Effective month</Label>
+            <MonthPicker
+              id="schedule-change-month"
+              value={scheduleChangeEffectiveMonth}
+              onChange={onScheduleChangeEffectiveMonthChange}
+              placeholder="Select month"
+              className="w-full"
+            />
+          </div>
+
+          <div className="grid min-w-0 max-w-full grid-cols-2 gap-3">
+            <div className="min-w-0 space-y-2">
+              <Label className="text-sm">Charge schedule</Label>
+              <Select value={scheduleChangeBillingType} onValueChange={(value) => onScheduleChangeBillingTypeChange(value as RecurringBillingType)}>
+                <SelectTrigger className="h-11 rounded-xl border-border/60 sm:h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day_of_month">Specific day</SelectItem>
+                  <SelectItem value="last_day">Last day</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="min-w-0 space-y-2">
+              <Label className="text-sm">Billing day</Label>
+              <Input
+                type="number"
+                min="1"
+                max="31"
+                value={scheduleChangeBillingType === "last_day" ? "" : scheduleChangeBillingDay}
+                onChange={(event) => onScheduleChangeBillingDayChange(event.target.value)}
+                disabled={scheduleChangeBillingType === "last_day"}
+                placeholder={scheduleChangeBillingType === "last_day" ? "Auto" : "1-31"}
+                inputMode="numeric"
+                className="h-10 rounded-xl border-border/60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-muted/10 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
+            <p className="mt-2 text-sm text-muted-foreground">{schedulePreview}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
+              <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-muted-foreground">Current version</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatCurrency(item.amount)} · {formatBillingSchedule(item)} · {currentVersionDetail}
+              </p>
+            </div>
+          </div>
+
+          {nextScheduledItem ? (
+            <div className="rounded-2xl border border-border/60 bg-muted/10 p-3 sm:p-5">
+              <p className="text-sm font-semibold">Scheduled change</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {formatCurrency(nextScheduledItem.amount)} · Starts {formatAddedMonth(nextScheduledItem.starts_month)} · {formatBillingSchedule(nextScheduledItem)}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl bg-secondary/50 p-3 sm:p-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <DetailRow className="col-span-2" icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />} label="Schedule" value={formatBillingSchedule(item)} detail={`Next: ${formatProjectedDateLong(item.projected_date_for_month)}`} />
+              <DetailRow icon={<Folder className="h-5 w-5 text-muted-foreground" />} label="Category" value={categoryConfig[item.category].label} />
+              <DetailRow icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />} label="Tag" value={item.tag.name} />
+              <DetailRow icon={<CreditCard className="h-5 w-5 text-muted-foreground" />} label="Card" value={item.card?.name ?? "No card"} />
+              <DetailRow icon={<Repeat className="h-5 w-5 text-muted-foreground" />} label="Status this month" value={getOccurrenceStatusLabel(occurrenceStatus)} detail={getRecurringDisplayStatusLabel(status)} />
+              <DetailRow className="col-span-2" icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />} label="Active months" value={`Starts ${formatAddedMonth(item.starts_month)}`} detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"} />
+            </div>
+          </div>
+
+          {(isSeriesLoading || seriesItems.length > 1) && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">History</h3>
+              {isSeriesLoading ? (
+                <p className="text-sm text-muted-foreground">Loading price history…</p>
+              ) : (
+                <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/10 p-3">
+                  {seriesItems.map((seriesItem) => (
+                    <p key={seriesItem.id} className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{formatCurrency(seriesItem.amount)}</span>
+                      {" · "}
+                      {formatAddedMonth(seriesItem.starts_month)}
+                      {" – "}
+                      {seriesItem.ends_month ? formatAddedMonth(seriesItem.ends_month) : "Present"}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </ResponsiveDialog>
   )
-}
-
-interface ScheduleChangeDialogProps {
-  item: RecurringExpense | null
-  open: boolean
-  amount: string
-  effectiveMonth: string
-  isMutating: boolean
-  onOpenChange: (open: boolean) => void
-  onAmountChange: (value: string) => void
-  onEffectiveMonthChange: (value: string) => void
-  onSave: () => void
-}
-
-export function ScheduleChangeDialog({
-  item,
-  open,
-  amount,
-  effectiveMonth,
-  isMutating,
-  onOpenChange,
-  onAmountChange,
-  onEffectiveMonthChange,
-  onSave,
-}: ScheduleChangeDialogProps) {
-  if (!item) {
-    return null
-  }
-
-  return (
-    <ResponsiveDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Schedule change"
-      description={`${item.expense} is currently ${formatCurrency(item.amount)}.`}
-      mobileSize="compact"
-      desktopClassName="sm:w-[min(calc(100dvw-2rem),32rem)] sm:max-w-[32rem]"
-      footer={
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:justify-end">
-          <Button type="button" variant="ghost" className="h-11 rounded-xl px-4" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" className="h-11 rounded-xl" onClick={onSave} disabled={isMutating}>
-            {isMutating ? "Scheduling..." : "Schedule change"}
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Create a new version starting in {formatAddedMonth(effectiveMonth)}.
-        </p>
-
-        <div className="space-y-2">
-          <Label htmlFor="schedule-change-amount" className="text-sm font-medium">New amount</Label>
-          <AmountInput
-            id="schedule-change-amount"
-            name="schedule_change_amount"
-            value={amount}
-            onValueChange={onAmountChange}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="schedule-change-month" className="text-sm font-medium">Effective month</Label>
-          <MonthPicker
-            id="schedule-change-month"
-            value={effectiveMonth}
-            onChange={onEffectiveMonthChange}
-            placeholder="Select month"
-            className="w-full"
-          />
-        </div>
-      </div>
-    </ResponsiveDialog>
-  )
-}
-
-function getRecurringStatusClasses(status: RecurringDisplayStatus): string {
-  switch (status) {
-    case "generated":
-      return "text-emerald-700"
-    case "upcoming":
-      return "text-foreground"
-    case "due_today":
-      return "text-amber-700"
-    case "overdue":
-      return "text-destructive"
-    case "paused":
-    case "ended":
-    case "starts_later":
-      return "text-muted-foreground"
-  }
 }
 
 function DetailRow({

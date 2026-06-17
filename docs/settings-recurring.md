@@ -11,12 +11,14 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Desktop uses a wider settings layout with the main content on the left and a compact helper/summary rail on the right.
 - The summary card keeps month selection, committed total, and recurring item count visible.
 - The page is month-based, not day-based; month selection uses a month-only picker with year controls and a Current month shortcut.
-- Recurring rows are grouped by projected date for the selected month and mirror recent transaction rows with a category-colored icon, title, metadata chips, amount, and chevron.
-- Recurring-specific details stay visible as compact chips: tag, card when available, billing schedule, and active/inactive status.
+- The main commitments list now renders one visible row per `series_id` for the selected month, so future scheduled versions do not appear as duplicate rows.
+- Mobile rows are intentionally compact: name, amount, and a single subtitle line with due date, tag, and selected-month status.
 - The list can be sorted locally by newest or oldest projected date without changing backend behavior.
 - Tapping or clicking a recurring row opens a detail sheet, matching the transaction row interaction pattern.
-- Detail now uses the shared `ResponsiveDialog` shell with `mobileSize="compact"` so the read-only tray stays tighter than the longer create/edit forms while keeping the same shared behavior.
+- Detail now uses the shared `ResponsiveDialog` shell with `mobileSize="compact"` so the tray stays tighter than the longer create/edit forms while keeping the same shared behavior.
 - Edit and Delete actions live in the detail tray; Delete still confirms before mutating data.
+- Detail explains the current version as a series-level commitment, shows a scheduled future change when present, and renders version history when the series has multiple rows.
+- Schedule change no longer opens a second tray on mobile. It transitions inside the same tray and supports amount, effective month, billing type, and billing day changes with a preview.
 - New and edit use the existing mobile tray / desktop modal pattern, grouped into Expense, Schedule, and Status sections.
 - New and edit use the shared `ResponsiveDialog` shell for mobile tray behavior, desktop modal sizing, swipe-dismiss, close handling, and scroll containment.
 - Delete confirmation now uses the shared `ResponsiveConfirmDialog` shell so destructive confirmation matches the rest of Settings.
@@ -36,13 +38,14 @@ The Settings -> Recurring page manages monthly recurring expense items.
 ## Design decisions
 
 - "Rules" was renamed to "Recurring items" in user-facing labels because it describes the user's bills rather than the system model.
-- "Added for June 2026" was removed from the default row view to reduce metadata noise; rows focus on what, how much, tag/card, status, schedule, and projected date grouping.
-- Projected-date group headers intentionally follow the Recent Transactions list pattern while keeping recurring-specific schedule metadata in chips.
+- Raw recurring-rule rows are not shown directly in the default month list; the page presents one user-facing commitment per series for the selected month.
+- Future scheduled versions stay out of the default month list and are surfaced through detail-tray context plus the `Changes` filter.
 - The sort control mirrors the Transactions page pattern with simple Newest and Oldest date controls.
 - Row tap opens details, while Edit/Delete move into the detail sheet so rows feel closer to transaction rows and less like an admin table.
 - Mobile spacing was tightened around the header, intro, summary card, list header, and rows so the first recurring item appears sooner.
 - Only one primary Add CTA is visible per layout: mobile uses the header "+ Add" action, while desktop uses the right-rail "Add recurring expense" action.
 - On mobile, Monthly Commitments uses the page-level header `Add` action for adding recurring commitments. The global bottom navigation `Add` remains reserved for the normal transaction-add flow. The previous sticky `Add commitment` button was removed to reduce duplicate actions and improve list visibility.
+- Primary mobile filters now map to the selected month mental model: `All`, `Upcoming`, `Logged`, and `Changes`.
 - Recurring creation should feel like "Add Transaction + Schedule": amount is the hero field, description uses transaction-style language, tags use mobile chips, category uses segmented buttons, and optional card selection stays with expense classification.
 - Inline tag/card creation should stay consistent with Add Transaction: same naming input, icon picker for tags, keyboard submit behavior, cancel behavior, and immediate selection after save.
 - Field-level validation appears inline near Amount, Description, and Billing day; the sticky footer is reserved for Cancel and Save/Create actions.

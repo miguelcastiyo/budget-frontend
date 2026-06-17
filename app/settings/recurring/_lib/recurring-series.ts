@@ -1,0 +1,227 @@
+"use client"
+
+import { getCurrentMonthKey } from "@/lib/date-filters"
+import type { RecurringExpense, RecurringBillingType } from "@/lib/api/types"
+import { formatDateValue } from "@/lib/date-filters"
+
+export type CommitmentOccurrenceStatus = "generated" | "upcoming" | "not_generated"
+export type CommitmentLifecycleStatus = "active" | "paused" | "ended" | "starts_later"
+export type CommitmentSeriesState = "current" | "has_scheduled_change" | "changed_this_month"
+
+export interface RecurringSeriesEntry {
+  seriesId: string
+  currentItem: RecurringExpense
+  seriesItems: RecurringExpense[]
+  nextScheduledItem: RecurringExpense | null
+  occurrenceStatus: CommitmentOccurrenceStatus
+  seriesState: CommitmentSeriesState
+}
+
+export function isMonthWithinRecurringWindow(rule: RecurringExpense, selectedMonth: string): boolean {
+  if (rule.starts_month > selectedMonth) {
+    return false
+  }
+
+  return rule.ends_month === null || rule.ends_month >= selectedMonth
+}
+
+export function getRecurringLifecycleStatus(
+  rule: RecurringExpense,
+  selectedMonth: string
+): CommitmentLifecycleStatus {
+  if (selectedMonth < rule.starts_month) {
+    return "starts_later"
+  }
+
+  if (rule.ends_month && selectedMonth > rule.ends_month) {
+    return "ended"
+  }
+
+  if (!rule.is_active) {
+    return "paused"
+  }
+
+  return "active"
+}
+
+export function getRecurringOccurrenceStatus(
+  rule: RecurringExpense,
+  selectedMonth: string,
+  today = new Date()
+): CommitmentOccurrenceStatus {
+  if (rule.generated_for_month) {
+    return "generated"
+  }
+
+  const currentMonth = getCurrentMonthKey(today)
+  if (selectedMonth < currentMonth) {
+    return "not_generated"
+  }
+
+  if (selectedMonth > currentMonth) {
+    return "upcoming"
+  }
+
+  const todayIso = `${selectedMonth}-${String(today.getDate()).padStart(2, "0")}`
+  return rule.projected_date_for_month >= todayIso ? "upcoming" : "not_generated"
+}
+
+export function groupRecurringRulesBySeries(items: RecurringExpense[]): Map<string, RecurringExpense[]> {
+  const grouped = new Map<string, RecurringExpense[]>()
+
+  items.forEach((item) => {
+    const existing = grouped.get(item.series_id) ?? []
+    existing.push(item)
+    grouped.set(item.series_id, existing)
+  })
+
+  grouped.forEach((seriesItems, key) => {
+    grouped.set(
+      key,
+      [...seriesItems].sort((first, second) => {
+        const monthCompare = first.starts_month.localeCompare(second.starts_month)
+        if (monthCompare !== 0) {
+          return monthCompare
+        }
+
+        return first.id.localeCompare(second.id)
+      })
+    )
+  })
+
+  return grouped
+}
+
+export function getActiveVersionForMonth(
+  seriesItems: RecurringExpense[],
+  selectedMonth: string
+): RecurringExpense | null {
+  const applicableItems = seriesItems.filter((item) => {
+    return item.is_active && isMonthWithinRecurringWindow(item, selectedMonth)
+  })
+
+  if (applicableItems.length === 0) {
+    return null
+  }
+
+  return [...applicableItems].sort((first, second) => second.starts_month.localeCompare(first.starts_month))[0] ?? null
+}
+
+export function getNextScheduledVersion(
+  seriesItems: RecurringExpense[],
+  selectedMonth: string
+): RecurringExpense | null {
+  return seriesItems.find((item) => item.is_active && item.starts_month > selectedMonth) ?? null
+}
+
+export function hasFutureScheduledChange(
+  seriesItems: RecurringExpense[],
+  selectedMonth: string
+): boolean {
+  return getNextScheduledVersion(seriesItems, selectedMonth) !== null
+}
+
+export function getSeriesState(
+  currentItem: RecurringExpense,
+  seriesItems: RecurringExpense[],
+  selectedMonth: string
+): CommitmentSeriesState {
+  if (hasFutureScheduledChange(seriesItems, selectedMonth)) {
+    return "has_scheduled_change"
+  }
+
+  if (currentItem.starts_month === selectedMonth && seriesItems.some((item) => item.id !== currentItem.id && item.starts_month < selectedMonth)) {
+    return "changed_this_month"
+  }
+
+  return "current"
+}
+
+export function buildRecurringSeriesEntries(
+  items: RecurringExpense[],
+  selectedMonth: string,
+  today = new Date()
+): RecurringSeriesEntry[] {
+  const grouped = groupRecurringRulesBySeries(items)
+  const entries: RecurringSeriesEntry[] = []
+
+  grouped.forEach((seriesItems, seriesId) => {
+    const currentItem = getActiveVersionForMonth(seriesItems, selectedMonth)
+    if (!currentItem) {
+      return
+    }
+
+    entries.push({
+      seriesId,
+      currentItem,
+      seriesItems,
+      nextScheduledItem: getNextScheduledVersion(seriesItems, selectedMonth),
+      occurrenceStatus: getRecurringOccurrenceStatus(currentItem, selectedMonth, today),
+      seriesState: getSeriesState(currentItem, seriesItems, selectedMonth),
+    })
+  })
+
+  return entries
+}
+
+export function getOccurrenceStatusLabel(status: CommitmentOccurrenceStatus): string {
+  switch (status) {
+    case "generated":
+      return "Logged"
+    case "upcoming":
+      return "Upcoming"
+    case "not_generated":
+      return "Not generated"
+  }
+}
+
+export function getSeriesStateLabel(state: CommitmentSeriesState): string {
+  switch (state) {
+    case "current":
+      return "Current"
+    case "has_scheduled_change":
+      return "Scheduled change"
+    case "changed_this_month":
+      return "Changed this month"
+  }
+}
+
+export function formatCommitmentRowSubtitle(rule: RecurringExpense, status: CommitmentOccurrenceStatus): string {
+  return `Due ${formatDateValue(rule.projected_date_for_month, { month: "short", day: "numeric" })} · ${rule.tag.name} · ${getOccurrenceStatusLabel(status)}`
+}
+
+export function formatBillingSchedulePreview(
+  billingType: RecurringBillingType,
+  billingDay: number | null
+): string {
+  if (billingType === "last_day") {
+    return "charge on the last day of each month"
+  }
+
+  return `charge on day ${billingDay ?? 1}`
+}
+
+export function formatScheduledChangePreview(
+  currentRule: RecurringExpense,
+  values: {
+    amount: string
+    effectiveMonth: string
+    billingType: RecurringBillingType
+    billingDay: number | null
+  }
+): string {
+  const amountChanged = values.amount !== currentRule.amount
+  const billingChanged = values.billingType !== currentRule.billing_type || values.billingDay !== currentRule.billing_day
+
+  const firstSentence = `${currentRule.expense} will stay ${currentRule.amount === values.amount ? "the same amount" : `${currentRule.amount}`} through ${currentRule.ends_month ? formatDateValue(currentRule.ends_month + "-01", { month: "long", year: "numeric" }) : "the month before the change"}.`
+
+  if (!amountChanged && billingChanged) {
+    return `${firstSentence} Starting ${formatDateValue(values.effectiveMonth + "-01", { month: "long", year: "numeric" })}, it will ${formatBillingSchedulePreview(values.billingType, values.billingDay)}.`
+  }
+
+  if (amountChanged && !billingChanged) {
+    return `${firstSentence} Starting ${formatDateValue(values.effectiveMonth + "-01", { month: "long", year: "numeric" })}, it will be ${values.amount} and keep the same schedule.`
+  }
+
+  return `${firstSentence} Starting ${formatDateValue(values.effectiveMonth + "-01", { month: "long", year: "numeric" })}, it will be ${values.amount} and ${formatBillingSchedulePreview(values.billingType, values.billingDay)}.`
+}

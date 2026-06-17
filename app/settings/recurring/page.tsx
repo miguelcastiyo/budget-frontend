@@ -14,6 +14,7 @@ import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dial
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getCurrentMonthKey, getNextMonthKey } from "@/lib/date-filters"
 import type {
+  RecurringBillingType,
   RecurringExpense,
   RecurringExpenseSeriesResponse,
   Tag,
@@ -26,7 +27,6 @@ import {
   RecurringDetailDialog,
   RecurringForm,
   RecurringItemRow,
-  ScheduleChangeDialog,
 } from "./_components/recurring-sections"
 import { useRecurringData } from "./_hooks/use-recurring-data"
 import {
@@ -42,9 +42,16 @@ import {
   type RecurringFormState,
   type RecurringSort,
 } from "./_lib/recurring"
-import { getRecurringDisplayStatus, type RecurringDisplayStatus } from "./_lib/recurring-status"
+import {
+  buildRecurringSeriesEntries,
+  formatCommitmentRowSubtitle,
+  getOccurrenceStatusLabel,
+  type CommitmentOccurrenceStatus,
+  type RecurringSeriesEntry,
+} from "./_lib/recurring-series"
 
-type RecurringFilter = "all" | "upcoming" | "generated" | "paused"
+type RecurringFilter = "all" | "upcoming" | "generated" | "changes"
+type DetailTrayMode = "details" | "schedule_change"
 
 export default function RecurringSettingsPage() {
   const router = useRouter()
@@ -59,16 +66,22 @@ export default function RecurringSettingsPage() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detailSeries, setDetailSeries] = useState<RecurringExpenseSeriesResponse | null>(null)
   const [isSeriesLoading, setIsSeriesLoading] = useState(false)
-  const [scheduleChangeId, setScheduleChangeId] = useState<string | null>(null)
+  const [detailTrayMode, setDetailTrayMode] = useState<DetailTrayMode>("details")
   const [scheduleChangeAmount, setScheduleChangeAmount] = useState("")
   const [scheduleChangeEffectiveMonth, setScheduleChangeEffectiveMonth] = useState(getNextMonthKey(getCurrentMonthKey()))
+  const [scheduleChangeBillingType, setScheduleChangeBillingType] = useState<RecurringBillingType>("day_of_month")
+  const [scheduleChangeBillingDay, setScheduleChangeBillingDay] = useState("1")
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [isMutating, setIsMutating] = useState(false)
   const { data, tags, cards, isLoading, error, setTags, setCards, setError, loadData } = useRecurringData(month)
   const editingItem = data?.items.find((item) => item.id === editingId) ?? null
-  const detailItem = data?.items.find((item) => item.id === detailId) ?? null
-  const scheduleChangeItem = data?.items.find((item) => item.id === scheduleChangeId) ?? null
+  const seriesEntries = useMemo(
+    () => buildRecurringSeriesEntries(data?.items ?? [], month),
+    [data?.items, month]
+  )
+  const detailEntry = seriesEntries.find((entry) => entry.currentItem.id === detailId) ?? null
+  const detailItem = detailEntry?.currentItem ?? null
   const hasEditingChanges = Boolean(
     editingForm &&
     editingItem &&
@@ -97,11 +110,16 @@ export default function RecurringSettingsPage() {
     if (!detailItem) {
       setDetailSeries(null)
       setIsSeriesLoading(false)
+      setDetailTrayMode("details")
       return
     }
 
     let cancelled = false
     setIsSeriesLoading(true)
+    setDetailSeries({
+      series_id: detailEntry?.seriesId ?? detailItem.series_id,
+      items: detailEntry?.seriesItems ?? [detailItem],
+    })
 
     void apiClient.getRecurringExpenseSeries(detailItem.id)
       .then((response) => {
@@ -129,56 +147,53 @@ export default function RecurringSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [detailItem, setError])
+  }, [detailEntry, detailItem, setError])
 
   const tagOptions = useMemo(() => tags, [tags])
-  const itemsWithStatus = useMemo(
-    () => (data?.items ?? []).map((item) => ({
-      item,
-      status: getRecurringDisplayStatus(item, month),
-    })),
-    [data?.items, month]
-  )
   const activeItemsCount = useMemo(
-    () => itemsWithStatus.filter(({ status }) => ["generated", "upcoming", "due_today", "overdue"].includes(status)).length,
-    [itemsWithStatus]
+    () => seriesEntries.length,
+    [seriesEntries]
   )
   const generatedCount = useMemo(
-    () => itemsWithStatus.filter(({ status }) => status === "generated").length,
-    [itemsWithStatus]
+    () => seriesEntries.filter((entry) => entry.occurrenceStatus === "generated").length,
+    [seriesEntries]
   )
   const upcomingCount = useMemo(
-    () => itemsWithStatus.filter(({ status }) => status === "upcoming" || status === "due_today").length,
-    [itemsWithStatus]
+    () => seriesEntries.filter((entry) => entry.occurrenceStatus === "upcoming").length,
+    [seriesEntries]
   )
   const largestCommitment = useMemo(
-    () => itemsWithStatus.reduce<{ expense: string; amount: number } | null>((largest, { item }) => {
-      const amount = Number(item.amount)
+    () => seriesEntries.reduce<{ expense: string; amount: number } | null>((largest, entry) => {
+      const amount = Number(entry.currentItem.amount)
       if (!Number.isFinite(amount)) {
         return largest
       }
       if (!largest || amount > largest.amount) {
-        return { expense: item.expense, amount }
+        return { expense: entry.currentItem.expense, amount }
       }
       return largest
     }, null),
-    [itemsWithStatus]
+    [seriesEntries]
   )
   const upcomingItems = useMemo(
-    () => itemsWithStatus
-      .filter(({ status }) => status === "upcoming" || status === "due_today")
-      .map(({ item }) => item)
+    () => seriesEntries
+      .filter((entry) => entry.occurrenceStatus === "upcoming")
+      .map((entry) => entry.currentItem)
       .sort((first, second) => first.projected_date_for_month.localeCompare(second.projected_date_for_month))
       .slice(0, 5),
-    [itemsWithStatus]
+    [seriesEntries]
   )
   const sortedRecurringItems = useMemo(
-    () => sortRecurringItems(data?.items ?? [], recurringSort),
-    [data?.items, recurringSort]
+    () => sortRecurringItems(seriesEntries.map((entry) => entry.currentItem), recurringSort),
+    [seriesEntries, recurringSort]
+  )
+  const sortedSeriesEntries = useMemo(
+    () => sortedRecurringItems.map((item) => seriesEntries.find((entry) => entry.currentItem.id === item.id)).filter(Boolean) as RecurringSeriesEntry[],
+    [seriesEntries, sortedRecurringItems]
   )
   const filteredRecurringItems = useMemo(
-    () => sortedRecurringItems.filter((item) => matchesRecurringFilter(getRecurringDisplayStatus(item, month), mobileFilter)),
-    [month, mobileFilter, sortedRecurringItems]
+    () => sortedSeriesEntries.filter((entry) => matchesRecurringFilter(entry, mobileFilter)),
+    [mobileFilter, sortedSeriesEntries]
   )
   const openAddCommitment = () => {
     setShowNew(true)
@@ -319,27 +334,55 @@ export default function RecurringSettingsPage() {
   }
 
   const startScheduleChange = (item: RecurringExpense) => {
-    setScheduleChangeId(item.id)
+    setDetailId(item.id)
+    setDetailTrayMode("schedule_change")
     setScheduleChangeAmount(item.amount)
     setScheduleChangeEffectiveMonth(getNextMonthKey(month))
+    setScheduleChangeBillingType(item.billing_type)
+    setScheduleChangeBillingDay(item.billing_day === null ? "1" : String(item.billing_day))
   }
 
   const handleScheduleChange = async () => {
-    if (!scheduleChangeItem || !isValidRecurringAmount(scheduleChangeAmount)) {
+    if (!detailItem || !isValidRecurringAmount(scheduleChangeAmount)) {
       setError("Add a valid amount before scheduling the change")
       return
+    }
+
+    if (scheduleChangeBillingType === "day_of_month") {
+      const day = Number.parseInt(scheduleChangeBillingDay, 10)
+      if (!Number.isInteger(day) || day < 1 || day > 31) {
+        setError("Enter a billing day from 1 to 31")
+        return
+      }
     }
 
     setIsMutating(true)
     setError(null)
 
     try {
-      await apiClient.scheduleRecurringExpenseChange(scheduleChangeItem.id, {
+      const payload: {
+        effective_month: string
+        amount?: string
+        billing_type?: RecurringBillingType
+        billing_day?: number | null
+      } = {
         effective_month: scheduleChangeEffectiveMonth,
-        amount: formatRecurringAmount(scheduleChangeAmount),
-      })
-      setScheduleChangeId(null)
-      setDetailId(null)
+      }
+
+      if (scheduleChangeAmount !== detailItem.amount) {
+        payload.amount = formatRecurringAmount(scheduleChangeAmount)
+      }
+
+      if (
+        scheduleChangeBillingType !== detailItem.billing_type
+        || (scheduleChangeBillingType === "day_of_month" && Number(scheduleChangeBillingDay) !== (detailItem.billing_day ?? 1))
+      ) {
+        payload.billing_type = scheduleChangeBillingType
+        payload.billing_day = scheduleChangeBillingType === "last_day" ? null : Number(scheduleChangeBillingDay)
+      }
+
+      await apiClient.scheduleRecurringExpenseChange(detailItem.id, payload)
+      setDetailTrayMode("details")
       await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -377,7 +420,7 @@ export default function RecurringSettingsPage() {
       <main className="mx-auto w-full max-w-full overflow-x-hidden px-4 pt-3 sm:max-w-lg lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            See what this month already owes you, what has generated, and what is still coming up.
+            See what this month already owes you, what has been logged, and what is still coming up.
           </p>
         </div>
 
@@ -403,7 +446,7 @@ export default function RecurringSettingsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                   <p>{activeItemsCount} active</p>
-                  <p>{generatedCount} generated</p>
+                  <p>{generatedCount} logged</p>
                   <p>{upcomingCount} upcoming</p>
                 </div>
                 {largestCommitment ? (
@@ -419,8 +462,8 @@ export default function RecurringSettingsPage() {
                 items={[
                   { value: "all", label: "All" },
                   { value: "upcoming", label: "Upcoming" },
-                  { value: "generated", label: "Generated" },
-                  { value: "paused", label: "Paused" },
+                  { value: "generated", label: "Logged" },
+                  { value: "changes", label: "Changes" },
                 ]}
                 value={mobileFilter}
                 onValueChange={(value) => setMobileFilter(value as RecurringFilter)}
@@ -488,15 +531,24 @@ export default function RecurringSettingsPage() {
                 </div>
               )}
 
-              {!isLoading && (data?.items.length ?? 0) > 0 && filteredRecurringItems.length === 0 ? (
+              {!isLoading && seriesEntries.length > 0 && filteredRecurringItems.length === 0 ? (
                 <div className="p-4 sm:p-5">
                   <h3 className="text-sm font-semibold">{getFilteredEmptyState(mobileFilter).title}</h3>
                   <p className="mt-2 text-sm text-muted-foreground">{getFilteredEmptyState(mobileFilter).description}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-border/50">
-                  {filteredRecurringItems.map((item) => (
-                    <RecurringItemRow key={item.id} item={item} selectedMonth={month} onOpen={() => setDetailId(item.id)} />
+                  {filteredRecurringItems.map((entry) => (
+                    <RecurringItemRow
+                      key={entry.seriesId}
+                      item={entry.currentItem}
+                      subtitle={formatCommitmentRowSubtitle(entry.currentItem, entry.occurrenceStatus)}
+                      showScheduledChange={entry.seriesState === "has_scheduled_change"}
+                      onOpen={() => {
+                        setDetailTrayMode("details")
+                        setDetailId(entry.currentItem.id)
+                      }}
+                    />
                   ))}
                 </div>
               )}
@@ -516,7 +568,7 @@ export default function RecurringSettingsPage() {
                   <span className="font-medium">{activeItemsCount}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Generated this month</span>
+                  <span className="text-muted-foreground">Logged this month</span>
                   <span className="font-medium">{generatedCount}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -628,31 +680,28 @@ export default function RecurringSettingsPage() {
         onOpenChange={(open) => {
           if (!open) {
             setDetailId(null)
+            setDetailTrayMode("details")
           }
         }}
         selectedMonth={month}
+        mode={detailTrayMode}
+        scheduleChangeAmount={scheduleChangeAmount}
+        scheduleChangeEffectiveMonth={scheduleChangeEffectiveMonth}
+        scheduleChangeBillingType={scheduleChangeBillingType}
+        scheduleChangeBillingDay={scheduleChangeBillingDay}
+        isMutating={isMutating}
+        onScheduleChangeAmountChange={setScheduleChangeAmount}
+        onScheduleChangeEffectiveMonthChange={setScheduleChangeEffectiveMonth}
+        onScheduleChangeBillingTypeChange={setScheduleChangeBillingType}
+        onScheduleChangeBillingDayChange={setScheduleChangeBillingDay}
+        onScheduleChangeBack={() => setDetailTrayMode("details")}
+        onScheduleChangeSubmit={() => void handleScheduleChange()}
         onEdit={startEdit}
         onScheduleChange={startScheduleChange}
         onDelete={(item) => {
           setDetailId(null)
           setDeleteId(item.id)
         }}
-      />
-
-      <ScheduleChangeDialog
-        item={scheduleChangeItem}
-        open={scheduleChangeId !== null && scheduleChangeItem !== null}
-        amount={scheduleChangeAmount}
-        effectiveMonth={scheduleChangeEffectiveMonth}
-        isMutating={isMutating}
-        onOpenChange={(open) => {
-          if (!open && !isMutating) {
-            setScheduleChangeId(null)
-          }
-        }}
-        onAmountChange={setScheduleChangeAmount}
-        onEffectiveMonthChange={setScheduleChangeEffectiveMonth}
-        onSave={() => void handleScheduleChange()}
       />
 
       <ResponsiveConfirmDialog
@@ -676,16 +725,16 @@ export default function RecurringSettingsPage() {
   )
 }
 
-function matchesRecurringFilter(status: RecurringDisplayStatus, filter: RecurringFilter): boolean {
+function matchesRecurringFilter(entry: RecurringSeriesEntry, filter: RecurringFilter): boolean {
   switch (filter) {
     case "all":
       return true
     case "upcoming":
-      return status === "upcoming" || status === "due_today" || status === "overdue"
+      return entry.occurrenceStatus === "upcoming"
     case "generated":
-      return status === "generated"
-    case "paused":
-      return status === "paused" || status === "ended" || status === "starts_later"
+      return entry.occurrenceStatus === "generated"
+    case "changes":
+      return entry.seriesState === "has_scheduled_change"
   }
 }
 
@@ -695,17 +744,17 @@ function getFilteredEmptyState(filter: RecurringFilter): { title: string; descri
     case "upcoming":
       return {
         title: "Nothing else upcoming this month",
-        description: "All active commitments for this month have already been generated or completed.",
+        description: "All active commitments for this month have already been logged or completed.",
       }
     case "generated":
       return {
-        title: "Nothing generated yet",
-        description: "No commitments for this month have generated a transaction yet.",
+        title: "Nothing logged yet",
+        description: "No commitments for this month have been logged yet.",
       }
-    case "paused":
+    case "changes":
       return {
-        title: "No paused commitments here",
-        description: "There are no paused, ended, or not-yet-started commitments in this view.",
+        title: "No scheduled changes yet",
+        description: "None of this month's commitments have a future scheduled version yet.",
       }
   }
 }

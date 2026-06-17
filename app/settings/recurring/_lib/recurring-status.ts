@@ -52,7 +52,7 @@ export function getRecurringDisplayStatus(
 export function getRecurringDisplayStatusLabel(status: RecurringDisplayStatus): string {
   switch (status) {
     case "generated":
-      return "Generated"
+      return "Logged"
     case "upcoming":
       return "Upcoming"
     case "due_today":
