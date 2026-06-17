@@ -1,7 +1,7 @@
 # Settings: Recurring
 
 Status: Current  
-Last reviewed: 2026-06-13
+Last reviewed: 2026-06-16
 
 The Settings -> Recurring page manages monthly recurring expense items.
 
@@ -42,6 +42,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Row tap opens details, while Edit/Delete move into the detail sheet so rows feel closer to transaction rows and less like an admin table.
 - Mobile spacing was tightened around the header, intro, summary card, list header, and rows so the first recurring item appears sooner.
 - Only one primary Add CTA is visible per layout: mobile uses the header "+ Add" action, while desktop uses the right-rail "Add recurring expense" action.
+- On mobile, Monthly Commitments uses the page-level header `Add` action for adding recurring commitments. The global bottom navigation `Add` remains reserved for the normal transaction-add flow. The previous sticky `Add commitment` button was removed to reduce duplicate actions and improve list visibility.
 - Recurring creation should feel like "Add Transaction + Schedule": amount is the hero field, description uses transaction-style language, tags use mobile chips, category uses segmented buttons, and optional card selection stays with expense classification.
 - Inline tag/card creation should stay consistent with Add Transaction: same naming input, icon picker for tags, keyboard submit behavior, cancel behavior, and immediate selection after save.
 - Field-level validation appears inline near Amount, Description, and Billing day; the sticky footer is reserved for Cancel and Save/Create actions.
@@ -54,6 +55,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - Check light mode and dark mode.
 - Confirm the bottom navigation clears the iPhone home indicator.
 - Confirm the recurring list can scroll to the final item with breathing room above bottom navigation.
+- Confirm there is no separate sticky `Add commitment` button above the bottom navigation.
 - Open the new recurring tray and confirm the drag handle, close button, and sticky footer are visible.
 - Open the month picker, change the year, choose a month, and use Current month.
 - Tap a recurring row and confirm the detail sheet opens and closes.

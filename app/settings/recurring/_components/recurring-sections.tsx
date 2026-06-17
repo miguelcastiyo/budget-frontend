@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { format } from "date-fns"
 import { CalendarIcon, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2 } from "lucide-react"
@@ -10,7 +10,6 @@ import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/bu
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -20,6 +19,7 @@ import type { Card as CardType, RecurringBillingType, RecurringExpense, Tag } fr
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { getRecurringDisplayStatus, getRecurringDisplayStatusLabel, type RecurringDisplayStatus } from "../_lib/recurring-status"
 import {
   categoryConfig,
   emptyForm,
@@ -59,6 +59,7 @@ export function MonthPicker({
   const currentMonthValue = getCurrentMonthKey()
   const initialYear = selectedMonth?.getFullYear() ?? parseMonthKey(currentMonthValue)?.getFullYear() ?? new Date().getFullYear()
   const [visibleYear, setVisibleYear] = useState(initialYear)
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     if (selectedMonth) {
@@ -68,21 +69,29 @@ export function MonthPicker({
 
   return (
     <div className="space-y-1">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            aria-label={`Select month. Current selection: ${displayLabel}`}
-            className={cn("h-10 justify-start rounded-xl text-left font-normal", !selectedMonth && "text-muted-foreground", className)}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate">{displayLabel}</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[min(calc(100vw-2rem),21rem)] rounded-2xl p-3" align="end" avoidCollisions>
+      <Button
+        id={id}
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        aria-label={`Select month. Current selection: ${displayLabel}`}
+        className={cn("h-10 justify-start rounded-xl text-left font-normal", !selectedMonth && "text-muted-foreground", className)}
+        onClick={() => setOpen(true)}
+      >
+        <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="truncate">{displayLabel}</span>
+      </Button>
+
+      <ResponsiveDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Select month"
+        description="Choose which month to view."
+        mobileSize="compact"
+        desktopClassName="sm:w-[min(calc(100dvw-2rem),22rem)] sm:max-w-[22rem]"
+        bodyClassName="px-4 py-4 sm:px-5 sm:py-5"
+      >
+        <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <Button type="button" variant="ghost" size="icon-sm" className="rounded-full" aria-label="Previous year" onClick={() => setVisibleYear((year) => year - 1)}>
               <ChevronLeft className="h-4 w-4" />
@@ -93,7 +102,7 @@ export function MonthPicker({
             </Button>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {monthPickerMonths.map((monthOption) => {
               const monthValue = monthValueFromParts(visibleYear, monthOption.index)
               const isSelected = value === monthValue
@@ -104,7 +113,10 @@ export function MonthPicker({
                   key={monthValue}
                   type="button"
                   aria-pressed={isSelected}
-                  onClick={() => onChange(monthValue)}
+                  onClick={() => {
+                    onChange(monthValue)
+                    setOpen(false)
+                  }}
                   className={cn(
                     "h-11 rounded-xl border text-sm font-medium transition-colors",
                     isSelected ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/60 bg-muted/20 text-foreground hover:bg-muted/60",
@@ -117,26 +129,36 @@ export function MonthPicker({
             })}
           </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-3 h-9 w-full rounded-xl text-sm text-muted-foreground"
-            onClick={() => {
-              const currentMonth = parseMonthKey(currentMonthValue)
-              setVisibleYear(currentMonth?.getFullYear() ?? new Date().getFullYear())
-              onChange(currentMonthValue)
-            }}
-          >
-            Current month
-          </Button>
-        </PopoverContent>
-      </Popover>
-
-      {allowClear && value && (
-        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => onChange("")} disabled={disabled}>
-          Clear
-        </Button>
-      )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 rounded-xl text-sm text-muted-foreground"
+              onClick={() => {
+                const currentMonth = parseMonthKey(currentMonthValue)
+                setVisibleYear(currentMonth?.getFullYear() ?? new Date().getFullYear())
+                onChange(currentMonthValue)
+                setOpen(false)
+              }}
+            >
+              Current month
+            </Button>
+            {allowClear && value ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 rounded-xl text-sm text-muted-foreground"
+                onClick={() => {
+                  onChange("")
+                  setOpen(false)
+                }}
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </ResponsiveDialog>
     </div>
   )
 }
@@ -536,25 +558,42 @@ export function RecurringForm({
 
 interface RecurringDetailDialogProps {
   item: RecurringExpense | null
+  selectedMonth: string
+  seriesItems: RecurringExpense[]
+  isSeriesLoading: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onEdit: (item: RecurringExpense) => void
+  onScheduleChange: (item: RecurringExpense) => void
   onDelete: (item: RecurringExpense) => void
 }
 
 export function RecurringItemRow({
   item,
+  selectedMonth,
   onOpen,
 }: {
   item: RecurringExpense
+  selectedMonth: string
   onOpen: () => void
 }) {
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+  const status = getRecurringDisplayStatus(item, selectedMonth)
+  const statusLabel = getRecurringDisplayStatusLabel(status)
+  const statusClasses = getRecurringStatusClasses(status)
+  const secondaryMetadata = useMemo(() => {
+    const line = ["Monthly", `Due ${formatProjectedDate(item.projected_date_for_month)}`]
+    if (item.card?.name) {
+      line.push(item.card.name)
+    }
+    return line
+  }, [item.card?.name, item.projected_date_for_month])
+  const tertiaryMetadata = [categoryConfig[item.category].label, item.tag.name, statusLabel]
 
   return (
     <button
       type="button"
-      className="group grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem] items-center gap-2 p-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:gap-3"
+      className="group grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem] items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-5"
       aria-label={`Open details for ${item.expense}`}
       onClick={onOpen}
     >
@@ -563,29 +602,17 @@ export function RecurringItemRow({
       </div>
 
       <div className="min-w-0 overflow-hidden">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-sm font-semibold">{item.expense}</p>
-          <span className={cn("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium", item.is_active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-            {item.is_active ? "Active" : "Inactive"}
-          </span>
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <p className="truncate text-sm font-semibold sm:text-[15px]">{item.expense}</p>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-            <TagGlyph className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[7rem] truncate sm:max-w-[9rem]">{item.tag.name}</span>
-          </span>
-          {item.card && (
-            <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-              <CreditCard className="h-3 w-3 shrink-0 text-muted-foreground" />
-              <span className="max-w-[6rem] truncate sm:max-w-[9rem]">{item.card.name}</span>
-            </span>
-          )}
-          <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-            <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[8rem] truncate sm:max-w-[11rem]">{formatBillingSchedule(item)}</span>
-          </span>
+        <p className="mt-1 truncate text-xs text-muted-foreground sm:text-sm">{secondaryMetadata.join(" · ")}</p>
+        <div className="mt-1 flex items-center gap-1.5 overflow-hidden text-[11px] text-muted-foreground sm:text-xs">
+          <span className="truncate">{tertiaryMetadata[0]}</span>
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{tertiaryMetadata[1]}</span>
+          <span aria-hidden="true">·</span>
+          <span className={cn("truncate font-medium", statusClasses)}>{tertiaryMetadata[2]}</span>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Next: {formatProjectedDate(item.projected_date_for_month)}</p>
       </div>
 
       <div className="min-w-[4.25rem] shrink-0 text-right sm:min-w-[4.75rem]">
@@ -599,9 +626,13 @@ export function RecurringItemRow({
 
 export function RecurringDetailDialog({
   item,
+  selectedMonth,
+  seriesItems,
+  isSeriesLoading,
   open,
   onOpenChange,
   onEdit,
+  onScheduleChange,
   onDelete,
 }: RecurringDetailDialogProps) {
   if (!item) {
@@ -609,6 +640,7 @@ export function RecurringDetailDialog({
   }
 
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
+  const status = getRecurringDisplayStatus(item, selectedMonth)
 
   return (
     <ResponsiveDialog
@@ -622,15 +654,20 @@ export function RecurringDetailDialog({
       bodyClassName="px-4 py-4 sm:px-7 sm:py-6"
       footerClassName="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-7 sm:pt-4 sm:pb-6"
       footer={
-        <div className="grid grid-cols-2 gap-3">
-          <Button type="button" variant="outline" className="order-2 h-11 rounded-xl sm:h-12" onClick={() => onEdit(item)}>
-            <Pencil className="h-4 w-4" />
-            Edit
+        <div className="space-y-3">
+          <Button type="button" className="h-11 w-full rounded-xl sm:h-12" onClick={() => onScheduleChange(item)}>
+            Schedule change
           </Button>
-          <Button type="button" variant="outline" className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12" onClick={() => onDelete(item)}>
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Button type="button" variant="outline" className="order-2 h-11 rounded-xl sm:h-12" onClick={() => onEdit(item)}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+            <Button type="button" variant="outline" className="order-1 h-11 rounded-xl text-destructive hover:text-destructive sm:h-12" onClick={() => onDelete(item)}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </div>
         </div>
       }
     >
@@ -651,13 +688,127 @@ export function RecurringDetailDialog({
             <DetailRow icon={<Folder className="h-5 w-5 text-muted-foreground" />} label="Category" value={categoryConfig[item.category].label} />
             <DetailRow icon={<TagGlyph className="h-5 w-5 text-muted-foreground" />} label="Tag" value={item.tag.name} />
             <DetailRow icon={<CreditCard className="h-5 w-5 text-muted-foreground" />} label="Card" value={item.card?.name ?? "No card"} />
-            <DetailRow icon={<Repeat className="h-5 w-5 text-muted-foreground" />} label="Status" value={item.is_active ? "Active" : "Inactive"} />
+            <DetailRow icon={<Repeat className="h-5 w-5 text-muted-foreground" />} label="Status" value={getRecurringDisplayStatusLabel(status)} />
             <DetailRow className="col-span-2" icon={<CalendarIcon className="h-5 w-5 text-muted-foreground" />} label="Active months" value={`Starts ${formatAddedMonth(item.starts_month)}`} detail={item.ends_month ? `Ends ${formatAddedMonth(item.ends_month)}` : "No end month"} />
           </div>
+        </div>
+
+        {(isSeriesLoading || seriesItems.length > 1) && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">History</h3>
+            {isSeriesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading price history…</p>
+            ) : (
+              <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/10 p-3">
+                {seriesItems.map((seriesItem) => (
+                  <p key={seriesItem.id} className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{formatCurrency(seriesItem.amount)}</span>
+                    {" · "}
+                    {formatAddedMonth(seriesItem.starts_month)}
+                    {" – "}
+                    {seriesItem.ends_month ? formatAddedMonth(seriesItem.ends_month) : "Present"}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </ResponsiveDialog>
+  )
+}
+
+interface ScheduleChangeDialogProps {
+  item: RecurringExpense | null
+  open: boolean
+  amount: string
+  effectiveMonth: string
+  isMutating: boolean
+  onOpenChange: (open: boolean) => void
+  onAmountChange: (value: string) => void
+  onEffectiveMonthChange: (value: string) => void
+  onSave: () => void
+}
+
+export function ScheduleChangeDialog({
+  item,
+  open,
+  amount,
+  effectiveMonth,
+  isMutating,
+  onOpenChange,
+  onAmountChange,
+  onEffectiveMonthChange,
+  onSave,
+}: ScheduleChangeDialogProps) {
+  if (!item) {
+    return null
+  }
+
+  return (
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Schedule change"
+      description={`${item.expense} is currently ${formatCurrency(item.amount)}.`}
+      mobileSize="compact"
+      desktopClassName="sm:w-[min(calc(100dvw-2rem),32rem)] sm:max-w-[32rem]"
+      footer={
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:justify-end">
+          <Button type="button" variant="ghost" className="h-11 rounded-xl px-4" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="button" className="h-11 rounded-xl" onClick={onSave} disabled={isMutating}>
+            {isMutating ? "Scheduling..." : "Schedule change"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Create a new version starting in {formatAddedMonth(effectiveMonth)}.
+        </p>
+
+        <div className="space-y-2">
+          <Label htmlFor="schedule-change-amount" className="text-sm font-medium">New amount</Label>
+          <AmountInput
+            id="schedule-change-amount"
+            name="schedule_change_amount"
+            value={amount}
+            onValueChange={onAmountChange}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="schedule-change-month" className="text-sm font-medium">Effective month</Label>
+          <MonthPicker
+            id="schedule-change-month"
+            value={effectiveMonth}
+            onChange={onEffectiveMonthChange}
+            placeholder="Select month"
+            className="w-full"
+          />
         </div>
       </div>
     </ResponsiveDialog>
   )
+}
+
+function getRecurringStatusClasses(status: RecurringDisplayStatus): string {
+  switch (status) {
+    case "generated":
+      return "text-emerald-700"
+    case "upcoming":
+      return "text-foreground"
+    case "due_today":
+      return "text-amber-700"
+    case "overdue":
+      return "text-destructive"
+    case "paused":
+    case "ended":
+    case "starts_later":
+      return "text-muted-foreground"
+  }
 }
 
 function DetailRow({

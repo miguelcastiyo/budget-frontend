@@ -5,15 +5,17 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowDownWideNarrow, ArrowLeft, ArrowUpNarrowWide, Plus, Repeat } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { FormChipRail } from "@/components/budget/form-chip-rail"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getNextMonthKey } from "@/lib/date-filters"
 import type {
   RecurringExpense,
+  RecurringExpenseSeriesResponse,
   Tag,
   Card as CardType,
 } from "@/lib/api/types"
@@ -24,6 +26,7 @@ import {
   RecurringDetailDialog,
   RecurringForm,
   RecurringItemRow,
+  ScheduleChangeDialog,
 } from "./_components/recurring-sections"
 import { useRecurringData } from "./_hooks/use-recurring-data"
 import {
@@ -32,8 +35,6 @@ import {
   formatAddedMonth,
   formatProjectedDate,
   formatRecurringAmount,
-  formatRecurringGroupDate,
-  groupRecurringByProjectedDate,
   isValidBillingDay,
   isValidRecurringAmount,
   normalizeRecurringForm,
@@ -41,23 +42,33 @@ import {
   type RecurringFormState,
   type RecurringSort,
 } from "./_lib/recurring"
+import { getRecurringDisplayStatus, type RecurringDisplayStatus } from "./_lib/recurring-status"
+
+type RecurringFilter = "all" | "upcoming" | "generated" | "paused"
 
 export default function RecurringSettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [month, setMonth] = useState(getCurrentMonthKey())
   const [recurringSort, setRecurringSort] = useState<RecurringSort>("date_asc")
+  const [mobileFilter, setMobileFilter] = useState<RecurringFilter>("all")
   const [showNew, setShowNew] = useState(false)
   const [newForm, setNewForm] = useState<RecurringFormState>(() => emptyForm(getCurrentMonthKey()))
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingForm, setEditingForm] = useState<RecurringFormState | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailSeries, setDetailSeries] = useState<RecurringExpenseSeriesResponse | null>(null)
+  const [isSeriesLoading, setIsSeriesLoading] = useState(false)
+  const [scheduleChangeId, setScheduleChangeId] = useState<string | null>(null)
+  const [scheduleChangeAmount, setScheduleChangeAmount] = useState("")
+  const [scheduleChangeEffectiveMonth, setScheduleChangeEffectiveMonth] = useState(getNextMonthKey(getCurrentMonthKey()))
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [isMutating, setIsMutating] = useState(false)
   const { data, tags, cards, isLoading, error, setTags, setCards, setError, loadData } = useRecurringData(month)
   const editingItem = data?.items.find((item) => item.id === editingId) ?? null
   const detailItem = data?.items.find((item) => item.id === detailId) ?? null
+  const scheduleChangeItem = data?.items.find((item) => item.id === scheduleChangeId) ?? null
   const hasEditingChanges = Boolean(
     editingForm &&
     editingItem &&
@@ -82,27 +93,96 @@ export default function RecurringSettingsPage() {
     })
   }, [tags])
 
+  useEffect(() => {
+    if (!detailItem) {
+      setDetailSeries(null)
+      setIsSeriesLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setIsSeriesLoading(true)
+
+    void apiClient.getRecurringExpenseSeries(detailItem.id)
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        setDetailSeries(response)
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return
+        }
+        if (err instanceof ApiError) {
+          setError(formatApiErrorMessage(err))
+        } else {
+          setError("Unable to load recurring expense history")
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsSeriesLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [detailItem, setError])
+
   const tagOptions = useMemo(() => tags, [tags])
-  const activeItemsCount = useMemo(
-    () => data?.items.filter((item) => item.is_active).length ?? 0,
-    [data?.items]
+  const itemsWithStatus = useMemo(
+    () => (data?.items ?? []).map((item) => ({
+      item,
+      status: getRecurringDisplayStatus(item, month),
+    })),
+    [data?.items, month]
   )
-  const inactiveItemsCount = Math.max((data?.items_count ?? 0) - activeItemsCount, 0)
+  const activeItemsCount = useMemo(
+    () => itemsWithStatus.filter(({ status }) => ["generated", "upcoming", "due_today", "overdue"].includes(status)).length,
+    [itemsWithStatus]
+  )
+  const generatedCount = useMemo(
+    () => itemsWithStatus.filter(({ status }) => status === "generated").length,
+    [itemsWithStatus]
+  )
+  const upcomingCount = useMemo(
+    () => itemsWithStatus.filter(({ status }) => status === "upcoming" || status === "due_today").length,
+    [itemsWithStatus]
+  )
+  const largestCommitment = useMemo(
+    () => itemsWithStatus.reduce<{ expense: string; amount: number } | null>((largest, { item }) => {
+      const amount = Number(item.amount)
+      if (!Number.isFinite(amount)) {
+        return largest
+      }
+      if (!largest || amount > largest.amount) {
+        return { expense: item.expense, amount }
+      }
+      return largest
+    }, null),
+    [itemsWithStatus]
+  )
   const upcomingItems = useMemo(
-    () => [...(data?.items ?? [])]
-      .filter((item) => item.is_active)
+    () => itemsWithStatus
+      .filter(({ status }) => status === "upcoming" || status === "due_today")
+      .map(({ item }) => item)
       .sort((first, second) => first.projected_date_for_month.localeCompare(second.projected_date_for_month))
-      .slice(0, 3),
-    [data?.items]
+      .slice(0, 5),
+    [itemsWithStatus]
   )
   const sortedRecurringItems = useMemo(
     () => sortRecurringItems(data?.items ?? [], recurringSort),
     [data?.items, recurringSort]
   )
-  const recurringGroups = useMemo(
-    () => groupRecurringByProjectedDate(sortedRecurringItems),
-    [sortedRecurringItems]
+  const filteredRecurringItems = useMemo(
+    () => sortedRecurringItems.filter((item) => matchesRecurringFilter(getRecurringDisplayStatus(item, month), mobileFilter)),
+    [month, mobileFilter, sortedRecurringItems]
   )
+  const openAddCommitment = () => {
+    setShowNew(true)
+  }
   const closeNewRecurringDialog = () => {
     setShowNew(false)
     setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
@@ -138,7 +218,7 @@ export default function RecurringSettingsPage() {
       await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.error.message)
+        setError(formatApiErrorMessage(err))
       } else {
         setError("Unable to create recurring expense")
       }
@@ -195,7 +275,7 @@ export default function RecurringSettingsPage() {
       await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.error.message)
+        setError(formatApiErrorMessage(err))
       } else {
         setError("Unable to update recurring expense")
       }
@@ -223,7 +303,7 @@ export default function RecurringSettingsPage() {
       await loadData()
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.error.message)
+        setError(formatApiErrorMessage(err))
       } else {
         setError("Unable to delete recurring expense")
       }
@@ -238,6 +318,40 @@ export default function RecurringSettingsPage() {
     setEditingForm(formFromItem(item))
   }
 
+  const startScheduleChange = (item: RecurringExpense) => {
+    setScheduleChangeId(item.id)
+    setScheduleChangeAmount(item.amount)
+    setScheduleChangeEffectiveMonth(getNextMonthKey(month))
+  }
+
+  const handleScheduleChange = async () => {
+    if (!scheduleChangeItem || !isValidRecurringAmount(scheduleChangeAmount)) {
+      setError("Add a valid amount before scheduling the change")
+      return
+    }
+
+    setIsMutating(true)
+    setError(null)
+
+    try {
+      await apiClient.scheduleRecurringExpenseChange(scheduleChangeItem.id, {
+        effective_month: scheduleChangeEffectiveMonth,
+        amount: formatRecurringAmount(scheduleChangeAmount),
+      })
+      setScheduleChangeId(null)
+      setDetailId(null)
+      await loadData()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(formatApiErrorMessage(err))
+      } else {
+        setError("Unable to schedule recurring change")
+      }
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
@@ -247,12 +361,12 @@ export default function RecurringSettingsPage() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold flex-1">Recurring</h1>
+          <h1 className="text-xl font-bold flex-1">Monthly Commitments</h1>
           <Button
             variant="ghost"
             className="h-9 rounded-full px-3 lg:hidden"
-            aria-label="Add recurring expense"
-            onClick={() => setShowNew(true)}
+            aria-label="Add commitment"
+            onClick={openAddCommitment}
           >
             <Plus className="w-5 h-5" />
             <span className="text-sm">Add</span>
@@ -263,7 +377,7 @@ export default function RecurringSettingsPage() {
       <main className="mx-auto w-full max-w-full overflow-x-hidden px-4 pt-3 sm:max-w-lg lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            Monthly bills are added upfront so your budget reflects committed spending.
+            See what this month already owes you, what has generated, and what is still coming up.
           </p>
         </div>
 
@@ -273,7 +387,7 @@ export default function RecurringSettingsPage() {
           <div className="space-y-3 lg:space-y-4">
             <Card className="border-0 p-3 shadow-sm sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Label htmlFor="recurring-month" className="text-sm font-medium">Month</Label>
+                <Label htmlFor="recurring-month" className="text-sm font-medium">Selected month</Label>
                 <MonthPicker
                   id="recurring-month"
                   value={month}
@@ -282,29 +396,47 @@ export default function RecurringSettingsPage() {
                   className="w-full sm:w-[190px]"
                 />
               </div>
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:mt-4">
+              <div className="mt-4 space-y-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Committed total</p>
-                  <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{formatCurrency(data?.committed_total ?? "0.00")}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{formatAddedMonth(month)}</p>
+                  <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{formatCurrency(data?.committed_total ?? "0.00")} committed</p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-medium text-muted-foreground">Recurring items</p>
-                  <p className="mt-1 text-xl font-semibold">{data?.items_count ?? 0}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                  <p>{activeItemsCount} active</p>
+                  <p>{generatedCount} generated</p>
+                  <p>{upcomingCount} upcoming</p>
                 </div>
+                {largestCommitment ? (
+                  <p className="text-sm text-muted-foreground">
+                    Largest: <span className="font-medium text-foreground">{largestCommitment.expense}</span> · {formatCurrency(largestCommitment.amount.toFixed(2))}
+                  </p>
+                ) : null}
               </div>
             </Card>
+
+            <div className="lg:hidden">
+              <FormChipRail
+                items={[
+                  { value: "all", label: "All" },
+                  { value: "upcoming", label: "Upcoming" },
+                  { value: "generated", label: "Generated" },
+                  { value: "paused", label: "Paused" },
+                ]}
+                value={mobileFilter}
+                onValueChange={(value) => setMobileFilter(value as RecurringFilter)}
+                ariaLabel="Filter commitments"
+                fadeClassName="from-background via-background/80 to-transparent"
+                chipClassName="h-9 px-3 text-xs"
+              />
+            </div>
 
             <Card className="overflow-hidden border-0 shadow-sm">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold">Recurring items</h2>
+                  <h2 className="text-sm font-semibold">Commitments</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{formatAddedMonth(month)}</p>
                 </div>
                 <div className="flex min-w-0 shrink-0 items-center gap-2">
-                  <div className="hidden text-right text-xs text-muted-foreground sm:block">
-                    <p>{activeItemsCount} Active</p>
-                    {inactiveItemsCount > 0 && <p>{inactiveItemsCount} Inactive</p>}
-                  </div>
                   <div className="inline-flex max-w-full items-center rounded-lg border border-border/70 bg-background p-0.5">
                     <span className="hidden px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground lg:inline">
                       Sort
@@ -344,42 +476,67 @@ export default function RecurringSettingsPage() {
               </div>
 
               {!isLoading && (data?.items.length ?? 0) === 0 && (
-                <div className="p-4 text-sm text-muted-foreground sm:p-5">
-                  No recurring expenses yet.
+                <div className="p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold">No monthly commitments yet</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Add rent, subscriptions, savings transfers, insurance, or other fixed monthly items so your month starts with a clearer picture.
+                  </p>
+                  <Button className="mt-4 rounded-xl" onClick={openAddCommitment}>
+                    <Plus className="h-4 w-4" />
+                    Add commitment
+                  </Button>
                 </div>
               )}
 
-              <div>
-                {Array.from(recurringGroups.entries()).map(([date, items]) => (
-                  <div key={date}>
-                    <div className="bg-secondary/40 px-4 py-2">
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        {formatRecurringGroupDate(date)}
-                      </span>
-                    </div>
-                    <div className="divide-y divide-border/50">
-                      {items.map((item) => (
-                        <RecurringItemRow key={item.id} item={item} onOpen={() => setDetailId(item.id)} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {!isLoading && (data?.items.length ?? 0) > 0 && filteredRecurringItems.length === 0 ? (
+                <div className="p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold">{getFilteredEmptyState(mobileFilter).title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{getFilteredEmptyState(mobileFilter).description}</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {filteredRecurringItems.map((item) => (
+                    <RecurringItemRow key={item.id} item={item} selectedMonth={month} onOpen={() => setDetailId(item.id)} />
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
 
           <aside className="hidden space-y-4 lg:block">
             <Card className="border-0 p-5 shadow-sm">
+              <h2 className="text-sm font-semibold">Summary</h2>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Committed total</span>
+                  <span className="font-medium">{formatCurrency(data?.committed_total ?? "0.00")}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Active commitments</span>
+                  <span className="font-medium">{activeItemsCount}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Generated this month</span>
+                  <span className="font-medium">{generatedCount}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Upcoming this month</span>
+                  <span className="font-medium">{upcomingCount}</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-0 p-5 shadow-sm">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
                 <Repeat className="h-4 w-4 text-muted-foreground" />
               </div>
-              <h2 className="mt-4 text-sm font-semibold">Monthly commitments</h2>
+              <h2 className="mt-4 text-sm font-semibold">Actions</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use recurring items for bills you expect every month. They are included upfront for the selected month.
+                Keep fixed monthly items visible before the rest of the budget starts moving.
               </p>
-              <Button className="mt-5 w-full rounded-xl" onClick={() => setShowNew(true)}>
+              <Button className="mt-5 w-full rounded-xl" onClick={openAddCommitment}>
                 <Plus className="h-4 w-4" />
-                Add recurring expense
+                Add commitment
               </Button>
             </Card>
 
@@ -387,7 +544,7 @@ export default function RecurringSettingsPage() {
               <h2 className="text-sm font-semibold">Upcoming this month</h2>
               <div className="mt-4 space-y-3">
                 {upcomingItems.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No active recurring items for {formatAddedMonth(month)}.</p>
+                  <p className="text-sm text-muted-foreground">Nothing else upcoming this month.</p>
                 )}
                 {upcomingItems.map((item) => (
                   <div key={item.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 text-sm">
@@ -411,8 +568,8 @@ export default function RecurringSettingsPage() {
             closeNewRecurringDialog()
           }
         }}
-        title="New Recurring Bill"
-        description="Add a monthly bill so it counts toward your budget upfront."
+        title="New Commitment"
+        description="Add a monthly commitment so it counts toward your budget upfront."
         desktopClassName="sm:max-w-2xl"
         contentClassName="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]"
         headerClassName="relative z-10 px-5 pb-3 pt-2 sm:px-6 sm:pb-4 sm:pt-5"
@@ -423,7 +580,7 @@ export default function RecurringSettingsPage() {
           tags={tagOptions}
           cards={cards}
           isMutating={isMutating}
-          saveLabel="Create recurring expense"
+          saveLabel="Create commitment"
           onChange={setNewForm}
           onCreateTag={handleCreateTag}
           onCreateCard={handleCreateCard}
@@ -439,7 +596,7 @@ export default function RecurringSettingsPage() {
             closeEditRecurringDialog()
           }
         }}
-        title="Edit Recurring Bill"
+        title="Edit Commitment"
         description="Update the monthly rule for future budget planning."
         desktopClassName="sm:max-w-2xl"
         contentClassName="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]"
@@ -465,17 +622,37 @@ export default function RecurringSettingsPage() {
 
       <RecurringDetailDialog
         item={detailItem}
+        seriesItems={detailSeries?.items ?? []}
+        isSeriesLoading={isSeriesLoading}
         open={detailId !== null && detailItem !== null}
         onOpenChange={(open) => {
           if (!open) {
             setDetailId(null)
           }
         }}
+        selectedMonth={month}
         onEdit={startEdit}
+        onScheduleChange={startScheduleChange}
         onDelete={(item) => {
           setDetailId(null)
           setDeleteId(item.id)
         }}
+      />
+
+      <ScheduleChangeDialog
+        item={scheduleChangeItem}
+        open={scheduleChangeId !== null && scheduleChangeItem !== null}
+        amount={scheduleChangeAmount}
+        effectiveMonth={scheduleChangeEffectiveMonth}
+        isMutating={isMutating}
+        onOpenChange={(open) => {
+          if (!open && !isMutating) {
+            setScheduleChangeId(null)
+          }
+        }}
+        onAmountChange={setScheduleChangeAmount}
+        onEffectiveMonthChange={setScheduleChangeEffectiveMonth}
+        onSave={() => void handleScheduleChange()}
       />
 
       <ResponsiveConfirmDialog
@@ -497,4 +674,47 @@ export default function RecurringSettingsPage() {
       <BottomNav />
     </div>
   )
+}
+
+function matchesRecurringFilter(status: RecurringDisplayStatus, filter: RecurringFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true
+    case "upcoming":
+      return status === "upcoming" || status === "due_today" || status === "overdue"
+    case "generated":
+      return status === "generated"
+    case "paused":
+      return status === "paused" || status === "ended" || status === "starts_later"
+  }
+}
+
+function getFilteredEmptyState(filter: RecurringFilter): { title: string; description: string } {
+  switch (filter) {
+    case "all":
+    case "upcoming":
+      return {
+        title: "Nothing else upcoming this month",
+        description: "All active commitments for this month have already been generated or completed.",
+      }
+    case "generated":
+      return {
+        title: "Nothing generated yet",
+        description: "No commitments for this month have generated a transaction yet.",
+      }
+    case "paused":
+      return {
+        title: "No paused commitments here",
+        description: "There are no paused, ended, or not-yet-started commitments in this view.",
+      }
+  }
+}
+
+function formatApiErrorMessage(error: ApiError): string {
+  const detail = error.error.details?.[0]
+  if (!detail?.message) {
+    return error.error.message
+  }
+
+  return `${error.error.message} ${detail.message}`
 }

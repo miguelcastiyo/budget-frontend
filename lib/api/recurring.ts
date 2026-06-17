@@ -3,6 +3,9 @@ import type {
   CreateRecurringExpenseRequest,
   RecurringExpense,
   RecurringExpensesResponse,
+  RecurringExpenseSeriesResponse,
+  ScheduleRecurringExpenseChangeRequest,
+  ScheduleRecurringExpenseChangeResponse,
   UpdateRecurringExpenseRequest,
 } from "./types"
 
@@ -29,6 +32,20 @@ export function createRecurringApi(core: ApiClientCore) {
         method: "PATCH",
         body: JSON.stringify(data),
       })
+    },
+
+    async scheduleRecurringExpenseChange(
+      recurringExpenseId: string,
+      data: ScheduleRecurringExpenseChangeRequest
+    ): Promise<ScheduleRecurringExpenseChangeResponse> {
+      return core.request<ScheduleRecurringExpenseChangeResponse>(`/me/recurring-expenses/${recurringExpenseId}/schedule-change`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+    },
+
+    async getRecurringExpenseSeries(recurringExpenseId: string): Promise<RecurringExpenseSeriesResponse> {
+      return core.request<RecurringExpenseSeriesResponse>(`/me/recurring-expenses/${recurringExpenseId}/series`)
     },
 
     async deleteRecurringExpense(recurringExpenseId: string): Promise<void> {

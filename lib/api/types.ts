@@ -173,9 +173,11 @@ export interface Card {
 
 // Recurring expenses
 export type RecurringBillingType = "day_of_month" | "last_day"
+export type GeneratedTransactionAction = "reject" | "update_linked_transaction"
 
 export interface RecurringExpense {
   id: string
+  series_id: string
   expense: string
   amount: string
   category: Category
@@ -224,6 +226,30 @@ export interface UpdateRecurringExpenseRequest {
   starts_month?: string
   ends_month?: string | null
   is_active?: boolean
+}
+
+export interface ScheduleRecurringExpenseChangeRequest {
+  effective_month: string
+  amount?: string
+  category?: Category
+  tag_id?: string
+  card_id?: string | null
+  billing_type?: RecurringBillingType
+  billing_day?: number | null
+  generated_transaction_action?: GeneratedTransactionAction
+}
+
+export interface RecurringExpenseSeriesResponse {
+  series_id: string
+  items: RecurringExpense[]
+}
+
+export interface ScheduleRecurringExpenseChangeResponse {
+  status: "scheduled"
+  series_id: string
+  ended_rule: RecurringExpense
+  new_rule: RecurringExpense
+  series_items: RecurringExpense[]
 }
 
 // Budget Settings
