@@ -1,19 +1,37 @@
 "use client"
 
 import { useState } from "react"
+import { RotateCw } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { formatCurrency } from "@/lib/formatters"
-import type { MonthOverviewCategoryItem } from "@/lib/api/types"
+import type { MonthCloseoutResponse, MonthOverviewCategoryItem, MonthOverviewResponse } from "@/lib/api/types"
+import { MonthCloseoutBackFace, getMonthCardAriaLabel, getMonthCardFlipHint } from "@/components/budget/month-closeout-back-face"
 
 interface SpendingSummaryProps {
   categories: MonthOverviewCategoryItem[]
+  overview?: MonthOverviewResponse | null
+  closeout?: MonthCloseoutResponse | null
+  isCloseoutLoading?: boolean
+  onCloseMonth?: () => void
+  onViewCloseout?: () => void
+  onReviewCloseout?: () => void
+  onSetBudget?: () => void
 }
 
 function safeNumber(value: number): number {
   return Number.isFinite(value) ? value : 0
 }
 
-export function SpendingSummary({ categories }: SpendingSummaryProps) {
+export function SpendingSummary({
+  categories,
+  overview = null,
+  closeout = null,
+  isCloseoutLoading = false,
+  onCloseMonth,
+  onViewCloseout,
+  onReviewCloseout,
+  onSetBudget,
+}: SpendingSummaryProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const totalSpent = categories.reduce(
     (sum, cat) => sum + safeNumber(parseFloat(cat.actual_spend)),
@@ -24,17 +42,8 @@ export function SpendingSummary({ categories }: SpendingSummaryProps) {
     0
   )
   const safeTotalBudget = totalBudget > 0 ? totalBudget : 1
-  const remaining = totalBudget - totalSpent
-  const remainingLabel = formatCurrency(Math.abs(remaining))
   const spentLabel = formatCurrency(totalSpent)
   const budgetLabel = formatCurrency(totalBudget)
-  const isOverBudget = remaining < 0
-  const remainingTextClass =
-    remainingLabel.length >= 10
-      ? "text-[2.1rem] sm:text-[3rem]"
-      : remainingLabel.length >= 9
-        ? "text-[2.35rem] sm:text-[3.3rem]"
-        : "text-[2.65rem] sm:text-[3.65rem]"
   const spentTextClass =
     spentLabel.length >= 10
       ? "text-[1.65rem] sm:text-[2.15rem]"
@@ -45,18 +54,34 @@ export function SpendingSummary({ categories }: SpendingSummaryProps) {
   const strokeWidth = 14
   const radius = (ringSize - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
+  const frontHint = getMonthCardFlipHint({
+    month: overview?.month ?? closeout?.month,
+    overview,
+    closeout,
+  })
 
   return (
-    <button
-      type="button"
-      aria-label={isFlipped ? "Show monthly spending summary" : "Show amount left this month"}
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={getMonthCardAriaLabel({
+        month: overview?.month ?? closeout?.month,
+        closeout,
+        isFlipped,
+      })}
       aria-pressed={isFlipped}
       className="group block w-full cursor-pointer appearance-none rounded-xl border-0 bg-transparent p-0 text-left text-current [perspective:1400px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       onClick={() => setIsFlipped((current) => !current)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          setIsFlipped((current) => !current)
+        }
+      }}
     >
       <div
-        className={`relative transition-transform duration-500 ease-out [transform-style:preserve-3d] group-active:scale-[0.99] motion-reduce:transition-none ${
-          isFlipped ? "[transform:rotateY(180deg)]" : ""
+        className={`relative transition-transform duration-500 ease-out [transform-style:preserve-3d] group-active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none ${
+          isFlipped ? "motion-reduce:[transform:none] [transform:rotateY(180deg)]" : ""
         }`}
       >
         <Card className="min-h-[312px] p-6 border-0 shadow-sm transition-all duration-200 [backface-visibility:hidden] group-hover:shadow-lg">
@@ -153,6 +178,17 @@ export function SpendingSummary({ categories }: SpendingSummaryProps) {
                 )
               })}
             </div>
+
+            {frontHint ? (
+              <div
+                className={`mt-5 flex items-center justify-center gap-2 text-sm ${
+                  frontHint.tone === "warning" ? "text-amber-800" : "text-muted-foreground"
+                }`}
+              >
+                <span>{frontHint.label}</span>
+                <RotateCw className="size-3.5 opacity-70" />
+              </div>
+            ) : null}
           </div>
         </Card>
 
@@ -160,23 +196,17 @@ export function SpendingSummary({ categories }: SpendingSummaryProps) {
           aria-hidden={!isFlipped}
           className="absolute inset-0 min-h-[312px] justify-center overflow-hidden border-0 p-6 shadow-sm transition-all duration-200 [backface-visibility:hidden] [transform:rotateY(180deg)] group-hover:shadow-lg"
         >
-          <div className="mx-auto flex w-full max-w-xl flex-col items-center justify-center py-6 text-center sm:py-8">
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {isOverBudget ? "Over Budget" : "Left This Month"}
-            </span>
-            <span
-              className={`mt-4 max-w-full ${remainingTextClass} font-bold leading-none tracking-tight tabular-nums sm:mt-5 ${
-                isOverBudget ? "text-destructive" : "text-foreground"
-              }`}
-            >
-              {remainingLabel}
-            </span>
-            <span className="mt-4 text-sm text-muted-foreground sm:text-base">
-              {isOverBudget ? "above your monthly budget" : `from ${budgetLabel}`}
-            </span>
-          </div>
+          <MonthCloseoutBackFace
+            overview={overview}
+            closeout={closeout}
+            isLoading={isCloseoutLoading}
+            onCloseMonth={onCloseMonth ?? (() => undefined)}
+            onViewCloseout={onViewCloseout ?? (() => undefined)}
+            onReviewCloseout={onReviewCloseout ?? (() => undefined)}
+            onSetBudget={onSetBudget ?? (() => undefined)}
+          />
         </Card>
       </div>
-    </button>
+    </div>
   )
 }

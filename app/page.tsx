@@ -6,12 +6,13 @@ import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
+import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
 import { TagBreakdown } from "@/components/budget/tag-breakdown"
 import { TransactionList } from "@/components/budget/transaction-list"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { ApiError, apiClient } from "@/lib/api/client"
-import type { MonthOverviewResponse, Transaction } from "@/lib/api/types"
+import type { MonthCloseoutResponse, MonthOverviewResponse, Transaction } from "@/lib/api/types"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -29,12 +30,16 @@ export default function DashboardPage() {
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [overview, setOverview] = useState<MonthOverviewResponse | null>(null)
+  const [closeout, setCloseout] = useState<MonthCloseoutResponse | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCloseoutLoading, setIsCloseoutLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [detailView, setDetailView] = useState<"tags" | "recent">("tags")
   const [isDismissingFirstRun, setIsDismissingFirstRun] = useState(false)
   const [isProgressDismissed, setIsProgressDismissed] = useState(false)
+  const [isCloseoutTrayOpen, setIsCloseoutTrayOpen] = useState(false)
+  const [closeoutTrayMode, setCloseoutTrayMode] = useState<MonthCloseoutTrayMode>("close")
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -46,11 +51,26 @@ export default function DashboardPage() {
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true)
+    setIsCloseoutLoading(true)
     setError(null)
 
     try {
-      const nextOverview = await apiClient.getMonthOverview(currentMonth)
-      setOverview(nextOverview)
+      const [overviewResult, closeoutResult] = await Promise.allSettled([
+        apiClient.getMonthOverview(currentMonth),
+        apiClient.getMonthCloseout(currentMonth),
+      ])
+
+      if (overviewResult.status === "rejected") {
+        throw overviewResult.reason
+      }
+
+      setOverview(overviewResult.value)
+
+      if (closeoutResult.status === "fulfilled") {
+        setCloseout(closeoutResult.value)
+      } else {
+        setCloseout(null)
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -59,6 +79,7 @@ export default function DashboardPage() {
       }
     } finally {
       setIsLoading(false)
+      setIsCloseoutLoading(false)
     }
   }, [currentMonth])
 
@@ -124,6 +145,16 @@ export default function DashboardPage() {
     router.push("/settings/data?start_import=1")
   }
 
+  const openCloseoutTray = (mode: MonthCloseoutTrayMode) => {
+    setCloseoutTrayMode(mode)
+    setIsCloseoutTrayOpen(true)
+  }
+
+  const handleCloseoutSaved = (nextCloseout: MonthCloseoutResponse) => {
+    setCloseout(nextCloseout)
+    void loadDashboardData()
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-mobile-nav">
@@ -182,7 +213,16 @@ export default function DashboardPage() {
           )}
 
           <div>
-            <SpendingSummary categories={categories} />
+            <SpendingSummary
+              categories={categories}
+              overview={overview}
+              closeout={closeout}
+              isCloseoutLoading={isCloseoutLoading}
+              onCloseMonth={() => openCloseoutTray("close")}
+              onViewCloseout={() => openCloseoutTray("view")}
+              onReviewCloseout={() => openCloseoutTray("review")}
+              onSetBudget={() => router.push("/settings/budget")}
+            />
           </div>
 
           <div className="grid grid-cols-3 gap-2 lg:gap-6">
@@ -281,6 +321,16 @@ export default function DashboardPage() {
         mode="edit"
         transaction={editingTransaction}
         onTransactionUpdated={() => void loadDashboardData()}
+      />
+
+      <MonthCloseoutTray
+        open={isCloseoutTrayOpen}
+        mode={closeoutTrayMode}
+        month={currentMonth}
+        closeout={closeout}
+        onOpenChange={setIsCloseoutTrayOpen}
+        onModeChange={setCloseoutTrayMode}
+        onSaved={handleCloseoutSaved}
       />
     </div>
   )

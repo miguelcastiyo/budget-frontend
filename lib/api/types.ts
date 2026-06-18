@@ -508,6 +508,114 @@ export interface MonthOverviewResponse {
   status_cards: MonthOverviewStatusCard[]
 }
 
+export type MonthCloseoutStatus =
+  | "open"
+  | "future"
+  | "missing_budget"
+  | "ready_to_close"
+  | "closed"
+  | "reopened"
+
+export type MonthCloseoutResultType = "surplus" | "deficit" | "balanced"
+
+export type MonthCloseoutAllocationType =
+  | "savings"
+  | "investment"
+  | "debt"
+  | "rollover"
+  | "buffer"
+  | "covered_by_buffer"
+  | "ignored"
+  | "other"
+
+export interface MonthCloseoutPlannedActual {
+  needs: string
+  wants: string
+  savings: string
+  total: string
+}
+
+export interface MonthCloseoutComputed {
+  budget_effective_month: string | null
+  budget_allocation_mode: AllocationMode
+  monthly_income: string
+  planned: MonthCloseoutPlannedActual
+  actual: MonthCloseoutPlannedActual
+  result_type: MonthCloseoutResultType
+  surplus_amount: string
+  deficit_amount: string
+  spending_surplus_amount: string
+  spending_deficit_amount: string
+}
+
+export interface MonthCloseoutAllocation {
+  id: string
+  allocation_type: MonthCloseoutAllocationType
+  label: string | null
+  amount: string
+  target_month: string | null
+  notes: string | null
+}
+
+export interface MonthCloseoutSaved {
+  id: string
+  status: "closed" | "reopened"
+  result_type: MonthCloseoutResultType
+  surplus_amount: string
+  deficit_amount: string
+  allocated_amount: string
+  unallocated_amount: string
+  is_stale: boolean
+  stale_reasons: string[]
+  closed_at: string
+  reopened_at: string | null
+  notes: string | null
+  allocations: MonthCloseoutAllocation[]
+}
+
+export interface MonthCloseoutResponse {
+  month: string
+  status: MonthCloseoutStatus
+  is_closeable: boolean
+  computed: MonthCloseoutComputed | null
+  closeout: MonthCloseoutSaved | null
+}
+
+export interface MonthCloseoutAllocationInput {
+  allocation_type: MonthCloseoutAllocationType
+  label?: string | null
+  amount: string
+  target_month?: string | null
+  notes?: string | null
+}
+
+export interface CloseMonthRequest {
+  notes?: string | null
+  allocations?: MonthCloseoutAllocationInput[]
+}
+
+export interface UpdateMonthCloseoutRequest {
+  notes?: string | null
+  allocations?: MonthCloseoutAllocationInput[]
+}
+
+export interface MonthCloseoutListItem {
+  id: string
+  month: string
+  status: "closed" | "reopened"
+  result_type: MonthCloseoutResultType
+  surplus_amount: string
+  deficit_amount: string
+  allocated_amount: string
+  unallocated_amount: string
+  is_stale: boolean
+  closed_at: string
+}
+
+export interface MonthCloseoutListResponse {
+  items: MonthCloseoutListItem[]
+}
+
 export interface InsightsMonthlySpendPoint {
   month: string
   total_spend: string
