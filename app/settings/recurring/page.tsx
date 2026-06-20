@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { sortCards } from "@/lib/cards"
 import { getCurrentMonthKey, getNextMonthKey } from "@/lib/date-filters"
 import type {
   RecurringBillingType,
@@ -253,7 +254,7 @@ export default function RecurringSettingsPage() {
 
   const handleCreateCard = async (name: string): Promise<CardType> => {
     const created = await apiClient.createCard({ name: name.trim() })
-    setCards((previous) => [...previous, created])
+    setCards((previous) => sortCards([...previous, created]))
     return created
   }
 

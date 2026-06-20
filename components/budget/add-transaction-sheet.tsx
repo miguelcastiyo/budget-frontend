@@ -38,10 +38,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon, ChevronDown, Plus, X, CreditCard } from "lucide-react"
+import { CalendarIcon, ChevronDown, CreditCard, Plus, Star, X } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { sortCards } from "@/lib/cards"
 import { parseDateValue } from "@/lib/date-filters"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
@@ -142,7 +143,7 @@ export function AddTransactionSheet({
 
       setTags(tagsResponse.items)
       setQuickPickTags(quickPickTagsResponse.items.length > 0 ? quickPickTagsResponse.items : tagsResponse.items.slice(0, 5))
-      setCards(cardsResponse.items)
+      setCards(sortCards(cardsResponse.items))
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -330,7 +331,7 @@ export function AddTransactionSheet({
 
     try {
       const created = await apiClient.createCard({ name })
-      setCards((prev) => [...prev, created])
+      setCards((prev) => sortCards([...prev, created]))
       setCardId(created.id)
       setNewCardName("")
       setShowNewCard(false)
@@ -529,6 +530,12 @@ export function AddTransactionSheet({
     ...quickPickTags,
     ...tags.filter((tag) => !quickPickTagIds.has(tag.id)),
   ]
+  const cardChipLabel = (card: CardType) => (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span>{card.name.trim().replace(/\s+/g, " ")}</span>
+      {card.is_favorite && <Star className="h-3 w-3 fill-amber-400 text-amber-500" />}
+    </span>
+  )
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig =
     !makeRecurring ||
@@ -850,7 +857,7 @@ export function AddTransactionSheet({
                               },
                               ...cards.map((card) => ({
                                 value: card.id,
-                                label: card.name.trim().replace(/\s+/g, " "),
+                                label: cardChipLabel(card),
                                 icon: <CreditCard className="h-4 w-4 shrink-0" />,
                                 ariaLabel: card.name,
                                 title: card.name,

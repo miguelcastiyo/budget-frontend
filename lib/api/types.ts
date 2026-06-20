@@ -160,6 +160,12 @@ export interface CreateNamedEntityRequest {
 export interface Card {
   id: string
   name: string
+  is_favorite: boolean
+}
+
+export interface UpdateCardRequest {
+  name?: string
+  is_favorite?: boolean
 }
 
 // Recurring expenses

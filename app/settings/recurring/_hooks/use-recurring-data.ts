@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { sortCards } from "@/lib/cards"
 import type { Card, RecurringExpensesResponse, Tag } from "@/lib/api/types"
 
 export function useRecurringData(month: string) {
@@ -23,7 +24,7 @@ export function useRecurringData(month: string) {
       ])
       setData(recurringResponse)
       setTags(tagsResponse.items)
-      setCards(cardsResponse.items)
+      setCards(sortCards(cardsResponse.items))
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)

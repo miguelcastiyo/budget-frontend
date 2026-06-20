@@ -19,6 +19,7 @@ require.extensions[".tsx"] = compileTypeScript
 
 const income = require("../lib/income-breakdown.ts")
 const allocation = require("../lib/budget-allocation.ts")
+const cards = require("../lib/cards.ts")
 const dateFilters = require("../lib/date-filters.ts")
 const formatters = require("../lib/formatters.ts")
 const insights = require("../lib/insights.ts")
@@ -169,6 +170,22 @@ assertEqual(insights.formatMonthTooltipLabel("2026-05"), "May 2026", "month tool
 assertEqual(insights.tagColor(0), "var(--color-chart-1)", "tag color uses theme chart palette first")
 assertEqual(insights.tagColor(20), "color-mix(in srgb, var(--color-chart-1) 58%, var(--color-foreground))", "tag color generates deterministic overflow colors")
 assertEqual(insights.dayLabel("Monday"), "MON", "day label abbreviates day names")
+
+assertDeepEqual(
+  cards.sortCards([
+    { id: "12", name: "zeta", is_favorite: false },
+    { id: "2", name: "Alpha", is_favorite: false },
+    { id: "9", name: "beta", is_favorite: true },
+    { id: "3", name: "Beta", is_favorite: false },
+  ]),
+  [
+    { id: "9", name: "beta", is_favorite: true },
+    { id: "2", name: "Alpha", is_favorite: false },
+    { id: "3", name: "Beta", is_favorite: false },
+    { id: "12", name: "zeta", is_favorite: false },
+  ],
+  "card sorting keeps favorite first and falls back to case-insensitive name"
+)
 
 console.log("Frontend helper tests passed")
 

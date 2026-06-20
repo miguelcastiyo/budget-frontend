@@ -1,5 +1,5 @@
 import type { ApiClientCore } from "./core"
-import type { Card, CreateNamedEntityRequest, Tag, TagQuickPicksResponse } from "./types"
+import type { Card, CreateNamedEntityRequest, Tag, TagQuickPicksResponse, UpdateCardRequest } from "./types"
 
 export function createTaxonomyApi(core: ApiClientCore) {
   return {
@@ -46,7 +46,7 @@ export function createTaxonomyApi(core: ApiClientCore) {
       })
     },
 
-    async updateCard(cardId: string, data: CreateNamedEntityRequest): Promise<Card> {
+    async updateCard(cardId: string, data: UpdateCardRequest): Promise<Card> {
       return core.request<Card>(`/me/cards/${cardId}`, {
         method: "PATCH",
         body: JSON.stringify(data),

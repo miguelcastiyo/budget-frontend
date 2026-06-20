@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { format } from "date-fns"
-import { CalendarIcon, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, CreditCard, Folder, Pencil, Plus, Repeat, Tag as TagGlyph, Trash2 } from "lucide-react"
+import { CalendarIcon, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, CreditCard, Folder, Pencil, Plus, Repeat, Star, Tag as TagGlyph, Trash2 } from "lucide-react"
 import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
@@ -182,6 +182,15 @@ interface RecurringFormProps {
   onCreateCard: (name: string) => Promise<CardType>
   onCancel: () => void
   onSave: () => void
+}
+
+function cardChipLabel(card: CardType): ReactNode {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span>{card.name.trim().replace(/\s+/g, " ")}</span>
+      {card.is_favorite && <Star className="h-3 w-3 fill-amber-400 text-amber-500" />}
+    </span>
+  )
 }
 
 export function RecurringForm({
@@ -464,7 +473,7 @@ export function RecurringForm({
                   },
                   ...cards.map((card) => ({
                     value: card.id,
-                    label: card.name.trim().replace(/\s+/g, " "),
+                    label: cardChipLabel(card),
                     icon: <CreditCard className="h-4 w-4 shrink-0" />,
                     ariaLabel: card.name,
                     title: card.name,

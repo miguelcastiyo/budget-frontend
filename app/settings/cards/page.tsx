@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import type { Card as CardType } from "@/lib/api/types"
-import { ArrowLeft, Check, CreditCard, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react"
+import { ArrowLeft, Check, CreditCard, MoreHorizontal, Pencil, Plus, Star, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import {
   DropdownMenu,
@@ -16,9 +16,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { sortCards } from "@/lib/cards"
 
 function cardCountLabel(count: number) {
   return `${count} ${count === 1 ? "card" : "cards"}`
+}
+
+function upsertUpdatedCard(cards: CardType[], updated: CardType): CardType[] {
+  const next = cards.map((card) => {
+    if (card.id === updated.id) {
+      return updated
+    }
+
+    if (updated.is_favorite && card.is_favorite) {
+      return { ...card, is_favorite: false }
+    }
+
+    return card
+  })
+
+  return sortCards(next)
 }
 
 export default function CardsSettingsPage() {
@@ -38,7 +55,7 @@ export default function CardsSettingsPage() {
     const loadCards = async () => {
       try {
         const response = await apiClient.getCards()
-        setCards(response.items)
+        setCards(sortCards(response.items))
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.error.message)
@@ -68,7 +85,7 @@ export default function CardsSettingsPage() {
 
     try {
       const updated = await apiClient.updateCard(editingId, { name: editingName.trim() })
-      setCards((previous) => previous.map((card) => (card.id === editingId ? updated : card)))
+      setCards((previous) => upsertUpdatedCard(previous, updated))
       setEditingId(null)
       setEditingName("")
     } catch (err) {
@@ -98,7 +115,7 @@ export default function CardsSettingsPage() {
 
     try {
       const created = await apiClient.createCard({ name })
-      setCards((previous) => [...previous, created])
+      setCards((previous) => sortCards([...previous, created]))
       setNewCardName("")
       setShowNewCard(false)
     } catch (err) {
@@ -129,6 +146,24 @@ export default function CardsSettingsPage() {
         setError(err.error.message)
       } else {
         setError("Unable to remove card")
+      }
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const handleFavoriteToggle = async (card: CardType) => {
+    setIsMutating(true)
+    setError(null)
+
+    try {
+      const updated = await apiClient.updateCard(card.id, { is_favorite: !card.is_favorite })
+      setCards((previous) => upsertUpdatedCard(previous, updated))
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError(card.is_favorite ? "Unable to clear favorite card" : "Unable to favorite card")
       }
     } finally {
       setIsMutating(false)
@@ -303,8 +338,28 @@ export default function CardsSettingsPage() {
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary">
                         <CreditCard className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <span className="min-w-0 flex-1 truncate font-medium">{card.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="min-w-0 truncate font-medium">{card.name}</span>
+                          {card.is_favorite && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                              <Star className="h-3 w-3 fill-current" />
+                              Favorite
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1 sm:hidden">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="rounded-full"
+                          aria-label={card.is_favorite ? `Clear favorite card ${card.name}` : `Favorite card ${card.name}`}
+                          onClick={() => void handleFavoriteToggle(card)}
+                          disabled={isMutating}
+                        >
+                          <Star className={card.is_favorite ? "h-4 w-4 fill-amber-400 text-amber-500" : "h-4 w-4"} />
+                        </Button>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -337,6 +392,10 @@ export default function CardsSettingsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem disabled={isMutating} onClick={() => void handleFavoriteToggle(card)}>
+                              <Star className={card.is_favorite ? "h-4 w-4 fill-amber-400 text-amber-500" : "h-4 w-4"} />
+                              {card.is_favorite ? "Clear favorite" : "Set as favorite"}
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleStartEdit(card)}>
                               <Pencil className="h-4 w-4" />
                               Edit card
