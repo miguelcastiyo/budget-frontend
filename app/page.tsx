@@ -256,7 +256,6 @@ export default function DashboardPage() {
 
             <TabsContent value="tags" className="mt-0">
               <TagBreakdown
-                className="lg:h-[420px]"
                 tags={tags}
                 emptyTitle="Your spending patterns will appear here"
                 emptyDescription="Add a transaction to start filling the page."
@@ -273,7 +272,6 @@ export default function DashboardPage() {
 
             <TabsContent value="recent" className="mt-0">
               <TransactionList
-                className="lg:h-[420px]"
                 transactions={recentTransactions}
                 title="Recent Transactions"
                 showViewAll
