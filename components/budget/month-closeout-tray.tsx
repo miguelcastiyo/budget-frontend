@@ -48,6 +48,13 @@ interface EditableAllocationRow {
   notes: string
 }
 
+interface TrayPresentation {
+  title: string
+  isReview: boolean
+  isReadOnly: boolean
+  resultLabel: string
+}
+
 const SURPLUS_TYPES: MonthCloseoutAllocationType[] = [
   "savings",
   "buffer",
@@ -164,6 +171,40 @@ function buildPayloadAllocations(rows: EditableAllocationRow[]): MonthCloseoutAl
     }))
 }
 
+function getTrayPresentation(mode: MonthCloseoutTrayMode): TrayPresentation {
+  switch (mode) {
+    case "review":
+      return {
+        title: "Closeout review",
+        isReview: true,
+        isReadOnly: false,
+        resultLabel: "Saved result",
+      }
+    case "view":
+      return {
+        title: "Month closeout",
+        isReview: false,
+        isReadOnly: true,
+        resultLabel: "Saved result",
+      }
+    case "edit":
+      return {
+        title: "Edit closeout",
+        isReview: false,
+        isReadOnly: false,
+        resultLabel: "Saved result",
+      }
+    case "close":
+    default:
+      return {
+        title: "Close month",
+        isReview: false,
+        isReadOnly: false,
+        resultLabel: "Current result",
+      }
+  }
+}
+
 export function MonthCloseoutTray({
   open,
   mode,
@@ -191,6 +232,7 @@ export function MonthCloseoutTray({
   )
   const remainingAllocation = Math.max(maxAllocationAmount - allocatedTotal, 0)
   const allocationTypeOptions = activeResultType === "deficit" ? DEFICIT_TYPES : SURPLUS_TYPES
+  const presentation = getTrayPresentation(mode)
 
   useEffect(() => {
     if (!open) {
@@ -198,22 +240,9 @@ export function MonthCloseoutTray({
     }
 
     setError(null)
-
-    if (mode === "close") {
-      setNotes(saved?.notes ?? "")
-      setAllocations(saved?.allocations?.map(allocationToRow) ?? [])
-      return
-    }
-
-    if (mode === "edit") {
-      setNotes(saved?.notes ?? "")
-      setAllocations(saved?.allocations?.map(allocationToRow) ?? [])
-      return
-    }
-
     setNotes(saved?.notes ?? "")
     setAllocations(saved?.allocations?.map(allocationToRow) ?? [])
-  }, [mode, open, saved])
+  }, [open, saved])
 
   useEffect(() => {
     if (!open) {
@@ -364,99 +393,29 @@ export function MonthCloseoutTray({
     setAllocations((current) => current.filter((allocation) => allocation.id !== id))
   }
 
-  const footer =
-    mode === "review" ? (
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 rounded-xl"
-          onClick={() => onModeChange("close")}
-        >
-          Update Closeout
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-12 rounded-xl"
-          onClick={() => onOpenChange(false)}
-        >
-          Keep Current Closeout
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 rounded-xl"
-          onClick={() => setShowReopenConfirm(true)}
-        >
-          Reopen Month
-        </Button>
-      </div>
-    ) : mode === "view" ? (
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 rounded-xl"
-          onClick={() => onModeChange("edit")}
-        >
-          <Pencil className="size-4" />
-          Edit Allocations
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-12 rounded-xl"
-          onClick={() => onOpenChange(false)}
-        >
-          Done
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 rounded-xl"
-          onClick={() => setShowReopenConfirm(true)}
-        >
-          <RotateCcw className="size-4" />
-          Reopen Month
-        </Button>
-      </div>
-    ) : (
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="text-sm text-muted-foreground">
-          {canEditAllocations
-            ? allocatedTotal > maxAllocationAmount + 0.001
-              ? `${formatCurrency(allocatedTotal - maxAllocationAmount)} over allocated`
-              : `${formatCurrency(remainingAllocation)} left unassigned`
-            : "No allocations needed for a balanced closeout."}
-        </div>
-        <Button
-          type="button"
-          className="h-12 rounded-xl px-6"
-          onClick={() => void submitForm()}
-          disabled={isSubmitting || !closeout || allocatedTotal > maxAllocationAmount + 0.001}
-        >
-          {primaryCtaLabel}
-        </Button>
-      </div>
-    )
-
   return (
     <>
       <ResponsiveDialog
         open={open}
         onOpenChange={onOpenChange}
-        title={
-          mode === "review"
-            ? "Closeout review"
-            : mode === "view"
-              ? "Month closeout"
-              : mode === "edit"
-                ? "Edit closeout"
-                : "Close month"
-        }
+        title={presentation.title}
         description={monthLabel}
-        footer={footer}
+        footer={
+          <MonthCloseoutTrayFooter
+            mode={mode}
+            canEditAllocations={canEditAllocations}
+            allocatedTotal={allocatedTotal}
+            maxAllocationAmount={maxAllocationAmount}
+            remainingAllocation={remainingAllocation}
+            isSubmitting={isSubmitting}
+            hasCloseout={Boolean(closeout)}
+            primaryCtaLabel={primaryCtaLabel}
+            onSubmit={() => void submitForm()}
+            onOpenChange={onOpenChange}
+            onModeChange={onModeChange}
+            onShowReopenConfirm={() => setShowReopenConfirm(true)}
+          />
+        }
         desktopClassName="sm:w-[min(calc(100dvw-2rem),44rem)] sm:max-w-[44rem]"
         bodyClassName="space-y-5"
       >
@@ -466,225 +425,29 @@ export function MonthCloseoutTray({
           </div>
         )}
 
-        {mode === "review" ? (
-          <div className="space-y-4">
-            <div className="rounded-3xl border border-amber-200/80 bg-amber-50/60 p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 size-5 text-amber-700" />
-                <div>
-                  <p className="font-medium text-amber-900">This month changed after it was closed.</p>
-                  <p className="mt-1 text-sm text-amber-800">Review the stored snapshot against the current month before deciding what to keep.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ComparisonCard
-                label="Stored closeout"
-                resultType={saved?.result_type ?? "balanced"}
-                resultAmount={getResultAmount(saved?.result_type ?? "balanced", saved)}
-                detail={saved ? `Closed ${formatDateTimeValue(saved.closed_at, { month: "short", day: "numeric", year: "numeric" })}` : "No saved closeout"}
-              />
-              <ComparisonCard
-                label="Current month result"
-                resultType={computed?.result_type ?? "balanced"}
-                resultAmount={getResultAmount(computed?.result_type ?? "balanced", computed)}
-                detail="Based on current budget and transactions"
-              />
-            </div>
-
-            {!!saved?.stale_reasons?.length && (
-              <div className="rounded-3xl border border-border/60 bg-muted/30 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Why it is stale</p>
-                <ul className="mt-3 space-y-2 text-sm text-foreground">
-                  {saved.stale_reasons.map((reason) => (
-                    <li key={reason}>• {reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {saved?.allocations?.length ? (
-              <AllocationSummaryList allocations={saved.allocations} />
-            ) : null}
-          </div>
+        {presentation.isReview ? (
+          <ReviewContent saved={saved} computed={computed} />
         ) : (
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-border/60 bg-card p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
-                {mode === "view" || mode === "edit" ? "Saved result" : "Current result"}
-              </p>
-              <div className={`mt-3 text-3xl font-semibold tracking-tight ${comparisonTone(activeResultType)}`}>
-                {getResultLabel(activeResultType, maxAllocationAmount)}
-              </div>
-              {(saved || computed) && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {activeResultType === "surplus"
-                    ? "You finished the month under plan."
-                    : activeResultType === "deficit"
-                      ? "Review how the overage should be covered."
-                      : "No allocations are required for this month."}
-                </p>
-              )}
-              {saved && (mode === "view" || mode === "edit") && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge variant="outline">{formatCurrency(saved.allocated_amount)} allocated</Badge>
-                  <Badge variant="outline">{formatCurrency(saved.unallocated_amount)} unassigned</Badge>
-                  {saved.is_stale ? <Badge variant="outline">Needs review</Badge> : null}
-                </div>
-              )}
-            </div>
-
-            {computed && mode === "close" ? (
-              <PlannedActualCard
-                computed={computed}
-                expanded={isPlannedActualExpanded}
-                onToggle={() => setIsPlannedActualExpanded((current) => !current)}
-              />
-            ) : null}
-
-            {canEditAllocations && mode !== "view" ? (
-              <div className="space-y-4 rounded-3xl border border-border/60 bg-card p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Allocations</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Allocate up to {formatCurrency(maxAllocationAmount)}. Partial allocation is allowed.
-                    </p>
-                  </div>
-                  <Badge variant="outline">{formatCurrency(remainingAllocation)} left</Badge>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {activeResultType === "surplus" ? (
-                    <>
-                      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => applyQuickAllocation("savings")}>
-                        Send all to savings
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => applyQuickAllocation("buffer")}>
-                        Keep as buffer
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => applyQuickAllocation("covered_by_buffer")}>
-                        Covered by buffer
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => applyQuickAllocation("savings")}>
-                        Covered by savings
-                      </Button>
-                    </>
-                  )}
-                  <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={addAllocation}>
-                    Split it up
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {allocations.map((allocation, index) => (
-                    <div key={allocation.id} className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-foreground">Allocation {index + 1}</p>
-                        <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={() => removeAllocation(allocation.id)}>
-                          Remove
-                        </Button>
-                      </div>
-
-                      <div className="mt-4 grid gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor={`allocation-type-${allocation.id}`}>Type</Label>
-                          <select
-                            id={`allocation-type-${allocation.id}`}
-                            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
-                            value={allocation.allocation_type}
-                            onChange={(event) =>
-                              updateAllocation(allocation.id, {
-                                allocation_type: event.target.value as MonthCloseoutAllocationType,
-                              })
-                            }
-                          >
-                            {allocationTypeOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {getAllocationTypeLabel(option)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <CompactCurrencyInput
-                          id={`allocation-amount-${allocation.id}`}
-                          label="Amount"
-                          value={allocation.amount}
-                          onValueChange={(value) => updateAllocation(allocation.id, { amount: value })}
-                        />
-
-                        <div className="grid gap-2">
-                          <Label htmlFor={`allocation-label-${allocation.id}`}>Label</Label>
-                          <Input
-                            id={`allocation-label-${allocation.id}`}
-                            value={allocation.label}
-                            onChange={(event) => updateAllocation(allocation.id, { label: event.target.value })}
-                            placeholder="Optional note label"
-                          />
-                        </div>
-
-                        {allocation.allocation_type === "rollover" ? (
-                          <div className="grid gap-2">
-                            <Label htmlFor={`allocation-target-month-${allocation.id}`}>Target month</Label>
-                            <Input
-                              id={`allocation-target-month-${allocation.id}`}
-                              value={allocation.target_month}
-                              onChange={(event) => updateAllocation(allocation.id, { target_month: event.target.value })}
-                              placeholder="YYYY-MM"
-                            />
-                          </div>
-                        ) : null}
-
-                        <div className="grid gap-2">
-                          <Label htmlFor={`allocation-notes-${allocation.id}`}>Notes</Label>
-                          <Textarea
-                            id={`allocation-notes-${allocation.id}`}
-                            value={allocation.notes}
-                            onChange={(event) => updateAllocation(allocation.id, { notes: event.target.value })}
-                            placeholder="Optional details"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {allocations.length === 0 ? (
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border px-4 py-5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
-                      onClick={addAllocation}
-                    >
-                      <Plus className="size-4" />
-                      Add allocation
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {mode === "view" && saved?.allocations?.length ? <AllocationSummaryList allocations={saved.allocations} /> : null}
-
-            <div className="space-y-2 rounded-3xl border border-border/60 bg-card p-5">
-              <Label htmlFor="closeout-notes">Notes</Label>
-              {mode === "view" ? (
-                <div className="rounded-2xl bg-muted/30 px-4 py-3 text-sm text-foreground">
-                  {saved?.notes?.trim() ? saved.notes : "No notes saved for this month."}
-                </div>
-              ) : (
-                <Textarea
-                  id="closeout-notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Add any context you want to keep with this month."
-                />
-              )}
-            </div>
-          </div>
+          <EditorContent
+            mode={mode}
+            presentation={presentation}
+            saved={saved}
+            computed={computed}
+            notes={notes}
+            activeResultType={activeResultType}
+            maxAllocationAmount={maxAllocationAmount}
+            remainingAllocation={remainingAllocation}
+            canEditAllocations={canEditAllocations}
+            allocationTypeOptions={allocationTypeOptions}
+            allocations={allocations}
+            isPlannedActualExpanded={isPlannedActualExpanded}
+            onTogglePlannedActual={() => setIsPlannedActualExpanded((current) => !current)}
+            onQuickAllocation={applyQuickAllocation}
+            onAddAllocation={addAllocation}
+            onUpdateAllocation={updateAllocation}
+            onRemoveAllocation={removeAllocation}
+            onNotesChange={setNotes}
+          />
         )}
       </ResponsiveDialog>
 
@@ -704,6 +467,466 @@ export function MonthCloseoutTray({
         </div>
       </ResponsiveConfirmDialog>
     </>
+  )
+}
+
+function MonthCloseoutTrayFooter({
+  mode,
+  canEditAllocations,
+  allocatedTotal,
+  maxAllocationAmount,
+  remainingAllocation,
+  isSubmitting,
+  hasCloseout,
+  primaryCtaLabel,
+  onSubmit,
+  onOpenChange,
+  onModeChange,
+  onShowReopenConfirm,
+}: {
+  mode: MonthCloseoutTrayMode
+  canEditAllocations: boolean
+  allocatedTotal: number
+  maxAllocationAmount: number
+  remainingAllocation: number
+  isSubmitting: boolean
+  hasCloseout: boolean
+  primaryCtaLabel: string
+  onSubmit: () => void
+  onOpenChange: (open: boolean) => void
+  onModeChange: (mode: MonthCloseoutTrayMode) => void
+  onShowReopenConfirm: () => void
+}) {
+  if (mode === "review") {
+    return (
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={() => onModeChange("close")}>
+          Update Closeout
+        </Button>
+        <Button type="button" variant="ghost" className="h-12 rounded-xl" onClick={() => onOpenChange(false)}>
+          Keep Current Closeout
+        </Button>
+        <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={onShowReopenConfirm}>
+          Reopen Month
+        </Button>
+      </div>
+    )
+  }
+
+  if (mode === "view") {
+    return (
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={() => onModeChange("edit")}>
+          <Pencil className="size-4" />
+          Edit Allocations
+        </Button>
+        <Button type="button" variant="ghost" className="h-12 rounded-xl" onClick={() => onOpenChange(false)}>
+          Done
+        </Button>
+        <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={onShowReopenConfirm}>
+          <RotateCcw className="size-4" />
+          Reopen Month
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="text-sm text-muted-foreground">
+        {canEditAllocations
+          ? allocatedTotal > maxAllocationAmount + 0.001
+            ? `${formatCurrency(allocatedTotal - maxAllocationAmount)} over allocated`
+            : `${formatCurrency(remainingAllocation)} left unassigned`
+          : "No allocations needed for a balanced closeout."}
+      </div>
+      <Button
+        type="button"
+        className="h-12 rounded-xl px-6"
+        onClick={onSubmit}
+        disabled={isSubmitting || !hasCloseout || allocatedTotal > maxAllocationAmount + 0.001}
+      >
+        {primaryCtaLabel}
+      </Button>
+    </div>
+  )
+}
+
+function ReviewContent({
+  saved,
+  computed,
+}: {
+  saved: MonthCloseoutSaved | null
+  computed: MonthCloseoutComputed | null
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-3xl border border-amber-200/80 bg-amber-50/60 p-4">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 size-5 text-amber-700" />
+          <div>
+            <p className="font-medium text-amber-900">This month changed after it was closed.</p>
+            <p className="mt-1 text-sm text-amber-800">Review the stored snapshot against the current month before deciding what to keep.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ComparisonCard
+          label="Stored closeout"
+          resultType={saved?.result_type ?? "balanced"}
+          resultAmount={getResultAmount(saved?.result_type ?? "balanced", saved)}
+          detail={saved ? `Closed ${formatDateTimeValue(saved.closed_at, { month: "short", day: "numeric", year: "numeric" })}` : "No saved closeout"}
+        />
+        <ComparisonCard
+          label="Current month result"
+          resultType={computed?.result_type ?? "balanced"}
+          resultAmount={getResultAmount(computed?.result_type ?? "balanced", computed)}
+          detail="Based on current budget and transactions"
+        />
+      </div>
+
+      {!!saved?.stale_reasons?.length && (
+        <div className="rounded-3xl border border-border/60 bg-muted/30 p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Why it is stale</p>
+          <ul className="mt-3 space-y-2 text-sm text-foreground">
+            {saved.stale_reasons.map((reason) => (
+              <li key={reason}>• {reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {saved?.allocations?.length ? <AllocationSummaryList allocations={saved.allocations} /> : null}
+    </div>
+  )
+}
+
+function EditorContent({
+  mode,
+  presentation,
+  saved,
+  computed,
+  notes,
+  activeResultType,
+  maxAllocationAmount,
+  remainingAllocation,
+  canEditAllocations,
+  allocationTypeOptions,
+  allocations,
+  isPlannedActualExpanded,
+  onTogglePlannedActual,
+  onQuickAllocation,
+  onAddAllocation,
+  onUpdateAllocation,
+  onRemoveAllocation,
+  onNotesChange,
+}: {
+  mode: MonthCloseoutTrayMode
+  presentation: TrayPresentation
+  saved: MonthCloseoutSaved | null
+  computed: MonthCloseoutComputed | null
+  notes: string
+  activeResultType: MonthCloseoutResultType
+  maxAllocationAmount: number
+  remainingAllocation: number
+  canEditAllocations: boolean
+  allocationTypeOptions: MonthCloseoutAllocationType[]
+  allocations: EditableAllocationRow[]
+  isPlannedActualExpanded: boolean
+  onTogglePlannedActual: () => void
+  onQuickAllocation: (type: MonthCloseoutAllocationType) => void
+  onAddAllocation: () => void
+  onUpdateAllocation: (id: string, patch: Partial<EditableAllocationRow>) => void
+  onRemoveAllocation: (id: string) => void
+  onNotesChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-5">
+      <ResultSummaryCard
+        label={presentation.resultLabel}
+        resultType={activeResultType}
+        resultAmount={maxAllocationAmount}
+        showSavedBadges={mode === "view" || mode === "edit"}
+        saved={saved}
+        hasData={Boolean(saved || computed)}
+      />
+
+      {computed && mode === "close" ? (
+        <PlannedActualCard
+          computed={computed}
+          expanded={isPlannedActualExpanded}
+          onToggle={onTogglePlannedActual}
+        />
+      ) : null}
+
+      {canEditAllocations && !presentation.isReadOnly ? (
+        <AllocationEditor
+          activeResultType={activeResultType}
+          maxAllocationAmount={maxAllocationAmount}
+          remainingAllocation={remainingAllocation}
+          allocationTypeOptions={allocationTypeOptions}
+          allocations={allocations}
+          onQuickAllocation={onQuickAllocation}
+          onAddAllocation={onAddAllocation}
+          onUpdateAllocation={onUpdateAllocation}
+          onRemoveAllocation={onRemoveAllocation}
+        />
+      ) : null}
+
+      {presentation.isReadOnly && saved?.allocations?.length ? (
+        <AllocationSummaryList allocations={saved.allocations} />
+      ) : null}
+
+      <CloseoutNotesCard
+        isReadOnly={presentation.isReadOnly}
+        notes={notes}
+        savedNotes={saved?.notes ?? null}
+        onNotesChange={onNotesChange}
+      />
+    </div>
+  )
+}
+
+function ResultSummaryCard({
+  label,
+  resultType,
+  resultAmount,
+  showSavedBadges,
+  saved,
+  hasData,
+}: {
+  label: string
+  resultType: MonthCloseoutResultType
+  resultAmount: number
+  showSavedBadges: boolean
+  saved: MonthCloseoutSaved | null
+  hasData: boolean
+}) {
+  return (
+    <div className="rounded-3xl border border-border/60 bg-card p-5">
+      <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+      <div className={`mt-3 text-3xl font-semibold tracking-tight ${comparisonTone(resultType)}`}>
+        {getResultLabel(resultType, resultAmount)}
+      </div>
+      {hasData ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {resultType === "surplus"
+            ? "You finished the month under plan."
+            : resultType === "deficit"
+              ? "Review how the overage should be covered."
+              : "No allocations are required for this month."}
+        </p>
+      ) : null}
+      {saved && showSavedBadges ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Badge variant="outline">{formatCurrency(saved.allocated_amount)} allocated</Badge>
+          <Badge variant="outline">{formatCurrency(saved.unallocated_amount)} unassigned</Badge>
+          {saved.is_stale ? <Badge variant="outline">Needs review</Badge> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function AllocationEditor({
+  activeResultType,
+  maxAllocationAmount,
+  remainingAllocation,
+  allocationTypeOptions,
+  allocations,
+  onQuickAllocation,
+  onAddAllocation,
+  onUpdateAllocation,
+  onRemoveAllocation,
+}: {
+  activeResultType: MonthCloseoutResultType
+  maxAllocationAmount: number
+  remainingAllocation: number
+  allocationTypeOptions: MonthCloseoutAllocationType[]
+  allocations: EditableAllocationRow[]
+  onQuickAllocation: (type: MonthCloseoutAllocationType) => void
+  onAddAllocation: () => void
+  onUpdateAllocation: (id: string, patch: Partial<EditableAllocationRow>) => void
+  onRemoveAllocation: (id: string) => void
+}) {
+  return (
+    <div className="space-y-4 rounded-3xl border border-border/60 bg-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Allocations</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Allocate up to {formatCurrency(maxAllocationAmount)}. Partial allocation is allowed.
+          </p>
+        </div>
+        <Badge variant="outline">{formatCurrency(remainingAllocation)} left</Badge>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {activeResultType === "surplus" ? (
+          <>
+            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => onQuickAllocation("savings")}>
+              Send all to savings
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => onQuickAllocation("buffer")}>
+              Keep as buffer
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => onQuickAllocation("covered_by_buffer")}>
+              Covered by buffer
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => onQuickAllocation("savings")}>
+              Covered by savings
+            </Button>
+          </>
+        )}
+        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={onAddAllocation}>
+          Split it up
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {allocations.map((allocation, index) => (
+          <AllocationEditorRow
+            key={allocation.id}
+            allocation={allocation}
+            index={index}
+            allocationTypeOptions={allocationTypeOptions}
+            onUpdate={onUpdateAllocation}
+            onRemove={onRemoveAllocation}
+          />
+        ))}
+
+        {allocations.length === 0 ? (
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border px-4 py-5 text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
+            onClick={onAddAllocation}
+          >
+            <Plus className="size-4" />
+            Add allocation
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function AllocationEditorRow({
+  allocation,
+  index,
+  allocationTypeOptions,
+  onUpdate,
+  onRemove,
+}: {
+  allocation: EditableAllocationRow
+  index: number
+  allocationTypeOptions: MonthCloseoutAllocationType[]
+  onUpdate: (id: string, patch: Partial<EditableAllocationRow>) => void
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-foreground">Allocation {index + 1}</p>
+        <Button type="button" variant="ghost" size="sm" className="rounded-full px-3" onClick={() => onRemove(allocation.id)}>
+          Remove
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor={`allocation-type-${allocation.id}`}>Type</Label>
+          <select
+            id={`allocation-type-${allocation.id}`}
+            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
+            value={allocation.allocation_type}
+            onChange={(event) =>
+              onUpdate(allocation.id, {
+                allocation_type: event.target.value as MonthCloseoutAllocationType,
+              })
+            }
+          >
+            {allocationTypeOptions.map((option) => (
+              <option key={option} value={option}>
+                {getAllocationTypeLabel(option)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <CompactCurrencyInput
+          id={`allocation-amount-${allocation.id}`}
+          label="Amount"
+          value={allocation.amount}
+          onValueChange={(value) => onUpdate(allocation.id, { amount: value })}
+        />
+
+        <div className="grid gap-2">
+          <Label htmlFor={`allocation-label-${allocation.id}`}>Label</Label>
+          <Input
+            id={`allocation-label-${allocation.id}`}
+            value={allocation.label}
+            onChange={(event) => onUpdate(allocation.id, { label: event.target.value })}
+            placeholder="Optional note label"
+          />
+        </div>
+
+        {allocation.allocation_type === "rollover" ? (
+          <div className="grid gap-2">
+            <Label htmlFor={`allocation-target-month-${allocation.id}`}>Target month</Label>
+            <Input
+              id={`allocation-target-month-${allocation.id}`}
+              value={allocation.target_month}
+              onChange={(event) => onUpdate(allocation.id, { target_month: event.target.value })}
+              placeholder="YYYY-MM"
+            />
+          </div>
+        ) : null}
+
+        <div className="grid gap-2">
+          <Label htmlFor={`allocation-notes-${allocation.id}`}>Notes</Label>
+          <Textarea
+            id={`allocation-notes-${allocation.id}`}
+            value={allocation.notes}
+            onChange={(event) => onUpdate(allocation.id, { notes: event.target.value })}
+            placeholder="Optional details"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CloseoutNotesCard({
+  isReadOnly,
+  notes,
+  savedNotes,
+  onNotesChange,
+}: {
+  isReadOnly: boolean
+  notes: string
+  savedNotes: string | null
+  onNotesChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-2 rounded-3xl border border-border/60 bg-card p-5">
+      <Label htmlFor="closeout-notes">Notes</Label>
+      {isReadOnly ? (
+        <div className="rounded-2xl bg-muted/30 px-4 py-3 text-sm text-foreground">
+          {savedNotes?.trim() ? savedNotes : "No notes saved for this month."}
+        </div>
+      ) : (
+        <Textarea
+          id="closeout-notes"
+          value={notes}
+          onChange={(event) => onNotesChange(event.target.value)}
+          placeholder="Add any context you want to keep with this month."
+        />
+      )}
+    </div>
   )
 }
 
