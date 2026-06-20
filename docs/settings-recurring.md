@@ -13,7 +13,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - The page is month-based, not day-based; month selection uses a month-only picker with year controls and a Current month shortcut.
 - The main commitments list now renders one visible row per `series_id` for the selected month, so future scheduled versions do not appear as duplicate rows.
 - Mobile rows are intentionally compact: name, amount, and a single subtitle line with due date, tag, and selected-month status.
-- The list can be sorted locally by newest or oldest projected date without changing backend behavior.
+- The list can be sorted locally by highest or lowest amount without changing backend behavior.
 - Tapping or clicking a recurring row opens a detail sheet, matching the transaction row interaction pattern.
 - Detail now uses the shared `ResponsiveDialog` shell with `mobileSize="compact"` so the tray stays tighter than the longer create/edit forms while keeping the same shared behavior.
 - Edit and Delete actions live in the detail tray; Delete still confirms before mutating data.
@@ -40,7 +40,7 @@ The Settings -> Recurring page manages monthly recurring expense items.
 - "Rules" was renamed to "Recurring items" in user-facing labels because it describes the user's bills rather than the system model.
 - Raw recurring-rule rows are not shown directly in the default month list; the page presents one user-facing commitment per series for the selected month.
 - Future scheduled versions stay out of the default month list and are surfaced through detail-tray context plus the `Changes` filter.
-- The sort control mirrors the Transactions page pattern with simple Newest and Oldest date controls.
+- The sort control uses simple Highest and Lowest amount controls.
 - Row tap opens details, while Edit/Delete move into the detail sheet so rows feel closer to transaction rows and less like an admin table.
 - Mobile spacing was tightened around the header, intro, summary card, list header, and rows so the first recurring item appears sooner.
 - Only one primary Add CTA is visible per layout: mobile uses the header "+ Add" action, while desktop uses the right-rail "Add recurring expense" action.

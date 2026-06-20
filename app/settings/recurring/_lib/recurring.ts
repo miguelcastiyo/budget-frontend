@@ -18,7 +18,7 @@ export interface RecurringFormState {
   is_active: boolean
 }
 
-export type RecurringSort = "date_asc" | "date_desc"
+export type RecurringSort = "amount_asc" | "amount_desc"
 
 export const categoryConfig = {
   needs: { label: "Needs", selectedClassName: "bg-needs/15" },
@@ -142,9 +142,9 @@ export function groupRecurringByProjectedDate(items: RecurringExpense[]): Map<st
 
 export function sortRecurringItems(items: RecurringExpense[], sort: RecurringSort): RecurringExpense[] {
   return [...items].sort((first, second) => {
-    const dateCompare = first.projected_date_for_month.localeCompare(second.projected_date_for_month)
-    if (dateCompare !== 0) {
-      return sort === "date_desc" ? -dateCompare : dateCompare
+    const amountCompare = Number(first.amount) - Number(second.amount)
+    if (amountCompare !== 0) {
+      return sort === "amount_desc" ? -amountCompare : amountCompare
     }
 
     return first.expense.localeCompare(second.expense)

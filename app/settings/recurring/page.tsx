@@ -58,7 +58,7 @@ export default function RecurringSettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [month, setMonth] = useState(getCurrentMonthKey())
-  const [recurringSort, setRecurringSort] = useState<RecurringSort>("date_asc")
+  const [recurringSort, setRecurringSort] = useState<RecurringSort>("amount_desc")
   const [mobileFilter, setMobileFilter] = useState<RecurringFilter>("all")
   const [showNew, setShowNew] = useState(false)
   const [newForm, setNewForm] = useState<RecurringFormState>(() => emptyForm(getCurrentMonthKey()))
@@ -487,33 +487,33 @@ export default function RecurringSettingsPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setRecurringSort("date_desc")}
-                      aria-label="Sort newest first"
-                      title="Newest first"
+                      onClick={() => setRecurringSort("amount_desc")}
+                      aria-label="Sort highest amount first"
+                      title="Highest amount first"
                       className={cn(
                         "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors lg:px-2",
-                        recurringSort === "date_desc"
+                        recurringSort === "amount_desc"
                           ? "bg-secondary text-foreground"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <ArrowDownWideNarrow className="h-3.5 w-3.5" />
-                      <span className="hidden lg:inline">Newest</span>
+                      <span className="hidden lg:inline">Highest</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setRecurringSort("date_asc")}
-                      aria-label="Sort oldest first"
-                      title="Oldest first"
+                      onClick={() => setRecurringSort("amount_asc")}
+                      aria-label="Sort lowest amount first"
+                      title="Lowest amount first"
                       className={cn(
                         "inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors lg:px-2",
-                        recurringSort === "date_asc"
+                        recurringSort === "amount_asc"
                           ? "bg-secondary text-foreground"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       <ArrowUpNarrowWide className="h-3.5 w-3.5" />
-                      <span className="hidden lg:inline">Oldest</span>
+                      <span className="hidden lg:inline">Lowest</span>
                     </button>
                   </div>
                 </div>
