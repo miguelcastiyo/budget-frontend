@@ -5,7 +5,6 @@ import type {
   EmailChangeVerifiedResponse,
   Profile,
   RequestEmailChangeRequest,
-  SettingsSummaryResponse,
   SetupStatus,
   UpdateOnboardingStateRequest,
   UpdateOnboardingStateResponse,
@@ -39,19 +38,11 @@ export function createProfileApi(core: ApiClientCore) {
       })
     },
 
-    async getPreferences(): Promise<UserPreferences> {
-      return core.request<UserPreferences>("/me/preferences")
-    },
-
     async updatePreferences(data: UpdateUserPreferencesRequest): Promise<UserPreferences> {
       return core.request<UserPreferences>("/me/preferences", {
         method: "PATCH",
         body: JSON.stringify(data),
       })
-    },
-
-    async getSettingsSummary(): Promise<SettingsSummaryResponse> {
-      return core.request<SettingsSummaryResponse>("/me/settings-summary")
     },
 
     async requestEmailChange(data: RequestEmailChangeRequest): Promise<EmailChangeRequestedResponse> {
