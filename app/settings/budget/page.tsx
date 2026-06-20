@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Pencil } from "lucide-react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { BudgetAllocationForm } from "@/components/budget/budget-allocation-form"
 import { IncomeBreakdownForm } from "@/components/budget/income-breakdown-form"
@@ -17,7 +18,7 @@ import type {
   BudgetSettingsResolvedResponse,
   BudgetSettingsVersionItem,
 } from "@/lib/api/types"
-import { formatMonthLabel, getCurrentMonthKey } from "@/lib/date-filters"
+import { formatMonthLabel, getCurrentMonthKey, parseMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import {
@@ -40,9 +41,18 @@ import {
 } from "@/lib/income-breakdown"
 
 export default function BudgetSettingsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const requestedMonth = searchParams.get("month")
+  const initialMonth = useMemo(
+    () => (requestedMonth && parseMonthKey(requestedMonth) ? requestedMonth : getCurrentMonthKey()),
+    [requestedMonth]
+  )
+  const shouldAutoOpenEditor = searchParams.get("edit") === "1"
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey())
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth)
   const [budgetResolution, setBudgetResolution] = useState<BudgetSettingsResolvedResponse | null>(null)
   const [budgetVersions, setBudgetVersions] = useState<BudgetSettingsVersionItem[]>([])
   const [isBudgetLoading, setIsBudgetLoading] = useState(true)
@@ -54,6 +64,23 @@ export default function BudgetSettingsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
   const [showBudgetEditor, setShowBudgetEditor] = useState(false)
+
+  useEffect(() => {
+    if (initialMonth !== selectedMonth) {
+      setSelectedMonth(initialMonth)
+    }
+  }, [initialMonth, selectedMonth])
+
+  useEffect(() => {
+    const nextSearchParams = new URLSearchParams(searchParams.toString())
+    nextSearchParams.set("month", selectedMonth)
+    const nextQuery = nextSearchParams.toString()
+    const currentQuery = searchParams.toString()
+
+    if (nextQuery !== currentQuery) {
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+    }
+  }, [pathname, router, searchParams, selectedMonth])
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +141,19 @@ export default function BudgetSettingsPage() {
       cancelled = true
     }
   }, [selectedMonth])
+
+  useEffect(() => {
+    if (!shouldAutoOpenEditor || isBudgetLoading || budgetResolution === null || budgetError !== null) {
+      return
+    }
+
+    setShowBudgetEditor(true)
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString())
+    nextSearchParams.delete("edit")
+    const nextQuery = nextSearchParams.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }, [budgetError, budgetResolution, isBudgetLoading, pathname, router, searchParams, shouldAutoOpenEditor])
 
   const hydrateForm = (settings: BudgetSettings) => {
     const hydratedIncome = hydrateIncomeForm(settings)

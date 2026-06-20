@@ -221,7 +221,13 @@ export default function DashboardPage() {
               onCloseMonth={() => openCloseoutTray("close")}
               onViewCloseout={() => openCloseoutTray("view")}
               onReviewCloseout={() => openCloseoutTray("review")}
-              onSetBudget={() => router.push("/settings/budget")}
+              onSetBudget={() => {
+                const params = new URLSearchParams({
+                  month: currentMonth,
+                  edit: "1",
+                })
+                router.push(`/settings/budget?${params.toString()}`)
+              }}
             />
           </div>
 
