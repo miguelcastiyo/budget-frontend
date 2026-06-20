@@ -67,6 +67,12 @@ export function createAuthApi(core: ApiClientCore) {
       return core.request<InvitesResponse>("/auth/invitations")
     },
 
+    async revokeInvite(inviteId: string): Promise<void> {
+      await core.request<void>(`/auth/invitations/${encodeURIComponent(inviteId)}`, {
+        method: "DELETE",
+      })
+    },
+
     async getInvitePreview(inviteToken: string): Promise<InvitePreviewResponse> {
       return core.request<InvitePreviewResponse>(`/auth/invitations/preview?invite_token=${encodeURIComponent(inviteToken)}`)
     },

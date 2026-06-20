@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
-import { ArrowLeft, CalendarIcon, CheckCircle, Clock, Mail, Plus, Shield, UserPlus, XCircle } from "lucide-react"
+import { ArrowLeft, CalendarIcon, CheckCircle, Clock, Mail, Plus, Shield, Trash2, UserPlus, XCircle } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
+import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -107,6 +108,7 @@ export default function InvitesSettingsPage() {
   const [statusFilter, setStatusFilter] = useState<InviteStatusFilter>("all")
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
+  const [revokeInviteId, setRevokeInviteId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const isOwner = profile?.role === "owner"
@@ -242,6 +244,37 @@ export default function InvitesSettingsPage() {
     }
   }
 
+  const invitePendingRevoke = revokeInviteId
+    ? invites.find((invite) => invite.invite_id === revokeInviteId) ?? null
+    : null
+
+  const handleRevokeInvite = async () => {
+    if (!revokeInviteId) {
+      return
+    }
+
+    setIsMutating(true)
+    setError(null)
+
+    try {
+      await apiClient.revokeInvite(revokeInviteId)
+      setInvites((previous) => previous.map((invite) => (
+        invite.invite_id === revokeInviteId
+          ? { ...invite, status: "revoked" }
+          : invite
+      )))
+      setRevokeInviteId(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to revoke invite")
+      }
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
@@ -339,6 +372,19 @@ export default function InvitesSettingsPage() {
                         </p>
                       )}
                     </div>
+                    {invite.status === "pending" && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-full text-destructive hover:text-destructive"
+                        onClick={() => setRevokeInviteId(invite.invite_id)}
+                        disabled={isMutating}
+                        aria-label={`Revoke invite for ${invite.invitee_name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
                   </div>
                 </Card>
               ))
@@ -536,6 +582,31 @@ export default function InvitesSettingsPage() {
           </div>
         </div>
       </ResponsiveDialog>
+
+      <ResponsiveConfirmDialog
+        open={revokeInviteId !== null}
+        onOpenChange={(open) => {
+          if (!isMutating) {
+            setRevokeInviteId(open ? revokeInviteId : null)
+          }
+        }}
+        title="Revoke invite"
+        description="This cannot be undone in v1. The invite link will stop working immediately."
+        confirmLabel={isMutating ? "Revoking..." : "Revoke invite"}
+        confirmVariant="destructive"
+        confirmDisabled={!invitePendingRevoke || isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleRevokeInvite()}
+      >
+        {invitePendingRevoke ? (
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Revoke access for <span className="font-medium text-foreground">{invitePendingRevoke.invitee_name}</span>.
+            </p>
+            <p>{invitePendingRevoke.email}</p>
+          </div>
+        ) : null}
+      </ResponsiveConfirmDialog>
 
       <BottomNav />
     </div>
