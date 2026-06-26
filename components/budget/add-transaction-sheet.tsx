@@ -916,7 +916,7 @@ export function AddTransactionSheet({
                           </div>
 
                           {makeRecurring && (
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-end gap-3">
                               <div className="min-w-0 space-y-2">
                                 <Label className="text-xs text-muted-foreground">Billing rule</Label>
                                 <Select
@@ -935,9 +935,10 @@ export function AddTransactionSheet({
                               <div className="min-w-0 space-y-2">
                                 <Label className="text-xs text-muted-foreground">Billing day</Label>
                                 <Input
-                                  type="number"
-                                  min="1"
-                                  max="31"
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  enterKeyHint="done"
                                   value={recurringBillingType === "last_day" ? "" : recurringBillingDay}
                                   onChange={(e) => setRecurringBillingDay(e.target.value)}
                                   disabled={recurringBillingType === "last_day"}
