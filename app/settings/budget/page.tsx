@@ -60,10 +60,10 @@ export default function BudgetSettingsPage() {
     ),
     [currentMonthKey, requestedMonth]
   )
+  const selectedMonth = initialMonth
   const shouldAutoOpenEditor = searchParams.get("edit") === "1"
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
-  const [selectedMonth, setSelectedMonth] = useState(initialMonth)
   const [budgetResolution, setBudgetResolution] = useState<BudgetSettingsResolvedResponse | null>(null)
   const [budgetVersions, setBudgetVersions] = useState<BudgetSettingsVersionItem[]>([])
   const [isBudgetLoading, setIsBudgetLoading] = useState(true)
@@ -77,21 +77,26 @@ export default function BudgetSettingsPage() {
   const [showBudgetEditor, setShowBudgetEditor] = useState(false)
 
   useEffect(() => {
-    if (initialMonth !== selectedMonth) {
-      setSelectedMonth(initialMonth)
+    if (requestedMonth === initialMonth) {
+      return
     }
-  }, [initialMonth, selectedMonth])
 
-  useEffect(() => {
     const nextSearchParams = new URLSearchParams(searchParams.toString())
-    nextSearchParams.set("month", selectedMonth)
+    nextSearchParams.set("month", initialMonth)
     const nextQuery = nextSearchParams.toString()
     const currentQuery = searchParams.toString()
 
     if (nextQuery !== currentQuery) {
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
     }
-  }, [pathname, router, searchParams, selectedMonth])
+  }, [initialMonth, pathname, requestedMonth, router, searchParams])
+
+  const handleSelectedMonthChange = (month: string) => {
+    const nextSearchParams = new URLSearchParams(searchParams.toString())
+    nextSearchParams.set("month", month)
+    const nextQuery = nextSearchParams.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -151,7 +156,7 @@ export default function BudgetSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedMonth])
+  }, [initialMonth])
 
   useEffect(() => {
     if (!shouldAutoOpenEditor || isBudgetLoading || budgetResolution === null || budgetError !== null) {
@@ -345,7 +350,7 @@ export default function BudgetSettingsPage() {
         {success && <p className="text-sm text-success">{success}</p>}
 
         <section className="rounded-2xl border border-border/60 bg-card px-3 py-3 shadow-sm sm:p-5">
-          <MonthSelector currentMonth={selectedMonth} onChange={setSelectedMonth} />
+          <MonthSelector currentMonth={initialMonth} onChange={handleSelectedMonthChange} />
           <BudgetStatusCopy copy={budgetStatusCopy} className="mx-auto mt-2 max-w-sm text-center sm:mt-3" />
         </section>
 
