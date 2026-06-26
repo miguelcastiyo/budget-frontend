@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  compareMonthKeys,
   formatMonthLabel,
   getCurrentMonthKey,
   getNextMonthKey,
@@ -16,7 +17,9 @@ interface MonthSelectorProps {
 }
 
 export function MonthSelector({ currentMonth, onChange, allowFuture = false }: MonthSelectorProps) {
-  const isCurrentMonth = currentMonth === getCurrentMonthKey()
+  const currentMonthKey = getCurrentMonthKey()
+  const nextMonth = getNextMonthKey(currentMonth)
+  const canGoForward = allowFuture || compareMonthKeys(nextMonth, currentMonthKey) <= 0
   const monthLabel = formatMonthLabel(currentMonth) ?? currentMonth
 
   return (
@@ -39,8 +42,14 @@ export function MonthSelector({ currentMonth, onChange, allowFuture = false }: M
         variant="ghost"
         size="icon"
         className="h-9 w-9 rounded-full"
-        onClick={() => onChange(getNextMonthKey(currentMonth))}
-        disabled={!allowFuture && isCurrentMonth}
+        onClick={() => {
+          if (!canGoForward) {
+            return
+          }
+
+          onChange(nextMonth)
+        }}
+        disabled={!canGoForward}
       >
         <ChevronRight className="h-5 w-5" />
         <span className="sr-only">Next month</span>

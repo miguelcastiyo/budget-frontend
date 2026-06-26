@@ -916,14 +916,14 @@ export function AddTransactionSheet({
                           </div>
 
                           {makeRecurring && (
-                            <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-end gap-3">
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3">
                               <div className="min-w-0 space-y-2">
                                 <Label className="text-xs text-muted-foreground">Billing rule</Label>
                                 <Select
                                   value={recurringBillingType}
                                   onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
                                 >
-                                  <SelectTrigger className="h-10 min-w-0 rounded-xl border-border/60">
+                                  <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-border/60">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -943,7 +943,7 @@ export function AddTransactionSheet({
                                   onChange={(e) => setRecurringBillingDay(e.target.value)}
                                   disabled={recurringBillingType === "last_day"}
                                   placeholder={recurringBillingType === "last_day" ? "Auto" : "1-31"}
-                                  className="h-10 rounded-xl border-border/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  className="h-10 w-full rounded-xl border-border/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                               </div>
                             </div>

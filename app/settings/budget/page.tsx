@@ -18,7 +18,7 @@ import type {
   BudgetSettingsResolvedResponse,
   BudgetSettingsVersionItem,
 } from "@/lib/api/types"
-import { formatMonthLabel, getCurrentMonthKey, parseMonthKey } from "@/lib/date-filters"
+import { formatMonthLabel, getCurrentMonthKey, isFutureMonth, parseMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import {
@@ -51,9 +51,14 @@ export default function BudgetSettingsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const requestedMonth = searchParams.get("month")
+  const currentMonthKey = getCurrentMonthKey()
   const initialMonth = useMemo(
-    () => (requestedMonth && parseMonthKey(requestedMonth) ? requestedMonth : getCurrentMonthKey()),
-    [requestedMonth]
+    () => (
+      requestedMonth && parseMonthKey(requestedMonth) && !isFutureMonth(requestedMonth)
+        ? requestedMonth
+        : currentMonthKey
+    ),
+    [currentMonthKey, requestedMonth]
   )
   const shouldAutoOpenEditor = searchParams.get("edit") === "1"
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
@@ -340,7 +345,7 @@ export default function BudgetSettingsPage() {
         {success && <p className="text-sm text-success">{success}</p>}
 
         <section className="rounded-2xl border border-border/60 bg-card px-3 py-3 shadow-sm sm:p-5">
-          <MonthSelector currentMonth={selectedMonth} onChange={setSelectedMonth} allowFuture />
+          <MonthSelector currentMonth={selectedMonth} onChange={setSelectedMonth} />
           <BudgetStatusCopy copy={budgetStatusCopy} className="mx-auto mt-2 max-w-sm text-center sm:mt-3" />
         </section>
 

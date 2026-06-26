@@ -38,6 +38,21 @@ export function getNextMonthKey(month: string): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
 }
 
+export function compareMonthKeys(left: string, right: string): number {
+  const leftDate = parseMonthKey(left)
+  const rightDate = parseMonthKey(right)
+
+  if (!leftDate || !rightDate) {
+    return left.localeCompare(right)
+  }
+
+  return leftDate.getTime() - rightDate.getTime()
+}
+
+export function isFutureMonth(month: string, now = new Date()): boolean {
+  return compareMonthKeys(month, getCurrentMonthKey(now)) > 0
+}
+
 export const transactionFilterPresets: { value: Preset | "all"; label: string }[] = [
   { value: "all", label: "All Time" },
   { value: "last_7_days", label: "Last 7 Days" },
