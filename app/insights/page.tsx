@@ -44,7 +44,7 @@ import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
 
-type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "custom"
+type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "all_time" | "custom"
 
 interface InsightRange {
   date_from: string
@@ -79,6 +79,7 @@ const insightPresets: { value: Exclude<InsightPreset, "custom">; label: string }
   { value: "last_3_months", label: "3M" },
   { value: "last_6_months", label: "6M" },
   { value: "year_to_date", label: "YTD" },
+  { value: "all_time", label: "All Time" },
 ]
 
 const weekdayOrder: InsightsDayOfWeekSpendItem["day"][] = [
@@ -141,7 +142,7 @@ function formatRange(range: InsightRange): string {
   return `${format(from, "MMM d, yyyy")} - ${format(to, "MMM d, yyyy")}`
 }
 
-function getPresetRange(preset: Exclude<InsightPreset, "custom">): InsightRange {
+function getPresetRange(preset: Exclude<InsightPreset, "custom" | "all_time">): InsightRange {
   const today = new Date()
   const dateTo = toIsoDate(today)
 
@@ -330,14 +331,40 @@ export default function InsightsPage() {
     void loadInsights(appliedRange)
   }, [appliedRange, loadInsights])
 
-  const applyPreset = (preset: Exclude<InsightPreset, "custom">) => {
-    const range = getPresetRange(preset)
-    setSelectedPreset(preset)
-    setCustomFrom(range.date_from)
-    setCustomTo(range.date_to)
-    setCustomRangeError(null)
-    setShowAllTags(false)
-    setAppliedRange(range)
+  const resolveAllTimeRange = useCallback(async (): Promise<InsightRange> => {
+    const today = toIsoDate(new Date())
+
+    const oldestTransactionPage = await apiClient.getTransactions({
+      page: 1,
+      page_size: 1,
+      sort: "date_asc",
+    })
+
+    return {
+      date_from: oldestTransactionPage.items[0]?.date ?? today,
+      date_to: today,
+    }
+  }, [])
+
+  const applyPreset = async (preset: Exclude<InsightPreset, "custom">) => {
+    try {
+      const range = preset === "all_time"
+        ? await resolveAllTimeRange()
+        : getPresetRange(preset)
+
+      setSelectedPreset(preset)
+      setCustomFrom(range.date_from)
+      setCustomTo(range.date_to)
+      setCustomRangeError(null)
+      setShowAllTags(false)
+      setAppliedRange(range)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to load insights")
+      }
+    }
   }
 
   const applyCustomRange = () => {
@@ -490,7 +517,7 @@ function InsightsRangeSelector({
   rangeLabel: string
   isLoading: boolean
   customRangeError: string | null
-  onPresetSelect: (preset: Exclude<InsightPreset, "custom">) => void
+  onPresetSelect: (preset: Exclude<InsightPreset, "custom">) => Promise<void>
   onCustomSelect: () => void
   onCustomFromChange: (value: string) => void
   onCustomToChange: (value: string) => void
@@ -504,7 +531,7 @@ function InsightsRangeSelector({
             <button
               key={preset.value}
               type="button"
-              onClick={() => onPresetSelect(preset.value)}
+              onClick={() => void onPresetSelect(preset.value)}
               aria-pressed={selectedPreset === preset.value}
               className={cn(
                 "h-9 shrink-0 cursor-pointer rounded-full border px-3 text-sm font-medium transition-colors lg:h-10",
