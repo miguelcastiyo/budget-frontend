@@ -12,11 +12,10 @@ import { Label } from "@/components/ui/label"
 import { formatCurrency } from "@/lib/formatters"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { useAuth } from "@/components/auth/auth-provider"
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { formatMonthLabel, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import {
   budgetSettingsPayload,
   defaultBudgetAllocationFormState,
-  hydrateBudgetAllocationForm,
   isBudgetAllocationValid,
   type BudgetAllocationFormState,
 } from "@/lib/budget-allocation"
@@ -24,11 +23,14 @@ import {
   calculateMonthlyIncome,
   calculateMonthlyIncomeString,
   defaultIncomeFormState,
-  hydrateIncomeForm,
   isIncomeFormValid,
-  toDecimalString,
   type IncomeFormState,
 } from "@/lib/income-breakdown"
+import {
+  createBudgetFormState,
+  getAllocationPercentDisplay,
+  getAllocationTarget,
+} from "@/lib/budget-form"
 import type { BudgetSettings } from "@/lib/api/types"
 
 type OnboardingStep = "income" | "allocation" | "review"
@@ -47,8 +49,9 @@ export default function OnboardingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const budgetMonthLabel = formatBudgetMonth(getCurrentMonthKey())
-  const budgetMonthName = formatBudgetMonthName(getCurrentMonthKey())
+  const currentMonthKey = getCurrentMonthKey()
+  const budgetMonthLabel = formatMonthLabel(currentMonthKey) ?? currentMonthKey
+  const budgetMonthName = formatMonthValue(currentMonthKey, { month: "long" }) ?? currentMonthKey
 
   useEffect(() => {
     if (profile) {
@@ -92,8 +95,9 @@ export default function OnboardingPage() {
   }, [needsOnboarding, router])
 
   const hydrateBudgetForm = (settings: BudgetSettings) => {
-    setIncomeForm(hydrateIncomeForm(settings))
-    setAllocationForm(hydrateBudgetAllocationForm(settings))
+    const nextState = createBudgetFormState(settings)
+    setIncomeForm(nextState.incomeForm)
+    setAllocationForm(nextState.allocationForm)
     setShowAdvancedAllocation(false)
   }
 
@@ -111,12 +115,12 @@ export default function OnboardingPage() {
         : true
   const canSave = (!requiresDisplayName || hasValidName) && hasValidIncome && hasValidAllocation && !isSaving
 
-  const needsTarget = useMemo(() => allocationTarget(income, allocationForm, "needs"), [income, allocationForm])
-  const wantsTarget = useMemo(() => allocationTarget(income, allocationForm, "wants"), [income, allocationForm])
-  const savingsTarget = useMemo(() => allocationTarget(income, allocationForm, "savings"), [income, allocationForm])
-  const needsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "needs"), [income, allocationForm])
-  const wantsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "wants"), [income, allocationForm])
-  const savingsPercentDisplay = useMemo(() => allocationPercentDisplay(income, allocationForm, "savings"), [income, allocationForm])
+  const needsTarget = useMemo(() => getAllocationTarget(income, allocationForm, "needs"), [income, allocationForm])
+  const wantsTarget = useMemo(() => getAllocationTarget(income, allocationForm, "wants"), [income, allocationForm])
+  const savingsTarget = useMemo(() => getAllocationTarget(income, allocationForm, "savings"), [income, allocationForm])
+  const needsPercentDisplay = useMemo(() => getAllocationPercentDisplay(income, allocationForm, "needs"), [income, allocationForm])
+  const wantsPercentDisplay = useMemo(() => getAllocationPercentDisplay(income, allocationForm, "wants"), [income, allocationForm])
+  const savingsPercentDisplay = useMemo(() => getAllocationPercentDisplay(income, allocationForm, "savings"), [income, allocationForm])
 
   const goNext = () => {
     if (!canContinue) {
@@ -147,7 +151,7 @@ export default function OnboardingPage() {
 
       await apiClient.updateBudgetSettings({
         ...budgetSettingsPayload(incomeForm, allocationForm),
-        effective_month: getCurrentMonthKey(),
+        effective_month: currentMonthKey,
       })
 
       await refreshProfile()
@@ -338,76 +342,9 @@ function descriptionForStep(step: OnboardingStep): string {
   return "Review your first month before saving it."
 }
 
-function allocationTarget(
-  income: number,
-  allocationForm: BudgetAllocationFormState,
-  key: "needs" | "wants" | "savings"
-): number {
-  if (allocationForm.allocationMode === "amount") {
-    return Number.parseFloat(
-      key === "needs"
-        ? allocationForm.needsAmount
-        : key === "wants"
-          ? allocationForm.wantsAmount
-          : allocationForm.savingsAmount
-    ) || 0
-  }
-
-  const percent = Number.parseFloat(
-    key === "needs"
-      ? allocationForm.needsPercent
-      : key === "wants"
-        ? allocationForm.wantsPercent
-        : allocationForm.savingsPercent
-  ) || 0
-
-  return (income * percent) / 100
-}
-
-function allocationPercentDisplay(
-  income: number,
-  allocationForm: BudgetAllocationFormState,
-  key: "needs" | "wants" | "savings"
-): string {
-  if (allocationForm.allocationMode === "percent") {
-    return toDecimalString(
-      key === "needs"
-        ? allocationForm.needsPercent
-        : key === "wants"
-          ? allocationForm.wantsPercent
-          : allocationForm.savingsPercent
-    )
-  }
-
-  if (income <= 0) {
-    return "0.00"
-  }
-
-  return toDecimalString((allocationTarget(income, allocationForm, key) / income) * 100)
-}
-
 function incomeSummary(incomeForm: IncomeFormState): string {
   const sideIncome = incomeForm.sideIncomeType === "none" ? "No extra income" : "Includes extra income"
   return `${incomeForm.incomeSourceType === "monthly" ? "Monthly pay" : "Hourly pay"} · ${sideIncome}`
-}
-
-function formatBudgetMonth(month: string): string {
-  const [year, monthNumber] = month.split("-")
-  const parsed = new Date(Number(year), Number(monthNumber) - 1, 1)
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  })
-}
-
-function formatBudgetMonthName(month: string): string {
-  const [year, monthNumber] = month.split("-")
-  const parsed = new Date(Number(year), Number(monthNumber) - 1, 1)
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "long",
-  })
 }
 
 function AllocationPreviewCard({

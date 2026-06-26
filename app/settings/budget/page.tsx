@@ -32,13 +32,19 @@ import {
 } from "@/lib/budget-allocation"
 import {
   asNumber,
-  calculateHourlyMonthlyIncome,
   calculateMonthlyIncome,
   defaultIncomeFormState,
-  hydrateIncomeForm,
   isIncomeFormValid,
   type IncomeFormState,
 } from "@/lib/income-breakdown"
+import {
+  createBudgetFormState,
+  getAllocationPercent,
+  getAllocationTarget,
+  getPercentAllocationSummary,
+  getPrimaryIncomeAmount,
+  serializeBudgetFormState,
+} from "@/lib/budget-form"
 
 export default function BudgetSettingsPage() {
   const router = useRouter()
@@ -156,18 +162,17 @@ export default function BudgetSettingsPage() {
   }, [budgetError, budgetResolution, isBudgetLoading, pathname, router, searchParams, shouldAutoOpenEditor])
 
   const hydrateForm = (settings: BudgetSettings) => {
-    const hydratedIncome = hydrateIncomeForm(settings)
-    const hydratedAllocation = hydrateBudgetAllocationForm(settings)
-    setIncomeForm(hydratedIncome)
-    setAllocationForm(hydratedAllocation)
-    setLoadedPayloadKey(JSON.stringify(budgetSettingsPayload(hydratedIncome, hydratedAllocation)))
+    const nextState = createBudgetFormState(settings)
+    setIncomeForm(nextState.incomeForm)
+    setAllocationForm(nextState.allocationForm)
+    setLoadedPayloadKey(serializeBudgetFormState(nextState.incomeForm, nextState.allocationForm))
   }
 
   const income = calculateMonthlyIncome(incomeForm)
   const hasValidIncome = isIncomeFormValid(incomeForm)
   const hasValidAllocation = isBudgetAllocationValid(allocationForm, income)
   const currentPayloadKey = useMemo(
-    () => JSON.stringify(budgetSettingsPayload(incomeForm, allocationForm)),
+    () => serializeBudgetFormState(incomeForm, allocationForm),
     [incomeForm, allocationForm]
   )
   const hasBudgetChanges = loadedPayloadKey !== null && currentPayloadKey !== loadedPayloadKey
@@ -552,12 +557,10 @@ function BudgetDetailsCard({
   isLoading: boolean
   error: string | null
 }) {
-  const primaryIncome = incomeForm.incomeSourceType === "monthly"
-    ? asNumber(incomeForm.primaryMonthlyIncome)
-    : calculateHourlyMonthlyIncome(incomeForm.primaryHourlyRate, incomeForm.primaryWeeklyHours)
+  const primaryIncome = getPrimaryIncomeAmount(incomeForm)
   const extraIncome = income - primaryIncome
   const allocationDetail = allocationForm.allocationMode === "percent"
-    ? `${asNumber(allocationForm.needsPercent).toFixed(0)} / ${asNumber(allocationForm.wantsPercent).toFixed(0)} / ${asNumber(allocationForm.savingsPercent).toFixed(0)}`
+    ? getPercentAllocationSummary(allocationForm)
     : "By amount"
 
   return (
@@ -683,45 +686,27 @@ function BudgetAllocationSummary({
   income: number
 }) {
   const isPercentMode = allocationForm.allocationMode === "percent"
-  const needsPercent = isPercentMode
-    ? asNumber(allocationForm.needsPercent)
-    : income > 0
-      ? (asNumber(allocationForm.needsAmount) / income) * 100
-      : 0
-  const wantsPercent = isPercentMode
-    ? asNumber(allocationForm.wantsPercent)
-    : income > 0
-      ? (asNumber(allocationForm.wantsAmount) / income) * 100
-      : 0
-  const savingsPercent = isPercentMode
-    ? asNumber(allocationForm.savingsPercent)
-    : income > 0
-      ? (asNumber(allocationForm.savingsAmount) / income) * 100
-      : 0
+  const needsPercent = getAllocationPercent(income, allocationForm, "needs")
+  const wantsPercent = getAllocationPercent(income, allocationForm, "wants")
+  const savingsPercent = getAllocationPercent(income, allocationForm, "savings")
   const total = isPercentMode ? totalPercent(allocationForm) : totalAmount(allocationForm)
   const segments = [
     {
       label: "Needs",
       value: needsPercent,
-      target: isPercentMode
-        ? formatCurrency((needsPercent / 100) * income)
-        : formatCurrency(asNumber(allocationForm.needsAmount)),
+      target: formatCurrency(getAllocationTarget(income, allocationForm, "needs")),
       className: "bg-needs",
     },
     {
       label: "Wants",
       value: wantsPercent,
-      target: isPercentMode
-        ? formatCurrency((wantsPercent / 100) * income)
-        : formatCurrency(asNumber(allocationForm.wantsAmount)),
+      target: formatCurrency(getAllocationTarget(income, allocationForm, "wants")),
       className: "bg-wants",
     },
     {
       label: "Savings",
       value: savingsPercent,
-      target: isPercentMode
-        ? formatCurrency((savingsPercent / 100) * income)
-        : formatCurrency(asNumber(allocationForm.savingsAmount)),
+      target: formatCurrency(getAllocationTarget(income, allocationForm, "savings")),
       className: "bg-savings",
     },
   ]
