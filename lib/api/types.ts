@@ -354,6 +354,7 @@ export interface Transaction {
   amount: string
   category: Category
   is_split: boolean
+  notes: string | null
   source: "manual" | "import"
   recurring_expense_id: string | null
   tag: Tag
@@ -368,9 +369,10 @@ export interface CreateTransactionRequest {
   amount: string
   category: Category
   is_split?: boolean
+  notes?: string | null
   tag_id?: string
   tag?: { name: string }
-  card_id?: string
+  card_id?: string | null
   card?: { name: string }
 }
 
@@ -380,9 +382,10 @@ export interface UpdateTransactionRequest {
   amount?: string
   category?: Category
   is_split?: boolean
+  notes?: string | null
   tag_id?: string
   tag?: { name: string }
-  card_id?: string
+  card_id?: string | null
   card?: { name: string }
 }
 
@@ -653,6 +656,7 @@ export interface InsightsLargestTransactionItem {
   amount: string
   category: Category
   is_split: boolean
+  notes: string | null
   tag: Tag
   card_name: string | null
 }
@@ -706,7 +710,7 @@ export interface CsvImportErrorItem {
   message: string
 }
 
-export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" | "card" | "is_split"
+export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" | "card" | "is_split" | "notes"
 
 export type CsvImportMapping = Partial<Record<CsvImportField, string>>
 

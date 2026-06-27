@@ -33,6 +33,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
+import { TransactionNotesField } from "@/components/budget/transaction-notes-field"
 import {
   Popover,
   PopoverContent,
@@ -44,6 +45,11 @@ import { cn } from "@/lib/utils"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import { parseDateValue } from "@/lib/date-filters"
+import {
+  buildTransactionMoreDetailsSummary,
+  normalizeTransactionNotesForSubmit,
+  validateTransactionNotes,
+} from "@/lib/transaction-notes"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getTagIcon } from "@/lib/tag-icons"
@@ -72,6 +78,7 @@ export function AddTransactionSheet({
   const [isSplit, setIsSplit] = useState(false)
   const [tagId, setTagId] = useState("")
   const [cardId, setCardId] = useState("")
+  const [notes, setNotes] = useState("")
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [recurringBillingType, setRecurringBillingType] = useState<RecurringBillingType>("day_of_month")
   const [recurringBillingDay, setRecurringBillingDay] = useState("1")
@@ -93,6 +100,7 @@ export function AddTransactionSheet({
   const [isCreatingTag, setIsCreatingTag] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notesError, setNotesError] = useState<string | null>(null)
 
   const isEditMode = mode === "edit" && transaction !== null
   const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
@@ -170,6 +178,7 @@ export function AddTransactionSheet({
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
       setCardId(transaction.card?.id ?? "")
+      setNotes(transaction.notes ?? "")
       setShowNewTag(false)
       setNewTagName("")
       setNewTagIconKey("")
@@ -181,6 +190,7 @@ export function AddTransactionSheet({
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
       setSuggestions([])
       setError(null)
+      setNotesError(null)
       return
     }
 
@@ -257,6 +267,7 @@ export function AddTransactionSheet({
     setIsSplit(false)
     setTagId("")
     setCardId("")
+    setNotes("")
     setDate(now)
     setShowNewTag(false)
     setNewTagName("")
@@ -269,6 +280,7 @@ export function AddTransactionSheet({
     appliedSuggestionExpenseRef.current = null
     applyRecurringDefaultsFromDate(now)
     setError(null)
+    setNotesError(null)
   }
 
   const updateTransactionDate = (nextDate: Date) => {
@@ -363,6 +375,7 @@ export function AddTransactionSheet({
     amount: normalizedAmount,
     category,
     is_split: isSplit,
+    notes: normalizeTransactionNotesForSubmit(notes),
     tag_id: tagId,
     card_id: cardId || undefined,
   }
@@ -373,6 +386,7 @@ export function AddTransactionSheet({
       amount: Number.parseFloat(transaction.amount).toFixed(2),
       category: transaction.category,
       is_split: transaction.is_split,
+      notes: transaction.notes,
       tag_id: transaction.tag.id,
       card_id: transaction.card?.id || undefined,
     }
@@ -383,6 +397,13 @@ export function AddTransactionSheet({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const nextNotesError = validateTransactionNotes(notes)
+    const normalizedNotes = normalizeTransactionNotesForSubmit(notes)
+
+    if (nextNotesError) {
+      setNotesError(nextNotesError)
+      return
+    }
 
     if (!tagId) {
       setError("Please select a tag")
@@ -396,6 +417,7 @@ export function AddTransactionSheet({
 
     setIsSubmitting(true)
     setError(null)
+    setNotesError(null)
 
     try {
       if (isEditMode && transaction) {
@@ -405,6 +427,7 @@ export function AddTransactionSheet({
           amount: normalizedAmount,
           category,
           is_split: isSplit,
+          notes: normalizedNotes,
           tag_id: tagId,
           card_id: cardId || undefined,
         }
@@ -441,6 +464,9 @@ export function AddTransactionSheet({
 
         if (cardId) {
           payload.card_id = cardId
+        }
+        if (normalizedNotes !== null) {
+          payload.notes = normalizedNotes
         }
 
         const created = await apiClient.createTransaction(payload)
@@ -479,7 +505,15 @@ export function AddTransactionSheet({
       onOpenChange(false)
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.error.message)
+        const fieldError = err.error.details?.find((detail) => detail.field === "notes")
+        if (fieldError) {
+          setNotesError(
+            fieldError.message.includes("255")
+              ? "Notes must be 255 characters or fewer."
+              : fieldError.message
+          )
+        }
+        setError(fieldError && err.error.details?.length === 1 ? null : err.error.message)
       } else {
         setError(isEditMode ? "Unable to update transaction" : "Unable to create transaction")
       }
@@ -541,7 +575,14 @@ export function AddTransactionSheet({
     !makeRecurring ||
     recurringBillingType === "last_day" ||
     (Number.isInteger(recurringDayNumber) && recurringDayNumber >= 1 && recurringDayNumber <= 31)
-  const optionalDetailsCount = [cardId, isSplit, makeRecurring, transactionAlreadyRecurring].filter(Boolean).length
+  const moreDetailsSummary = buildTransactionMoreDetailsSummary({
+    cardName: cardId
+      ? (cards.find((card) => card.id === cardId)?.name ?? (transaction?.card?.id === cardId ? transaction.card.name : null))
+      : null,
+    isSplit,
+    hasRecurring: makeRecurring || transactionAlreadyRecurring,
+    hasNotes: normalizeTransactionNotesForSubmit(notes) !== null,
+  })
   const submitButtonLabel = (() => {
     if (isSubmitting) {
       return isEditMode ? "Saving..." : "Adding..."
@@ -798,6 +839,7 @@ export function AddTransactionSheet({
                   </div>
                 </div>
 
+                {/* Notes intentionally live inside More details so optional context does not slow down quick transaction logging. */}
                 <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card">
                   <button
                     type="button"
@@ -808,7 +850,7 @@ export function AddTransactionSheet({
                     <div className="min-w-0">
                       <p className="text-sm font-medium">More details</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {optionalDetailsCount > 0 ? `${optionalDetailsCount} optional detail${optionalDetailsCount === 1 ? "" : "s"} set` : "Card, split, and recurring settings"}
+                        {moreDetailsSummary}
                       </p>
                     </div>
                     <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", showMoreDetails && "rotate-180")} />
@@ -959,6 +1001,19 @@ export function AddTransactionSheet({
                           </p>
                         </div>
                       )}
+
+                      <div className="space-y-2">
+                        <TransactionNotesField
+                          value={notes}
+                          onChange={(value) => {
+                            setNotes(value)
+                            if (notesError) {
+                              setNotesError(validateTransactionNotes(value))
+                            }
+                          }}
+                          error={notesError}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

@@ -146,6 +146,13 @@ export function TransactionDetailSheet({
               </div>
             )}
           </div>
+
+          {transaction.notes && (
+            <div className="rounded-2xl bg-secondary/35 p-4">
+              <p className="text-sm text-muted-foreground">Note</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">{transaction.notes}</p>
+            </div>
+          )}
           
           {/* Actions */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

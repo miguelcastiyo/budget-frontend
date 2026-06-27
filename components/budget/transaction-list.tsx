@@ -206,6 +206,12 @@ export function TransactionList({
               <div className="divide-y divide-border/50">
                 {txns.map((transaction) => {
                   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
+                  const hasNotes = Boolean(transaction.notes)
+                  const compactMetaLine = [
+                    transaction.tag.name,
+                    transaction.card?.name ?? null,
+                    hasNotes ? "Note" : null,
+                  ].filter(Boolean).join(" · ")
 
                   return isInteractive ? (
                     <button
@@ -232,8 +238,7 @@ export function TransactionList({
                         </div>
                         {useInlineCompactMetadata ? (
                           <p className="text-xs text-muted-foreground truncate">
-                            {transaction.tag.name}
-                            {transaction.card && ` · ${transaction.card.name}`}
+                            {compactMetaLine}
                           </p>
                         ) : (
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -245,6 +250,11 @@ export function TransactionList({
                               <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
                                 <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
                                 <span className="truncate max-w-[170px]">{transaction.card.name}</span>
+                              </span>
+                            )}
+                            {hasNotes && (
+                              <span className="text-[10px] font-medium text-muted-foreground">
+                                Note
                               </span>
                             )}
                           </div>
@@ -280,8 +290,7 @@ export function TransactionList({
                         </div>
                         {useInlineCompactMetadata ? (
                           <p className="text-xs text-muted-foreground truncate">
-                            {transaction.tag.name}
-                            {transaction.card && ` · ${transaction.card.name}`}
+                            {compactMetaLine}
                           </p>
                         ) : (
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -293,6 +302,11 @@ export function TransactionList({
                               <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
                                 <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
                                 <span className="truncate max-w-[170px]">{transaction.card.name}</span>
+                              </span>
+                            )}
+                            {hasNotes && (
+                              <span className="text-[10px] font-medium text-muted-foreground">
+                                Note
                               </span>
                             )}
                           </div>

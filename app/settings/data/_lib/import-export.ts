@@ -24,6 +24,7 @@ export const HEADER_IMPORT_FIELDS: Array<{ key: HeaderImportField; label: string
   { key: "tag", label: "Spending tag", required: true, hint: "Creates or matches spending tags" },
   { key: "card", label: "Card", required: false, hint: "Creates or matches cards" },
   { key: "is_split", label: "Split", required: false, hint: "Optional true/false flag" },
+  { key: "notes", label: "Note", required: false, hint: "Optional transaction note" },
 ]
 
 export const NONE_VALUE = "__none"
