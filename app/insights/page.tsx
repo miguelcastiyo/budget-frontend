@@ -6,7 +6,6 @@ import { format } from "date-fns"
 import {
   ArrowRight,
   CalendarIcon,
-  CreditCard,
   Folder,
   LineChart,
   ReceiptText,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { TransactionPresenceIndicators } from "@/components/budget/transaction-presence-indicators"
 import { Button } from "@/components/ui/button"
 import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
@@ -963,12 +963,12 @@ function SingleNotableSpendingRow({ item }: { item: InsightsLargestTransactionIt
             <TagGlyph className="h-3 w-3 text-muted-foreground" />
             <span className="truncate">{item.tag.name}</span>
           </span>
-          {item.card_name && (
-            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
-              <CreditCard className="h-3 w-3 text-muted-foreground" />
-              <span className="truncate">{item.card_name}</span>
-            </span>
-          )}
+          <TransactionPresenceIndicators
+            hasCard={Boolean(item.card_name)}
+            hasNotes={Boolean(item.notes)}
+            className="rounded-full border border-border/70 bg-background px-2 py-1"
+            iconClassName="h-3 w-3"
+          />
         </div>
         <p className="mt-1 text-xs text-muted-foreground">{format(dateFromIso(item.date), "MMM d, yyyy")}</p>
       </div>
@@ -1003,12 +1003,12 @@ function GroupedNotableSpendingRow({
             <TagGlyph className="h-3 w-3 text-muted-foreground" />
             <span className="truncate">{item.tag.name}</span>
           </span>
-          {item.cardName && (
-            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
-              <CreditCard className="h-3 w-3 text-muted-foreground" />
-              <span className="truncate">{item.cardName}</span>
-            </span>
-          )}
+          <TransactionPresenceIndicators
+            hasCard={Boolean(item.cardName)}
+            hasNotes={item.transactions.some((transaction) => Boolean(transaction.notes))}
+            className="rounded-full border border-border/70 bg-background px-2 py-1"
+            iconClassName="h-3 w-3"
+          />
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {item.count} payments · {formatMoney(item.amountEach)} each
@@ -1084,12 +1084,12 @@ function NotableSpendingGroupSheet({
                 <TagGlyph className="h-3 w-3 text-muted-foreground" />
                 <span className="truncate">{group.tag.name}</span>
               </span>
-              {group.cardName && (
-                <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
-                  <CreditCard className="h-3 w-3 text-muted-foreground" />
-                  <span className="truncate">{group.cardName}</span>
-                </span>
-              )}
+              <TransactionPresenceIndicators
+                hasCard={Boolean(group.cardName)}
+                hasNotes={group.transactions.some((transaction) => Boolean(transaction.notes))}
+                className="rounded-full border border-border/70 bg-background px-2 py-1"
+                iconClassName="h-3 w-3"
+              />
             </div>
           </div>
 
@@ -1100,7 +1100,13 @@ function NotableSpendingGroupSheet({
                 <div key={transaction.transaction_id} className="flex items-center justify-between gap-3 px-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{format(dateFromIso(transaction.date), "MMM d, yyyy")}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{transaction.expense}</p>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <p className="truncate">{transaction.expense}</p>
+                      <TransactionPresenceIndicators
+                        hasCard={Boolean(transaction.card_name)}
+                        hasNotes={Boolean(transaction.notes)}
+                      />
+                    </div>
                   </div>
                   <p className="shrink-0 text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
                 </div>

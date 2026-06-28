@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { formatDateValue, parseDateValue } from "@/lib/date-filters"
 import { getTagIcon } from "@/lib/tag-icons"
+import { TransactionPresenceIndicators } from "@/components/budget/transaction-presence-indicators"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/lib/api/types"
-import { ChevronRight, ChevronsDown, Tag, CreditCard } from "lucide-react"
+import { ChevronRight, ChevronsDown, Tag } from "lucide-react"
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -207,12 +208,6 @@ export function TransactionList({
                 {txns.map((transaction) => {
                   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
                   const hasNotes = Boolean(transaction.notes)
-                  const compactMetaLine = [
-                    transaction.tag.name,
-                    transaction.card?.name ?? null,
-                    hasNotes ? "Note" : null,
-                  ].filter(Boolean).join(" · ")
-
                   return isInteractive ? (
                     <button
                       key={transaction.id}
@@ -237,26 +232,25 @@ export function TransactionList({
                           )}
                         </div>
                         {useInlineCompactMetadata ? (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {compactMetaLine}
-                          </p>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <p className="truncate">{transaction.tag.name}</p>
+                            <TransactionPresenceIndicators
+                              hasCard={Boolean(transaction.card)}
+                              hasNotes={hasNotes}
+                            />
+                          </div>
                         ) : (
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
                               <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
                               <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
                             </span>
-                            {transaction.card && (
-                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[170px]">{transaction.card.name}</span>
-                              </span>
-                            )}
-                            {hasNotes && (
-                              <span className="text-[10px] font-medium text-muted-foreground">
-                                Note
-                              </span>
-                            )}
+                            <TransactionPresenceIndicators
+                              hasCard={Boolean(transaction.card)}
+                              hasNotes={hasNotes}
+                              className="rounded-full border border-border/70 bg-background px-2 py-1"
+                              iconClassName="h-3 w-3"
+                            />
                           </div>
                         )}
                       </div>
@@ -289,26 +283,25 @@ export function TransactionList({
                           )}
                         </div>
                         {useInlineCompactMetadata ? (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {compactMetaLine}
-                          </p>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <p className="truncate">{transaction.tag.name}</p>
+                            <TransactionPresenceIndicators
+                              hasCard={Boolean(transaction.card)}
+                              hasNotes={hasNotes}
+                            />
+                          </div>
                         ) : (
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
                               <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
                               <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
                             </span>
-                            {transaction.card && (
-                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                <CreditCard className="w-3 h-3 text-muted-foreground shrink-0" />
-                                <span className="truncate max-w-[170px]">{transaction.card.name}</span>
-                              </span>
-                            )}
-                            {hasNotes && (
-                              <span className="text-[10px] font-medium text-muted-foreground">
-                                Note
-                              </span>
-                            )}
+                            <TransactionPresenceIndicators
+                              hasCard={Boolean(transaction.card)}
+                              hasNotes={hasNotes}
+                              className="rounded-full border border-border/70 bg-background px-2 py-1"
+                              iconClassName="h-3 w-3"
+                            />
                           </div>
                         )}
                       </div>
