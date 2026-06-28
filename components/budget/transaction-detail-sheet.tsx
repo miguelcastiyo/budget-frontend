@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { formatCurrency, formatCategory, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import type { Transaction } from "@/lib/api/types"
-import { CalendarDays, Tag as TagGlyph, CreditCard, Folder, Users, Pencil, Trash2 } from "lucide-react"
+import { CalendarDays, Tag as TagGlyph, CreditCard, Folder, Users, Pencil, Trash2, FileText } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -148,9 +148,16 @@ export function TransactionDetailSheet({
           </div>
 
           {transaction.notes && (
-            <div className="rounded-2xl bg-secondary/35 p-4">
-              <p className="text-sm text-muted-foreground">Note</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">{transaction.notes}</p>
+            <div className="bg-secondary/50 rounded-2xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-background flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Note</p>
+                  <p className="mt-1 whitespace-pre-wrap font-medium leading-6 text-foreground">{transaction.notes}</p>
+                </div>
+              </div>
             </div>
           )}
           
