@@ -23,6 +23,7 @@ const cards = require("../lib/cards.ts")
 const dateFilters = require("../lib/date-filters.ts")
 const formatters = require("../lib/formatters.ts")
 const insights = require("../lib/insights.ts")
+const monthCloseout = require("../lib/month-closeout.ts")
 
 const hourlyMonthly = income.calculateHourlyMonthlyIncome("20.00", "10.00")
 assertApprox(hourlyMonthly, 866.6666666667, 0.000001, "hourly income uses 52/12 monthly average")
@@ -170,6 +171,106 @@ assertEqual(insights.formatMonthTooltipLabel("2026-05"), "May 2026", "month tool
 assertEqual(insights.tagColor(0), "var(--color-chart-1)", "tag color uses theme chart palette first")
 assertEqual(insights.tagColor(20), "color-mix(in srgb, var(--color-chart-1) 58%, var(--color-foreground))", "tag color generates deterministic overflow colors")
 assertEqual(insights.dayLabel("Monday"), "MON", "day label abbreviates day names")
+
+assertEqual(monthCloseout.parseMoneyToCents("12.34"), 1234, "closeout money parser converts to cents")
+assertEqual(monthCloseout.getCloseoutOutcome("surplus"), "under", "closeout outcome maps surplus to under-plan language")
+assertEqual(
+  monthCloseout.buildFooterStatus({
+    outcome: "under",
+    availableCents: 31560,
+    allocatedCents: 0,
+  }),
+  "$315.60 ready to place",
+  "closeout footer status shows unassigned surplus"
+)
+assertEqual(
+  monthCloseout.buildFooterStatus({
+    outcome: "under",
+    availableCents: 31560,
+    allocatedCents: 21560,
+  }),
+  "$100.00 left to place",
+  "closeout footer status shows partial assignment"
+)
+assertEqual(
+  monthCloseout.inferCloseoutDecision(
+    [{ allocation_type: "savings", amount: "315.60" }],
+    31560
+  ),
+  "savings",
+  "closeout decision infers single full savings allocation"
+)
+assertEqual(
+  monthCloseout.inferCloseoutDecision([], 31560, 31560),
+  "buffer",
+  "closeout decision infers explicit buffer when all surplus stays unassigned"
+)
+assertDeepEqual(
+  monthCloseout.buildFooterState({
+    monthLabel: "June",
+    outcome: "under",
+    decision: null,
+    availableCents: 31560,
+    allocatedCents: 0,
+    isSubmitting: false,
+    hasError: false,
+  }),
+  {
+    helperText: "Choose where the $315.60 should go",
+    buttonText: "Choose an option",
+    disabled: true,
+  },
+  "closeout footer requires an explicit surplus decision"
+)
+assertDeepEqual(
+  monthCloseout.buildFooterState({
+    monthLabel: "June",
+    outcome: "under",
+    decision: "buffer",
+    availableCents: 31560,
+    allocatedCents: 0,
+    isSubmitting: false,
+    hasError: false,
+  }),
+  {
+    helperText: "$315.60 kept as buffer",
+    buttonText: "Close with buffer",
+    disabled: false,
+  },
+  "closeout footer describes keeping surplus as buffer"
+)
+assertDeepEqual(
+  monthCloseout.buildClosedSummary({
+    monthLabel: "June",
+    outcome: "under",
+    varianceCents: 31560,
+    allocatedCents: 31560,
+    unallocatedCents: 0,
+    allocations: [{ allocation_type: "savings" }],
+  }),
+  {
+    title: "June is closed",
+    amountLine: "$315.60 moved to savings",
+    detailLine: "You finished the month under plan.",
+  },
+  "closed closeout summary describes single savings transfer"
+)
+assertDeepEqual(
+  monthCloseout.buildClosedSummary({
+    monthLabel: "June",
+    outcome: "under",
+    varianceCents: 31560,
+    allocatedCents: 0,
+    unallocatedCents: 31560,
+    allocations: [],
+  }),
+  {
+    title: "June is closed",
+    amountLine: "$315.60 kept as buffer",
+    detailLine: "You finished the month under plan.",
+  },
+  "closed closeout summary describes kept buffer state"
+)
 
 assertDeepEqual(
   cards.sortCards([
