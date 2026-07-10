@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { compareMonthKeys, formatMonthLabel, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
+import { compareMonthKeys, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
@@ -17,7 +17,6 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import type { FundListItem, MonthCloseoutResponse, MonthOverviewResponse, Transaction } from "@/lib/api/types"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
@@ -61,37 +60,6 @@ function getFeaturedFund(activeFunds: FundListItem[]): FundListItem | null {
     }
     return left.name.localeCompare(right.name)
   })[0] ?? null
-}
-
-function getRecentCloseoutHighlight(
-  closeout: MonthCloseoutResponse | null,
-  activeFunds: FundListItem[]
-): { fund: FundListItem; amount: string; month: string } | null {
-  const month = closeout?.month
-  const allocations = closeout?.closeout?.allocations ?? []
-
-  if (!month || allocations.length === 0) {
-    return null
-  }
-
-  const allocation = allocations.find(
-    (item) => item.allocation_type === "fund" && item.fund_id && activeFunds.some((fund) => fund.id === item.fund_id)
-  )
-
-  if (!allocation?.fund_id) {
-    return null
-  }
-
-  const fund = activeFunds.find((item) => item.id === allocation.fund_id)
-  if (!fund) {
-    return null
-  }
-
-  return {
-    fund,
-    amount: allocation.amount,
-    month,
-  }
 }
 
 export default function DashboardPage() {
@@ -171,7 +139,6 @@ export default function DashboardPage() {
   const activeFunds = funds.filter((fund) => fund.status === "active")
   const totalFundBalance = activeFunds.reduce((sum, fund) => sum + parseAmount(fund.current_balance), 0)
   const featuredFund = getFeaturedFund(activeFunds)
-  const recentCloseoutHighlight = getRecentCloseoutHighlight(closeout, activeFunds)
 
   const hasMonthTransactions =
     recentTransactions.length > 0 ||
@@ -334,7 +301,6 @@ export default function DashboardPage() {
             activeFunds={activeFunds}
             totalFundBalance={totalFundBalance}
             featuredFund={featuredFund}
-            recentCloseoutHighlight={recentCloseoutHighlight}
           />
 
           <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
@@ -433,18 +399,17 @@ function DashboardFundsCard({
   activeFunds,
   totalFundBalance,
   featuredFund,
-  recentCloseoutHighlight,
 }: {
   activeFunds: FundListItem[]
   totalFundBalance: number
   featuredFund: FundListItem | null
-  recentCloseoutHighlight: { fund: FundListItem; amount: string; month: string } | null
 }) {
   const hasFunds = activeFunds.length > 0
   const ctaHref = hasFunds ? "/insights/funds" : "/insights/funds?create=1"
   const ctaLabel = hasFunds ? "Open" : "Create fund"
   const hasGoal = Boolean(featuredFund?.goal_amount)
   const percentFunded = Math.max(0, Math.min(Math.round(parseAmount(featuredFund?.percent_funded)), 100))
+  const remainingAmount = featuredFund?.remaining_amount ? formatCurrency(featuredFund.remaining_amount) : null
 
   return (
     <div className="space-y-3">
@@ -453,7 +418,12 @@ function DashboardFundsCard({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Funds</p>
           <h2 className="mt-1 text-base font-semibold text-foreground">Dedicated money</h2>
         </div>
-        <Button variant={hasFunds ? "ghost" : "outline"} size="sm" className="rounded-full" asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-11 rounded-full border-border/60 bg-[#f5efe4] px-4 hover:bg-[#efe6d6]"
+          asChild
+        >
           <Link href={ctaHref}>{ctaLabel}</Link>
         </Button>
       </div>
@@ -463,7 +433,12 @@ function DashboardFundsCard({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Funds</p>
             <h2 className="mt-1 text-base font-semibold text-foreground">Dedicated money</h2>
           </div>
-          <Button variant={hasFunds ? "ghost" : "outline"} size="sm" className="rounded-full" asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-11 rounded-full border-border/60 bg-[#f5efe4] px-4 hover:bg-[#efe6d6]"
+            asChild
+          >
             <Link href={ctaHref}>{ctaLabel}</Link>
           </Button>
         </div>
@@ -476,10 +451,10 @@ function DashboardFundsCard({
             <p className="text-sm text-muted-foreground">Japan 2026 · Moving Fund · Emergency Fund</p>
           </div>
         ) : (
-          <div className="space-y-4 px-6 pb-6 pt-6 lg:pt-4">
-            <div className="flex flex-wrap gap-6">
+          <div className="space-y-5 px-6 pb-5 pt-6 lg:pt-4">
+            <div className="flex flex-wrap gap-x-10 gap-y-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Saved</p>
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Total saved</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
                   {formatCurrency(totalFundBalance)}
                 </p>
@@ -490,60 +465,42 @@ function DashboardFundsCard({
               </div>
             </div>
 
-            {recentCloseoutHighlight ? (
-              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/70 px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                    <Sparkles className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">
-                      {(formatMonthLabel(recentCloseoutHighlight.month) ?? recentCloseoutHighlight.month).split(" ")[0]} added{" "}
-                      {formatCurrency(recentCloseoutHighlight.amount)} to {recentCloseoutHighlight.fund.name}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Closing under budget turned into real progress.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : featuredFund ? (
-              <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-foreground">{featuredFund.name}</p>
-                    {hasGoal ? (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {formatCurrency(featuredFund.current_balance)} of {formatCurrency(featuredFund.goal_amount ?? 0)}
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {formatCurrency(featuredFund.current_balance)} saved
-                        {featuredFund.target_month ? ` · Target ${formatMonthLabel(featuredFund.target_month) ?? featuredFund.target_month}` : ""}
-                      </p>
-                    )}
-                  </div>
-                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                </div>
-                {hasGoal ? (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium text-foreground">{percentFunded}% funded</span>
+            {featuredFund ? (
+              <div className="border-t border-border/60 pt-4">
+                <Link href="/insights/funds" className="block space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-medium text-foreground">{featuredFund.name}</p>
+                      {hasGoal ? (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatCurrency(featuredFund.current_balance)} of {formatCurrency(featuredFund.goal_amount ?? 0)}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {formatCurrency(featuredFund.current_balance)} tracked
+                        </p>
+                      )}
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted/70">
-                      <div
-                        className={cn("h-full rounded-full bg-foreground/80", percentFunded === 0 && "min-w-0")}
-                        style={{ width: `${percentFunded}%` }}
-                      />
+                    <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  </div>
+
+                  {hasGoal ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-medium text-foreground">{percentFunded}% funded</span>
+                        <span className="text-muted-foreground">{remainingAmount ?? formatCurrency(0)} left</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-muted/50">
+                        <div
+                          className={cn("h-full rounded-full bg-[#7b8f6a]", percentFunded === 0 && "min-w-0")}
+                          style={{ width: `${percentFunded}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant="outline">Open-ended</Badge>
-                    <Badge variant="outline">{featuredFund.entries_count} entries</Badge>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No goal set</p>
+                  )}
+                </Link>
               </div>
             ) : null}
           </div>
