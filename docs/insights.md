@@ -101,6 +101,8 @@ Supported presets:
 
 Changing a preset immediately fetches insights. Custom ranges require both dates and only fetch after applying a valid range where `date_from <= date_to`.
 
+`This Month` uses the full current calendar month range, not just today, so recurring expenses dated later in the current month still appear in the review early in the month.
+
 User-facing range labels use human-readable dates such as `Jan 1 - Jun 7, 2026`. Raw ISO dates are reserved for API calls, state, and internal logic.
 
 On mobile, range chips stay on one horizontally scrollable line. The rail uses hidden scrollbars and trailing padding so `Custom` remains reachable without making the selector card tall.

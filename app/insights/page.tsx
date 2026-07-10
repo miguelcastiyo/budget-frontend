@@ -147,9 +147,10 @@ function getPresetRange(preset: Exclude<InsightPreset, "custom" | "all_time">): 
   const dateTo = toIsoDate(today)
 
   if (preset === "this_month") {
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
     return {
       date_from: toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1)),
-      date_to: dateTo,
+      date_to: toIsoDate(monthEnd),
     }
   }
 
