@@ -28,6 +28,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { ApiError, apiClient } from "@/lib/api/client"
@@ -98,6 +99,8 @@ const budgetTrackingOptions: Array<{ value: FundBudgetTracking; label: string; h
     helper: "Attach this fund contribution to a transaction you already entered.",
   },
 ]
+
+const NO_CARD_SELECT_VALUE = "__none__"
 
 function parseAmount(value: string | null | undefined): number {
   const amount = Number.parseFloat(value ?? "")
@@ -929,16 +932,21 @@ function FundDialog({
 
         <div className="grid gap-2">
           <Label htmlFor="fund-type">Type</Label>
-          <select
-            id="fund-type"
-            className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
+          <Select
             value={values.fund_type}
-            onChange={(event) => setValues((current) => ({ ...current, fund_type: event.target.value as FundType }))}
+            onValueChange={(value) => setValues((current) => ({ ...current, fund_type: value as FundType }))}
           >
-            {fundTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
+            <SelectTrigger id="fund-type" className="h-11 w-full rounded-xl border-border/60">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {fundTypeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <AmountInput
@@ -1130,7 +1138,7 @@ function FundEntryDialog({
       }
       bodyClassName="space-y-5"
     >
-      <div className="grid gap-4">
+      <div className="grid min-w-0 gap-4">
         <AmountInput
           id="fund-entry-amount"
           name="fund-entry-amount"
@@ -1183,15 +1191,15 @@ function FundEntryDialog({
                     key={option.value}
                     type="button"
                     className={cn(
-                      "rounded-2xl border px-4 py-4 text-left transition-colors",
+                      "min-w-0 overflow-hidden rounded-2xl border px-4 py-4 text-left transition-colors",
                       isSelected
                         ? "border-foreground/20 bg-muted/40"
                         : "border-border/60 bg-background hover:bg-muted/20"
                     )}
                     onClick={() => setValues((current) => ({ ...current, budget_tracking: option.value }))}
                   >
-                    <p className="font-medium text-foreground">{option.label}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{option.helper}</p>
+                    <p className="text-balance font-medium leading-tight text-foreground">{option.label}</p>
+                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.helper}</p>
                   </button>
                 )
               })}
@@ -1212,31 +1220,45 @@ function FundEntryDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="fund-transaction-tag">Tag</Label>
-              <select
-                id="fund-transaction-tag"
-                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
+              <Select
                 value={values.transaction_tag_id}
-                onChange={(event) => setValues((current) => ({ ...current, transaction_tag_id: event.target.value }))}
+                onValueChange={(value) => setValues((current) => ({ ...current, transaction_tag_id: value }))}
               >
-                <option value="">Choose a tag</option>
-                {tags.map((tag) => (
-                  <option key={tag.id} value={tag.id}>{tag.name}</option>
-                ))}
-              </select>
+                <SelectTrigger id="fund-transaction-tag" className="h-11 w-full rounded-xl border-border/60">
+                  <SelectValue placeholder="Choose a tag" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="fund-transaction-card">Card</Label>
-              <select
-                id="fund-transaction-card"
-                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
-                value={values.transaction_card_id}
-                onChange={(event) => setValues((current) => ({ ...current, transaction_card_id: event.target.value }))}
+              <Select
+                value={values.transaction_card_id || NO_CARD_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setValues((current) => ({
+                    ...current,
+                    transaction_card_id: value === NO_CARD_SELECT_VALUE ? "" : value,
+                  }))
+                }
               >
-                <option value="">No card</option>
-                {cards.map((card) => (
-                  <option key={card.id} value={card.id}>{card.name}</option>
-                ))}
-              </select>
+                <SelectTrigger id="fund-transaction-card" className="h-11 w-full rounded-xl border-border/60">
+                  <SelectValue placeholder="No card" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CARD_SELECT_VALUE}>No card</SelectItem>
+                  {cards.map((card) => (
+                    <SelectItem key={card.id} value={card.id}>
+                      {card.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="fund-transaction-notes">Transaction note</Label>
@@ -1252,14 +1274,11 @@ function FundEntryDialog({
         ) : null}
 
         {mode === "create" && intent === "add" && isLinkMode ? (
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <Label htmlFor="fund-transaction-link">Savings transaction</Label>
-            <select
-              id="fund-transaction-link"
-              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
+            <Select
               value={values.transaction_id}
-              onChange={(event) => {
-                const transactionId = event.target.value
+              onValueChange={(transactionId) => {
                 const selectedTransaction = transactions.find((transaction) => transaction.id === transactionId)
 
                 setValues((current) => ({
@@ -1269,13 +1288,17 @@ function FundEntryDialog({
                 }))
               }}
             >
-              <option value="">Choose a transaction</option>
-              {transactions.map((transaction) => (
-                <option key={transaction.id} value={transaction.id}>
-                  {transaction.expense} • {formatCurrency(transaction.amount)} • {transaction.date}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="fund-transaction-link" className="h-11 w-full rounded-xl border-border/60">
+                <SelectValue placeholder="Choose a transaction" />
+              </SelectTrigger>
+              <SelectContent>
+                {transactions.map((transaction) => (
+                  <SelectItem key={transaction.id} value={transaction.id}>
+                    {`${transaction.expense} • ${formatCurrency(transaction.amount)} • ${transaction.date}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
 
