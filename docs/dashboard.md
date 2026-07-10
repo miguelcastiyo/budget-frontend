@@ -21,6 +21,7 @@ Dashboard month loading now fetches these endpoints in parallel:
 ```text
 GET /me/months/{month}/overview
 GET /me/month-closeouts/{month}
+GET /me/funds?status=active&include_entries_summary=true
 ```
 
 The overview response still drives:
@@ -36,6 +37,13 @@ The month closeout response drives:
 - back-of-card state and copy
 - closeout CTAs
 - closeout detail / review tray
+
+The funds list response now drives:
+
+- the compact Funds dashboard card
+- active-fund count
+- total balance across active funds
+- the route into `/insights/funds`
 
 Closeout writes use:
 
@@ -94,6 +102,7 @@ The tray supports:
 - collapsible planned vs actual details to reduce first-screen density on mobile
 - surplus or deficit allocation editing
 - partial allocation with live remaining amount
+- fund allocation rows with active-fund selection
 - rollover target month entry
 - notes
 - reopen confirmation
@@ -106,6 +115,7 @@ The frontend enforces these closeout rules before submit:
 
 - allocations cannot exceed the closeout surplus or deficit amount
 - zero-value rows are not submitted
+- fund rows require `fund_id`
 - rollover rows require `target_month`
 - non-rollover rows clear `target_month`
 - balanced months submit notes only

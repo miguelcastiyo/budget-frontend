@@ -75,6 +75,8 @@ function createReceiptRow(
 
 export function getDefaultAllocationLabel(type: MonthCloseoutAllocationType): string {
   switch (type) {
+    case "fund":
+      return "Fund contribution"
     case "savings":
       return "Savings"
     case "buffer":
@@ -97,6 +99,8 @@ export function getDefaultAllocationLabel(type: MonthCloseoutAllocationType): st
 
 export function getAllocationTypeLabel(type: MonthCloseoutAllocationType): string {
   switch (type) {
+    case "fund":
+      return "Fund"
     case "savings":
       return "Savings"
     case "investment":
@@ -123,6 +127,8 @@ export function getAllocationCardTitle(type: MonthCloseoutAllocationType, label?
   }
 
   switch (type) {
+    case "fund":
+      return "Fund contribution"
     case "savings":
       return "Savings deposit"
     case "buffer":

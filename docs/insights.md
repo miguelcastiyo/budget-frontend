@@ -7,6 +7,8 @@ Last reviewed: 2026-06-07
 
 Insights is a spending review page, not a generic analytics dashboard. It should feel like a calm monthly or range-based financial notebook entry.
 
+Funds now lives as a linked companion surface inside Insights, not as another analytics section. The Insights page includes a small Funds card that routes to `/insights/funds` for savings-goal and reserved-money workflows.
+
 The page answers:
 
 - How much did I spend?
@@ -14,6 +16,8 @@ The page answers:
 - Where did the money go?
 - What patterns stand out?
 - What transactions should I review?
+
+It can also hand off to Funds when the user wants to move from spending review into goal progress or fund-ledger actions.
 
 The experience is mobile-first. Desktop adds a supporting right column, but the main column still reads like a spending story rather than a metric grid.
 

@@ -496,6 +496,158 @@ export interface MonthOverviewStatusCard {
   detail: string
 }
 
+export type FundStatus = "active" | "archived"
+export type FundType = "goal" | "emergency" | "buffer" | "debt" | "investment" | "other"
+export type FundEntryType = "contribution" | "withdrawal" | "adjustment" | "starting_balance"
+export type FundEntryDirection = "in" | "out"
+export type FundEntrySourceType = "manual" | "transaction" | "month_closeout" | "starting_balance" | "correction"
+export type FundBudgetTracking = "fund_only" | "create_transaction" | "link_existing_transaction"
+
+export interface Fund {
+  id: string
+  name: string
+  fund_type: FundType
+  goal_amount: string | null
+  target_month: string | null
+  notes: string | null
+  status: FundStatus
+  sort_order: number
+  current_balance: string
+  remaining_amount: string | null
+  percent_funded: string | null
+  is_goal_met: boolean
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+}
+
+export interface FundListItem extends Fund {
+  entries_count: number
+}
+
+export interface FundEntry {
+  id: string
+  fund_id: string
+  entry_date: string
+  entry_type: FundEntryType
+  direction: FundEntryDirection
+  amount: string
+  source_type: FundEntrySourceType
+  source_month: string | null
+  source_transaction_id: string | null
+  source_closeout_id: string | null
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FundDetail extends Fund {
+  source_breakdown: {
+    month_closeout: string
+    transaction: string
+    manual: string
+    starting_balance: string
+    correction: string
+  }
+  entries_count: number
+  recent_entries: FundEntry[]
+}
+
+export interface FundsListResponse {
+  items: FundListItem[]
+}
+
+export interface FundEntriesPage {
+  items: FundEntry[]
+  page: number
+  page_size: number
+  total_items: number
+}
+
+export interface CreateFundRequest {
+  name: string
+  fund_type?: FundType
+  goal_amount?: string | null
+  target_month?: string | null
+  notes?: string | null
+  starting_balance?: string | null
+  sort_order?: number
+}
+
+export interface UpdateFundRequest {
+  name?: string
+  fund_type?: FundType
+  goal_amount?: string | null
+  target_month?: string | null
+  notes?: string | null
+  sort_order?: number
+}
+
+export interface CreateFundEntryTransactionDetails {
+  expense: string
+  tag_id: string
+  card_id: string | null
+  notes: string | null
+}
+
+export interface CreateFundEntryRequest {
+  entry_date?: string
+  entry_type: FundEntryType
+  direction: FundEntryDirection
+  amount: string
+  source_type: Extract<FundEntrySourceType, "manual" | "transaction" | "starting_balance" | "correction">
+  note?: string | null
+  budget_tracking?: FundBudgetTracking
+  transaction_id?: string | null
+  transaction?: CreateFundEntryTransactionDetails | null
+}
+
+export interface UpdateFundEntryRequest {
+  entry_date?: string
+  entry_type?: FundEntryType
+  direction?: FundEntryDirection
+  amount?: string
+  note?: string | null
+}
+
+export interface FundCloseoutSummaryFund {
+  id: string
+  name: string
+  fund_type: FundType
+  goal_amount: string | null
+  current_balance: string
+  percent_funded: string | null
+}
+
+export interface FundCloseoutSummaryFundRow {
+  fund: FundCloseoutSummaryFund
+  closeout_contributed: string
+  closeout_count: number
+}
+
+export interface FundCloseoutSummaryMonthAllocation {
+  fund_id: string
+  fund_name: string
+  amount: string
+}
+
+export interface FundCloseoutSummaryMonth {
+  month: string
+  result_type: MonthCloseoutResultType
+  surplus_amount: string
+  allocated_to_funds: string
+  unassigned_amount: string
+  fund_allocations: FundCloseoutSummaryMonthAllocation[]
+}
+
+export interface FundCloseoutSummaryResponse {
+  year: number
+  total_closeout_contributed: string
+  funds: FundCloseoutSummaryFundRow[]
+  unassigned_closeout_total: string
+  months: FundCloseoutSummaryMonth[]
+}
+
 export interface MonthOverviewResponse {
   month: string
   budget: MonthOverviewBudget
@@ -519,6 +671,7 @@ export type MonthCloseoutStatus =
 export type MonthCloseoutResultType = "surplus" | "deficit" | "balanced"
 
 export type MonthCloseoutAllocationType =
+  | "fund"
   | "savings"
   | "investment"
   | "debt"
@@ -551,6 +704,8 @@ export interface MonthCloseoutComputed {
 export interface MonthCloseoutAllocation {
   id: string
   allocation_type: MonthCloseoutAllocationType
+  fund_id: string | null
+  fund_name: string | null
   label: string | null
   amount: string
   target_month: string | null
@@ -583,6 +738,7 @@ export interface MonthCloseoutResponse {
 
 export interface MonthCloseoutAllocationInput {
   allocation_type: MonthCloseoutAllocationType
+  fund_id?: string | null
   label?: string | null
   amount: string
   target_month?: string | null

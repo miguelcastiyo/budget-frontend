@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { AlertTriangle, CheckCircle2, ChevronDown, Pencil, Plus, RotateCcw, Wallet } from "lucide-react"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
@@ -34,6 +35,7 @@ import {
 } from "@/lib/month-closeout"
 import { cn } from "@/lib/utils"
 import type {
+  FundListItem,
   MonthCloseoutAllocation,
   MonthCloseoutAllocationInput,
   MonthCloseoutAllocationType,
@@ -58,6 +60,7 @@ interface MonthCloseoutTrayProps {
 interface EditableAllocationRow {
   id: string
   allocation_type: MonthCloseoutAllocationType
+  fund_id: string
   label: string
   amount: string
   target_month: string
@@ -72,6 +75,7 @@ interface TrayPresentation {
 }
 
 const SURPLUS_TYPES: MonthCloseoutAllocationType[] = [
+  "fund",
   "savings",
   "buffer",
   "rollover",
@@ -105,6 +109,7 @@ function allocationToRow(allocation: MonthCloseoutAllocation): EditableAllocatio
   return {
     id: allocation.id,
     allocation_type: allocation.allocation_type,
+    fund_id: allocation.fund_id ?? "",
     label: allocation.label ?? "",
     amount: allocation.amount,
     target_month: allocation.target_month ?? "",
@@ -116,6 +121,7 @@ function createAllocationRow(month: string, type: MonthCloseoutAllocationType, a
   return {
     id: `draft-${Math.random().toString(36).slice(2, 10)}`,
     allocation_type: type,
+    fund_id: "",
     label: "",
     amount,
     target_month: type === "rollover" ? getNextMonthKey(month) : "",
@@ -128,6 +134,7 @@ function buildPayloadAllocations(rows: EditableAllocationRow[]): MonthCloseoutAl
     .filter((row) => parseAmount(row.amount) > 0)
     .map((row) => ({
       allocation_type: row.allocation_type,
+      fund_id: row.allocation_type === "fund" ? row.fund_id || null : null,
       amount: row.amount,
       label: row.label.trim() || getDefaultAllocationLabel(row.allocation_type),
       target_month: row.allocation_type === "rollover" ? row.target_month || null : null,
@@ -185,6 +192,8 @@ export function MonthCloseoutTray({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReopenConfirm, setShowReopenConfirm] = useState(false)
   const [isBreakdownExpanded, setIsBreakdownExpanded] = useState(true)
+  const [funds, setFunds] = useState<FundListItem[]>([])
+  const [isFundsLoading, setIsFundsLoading] = useState(false)
 
   const computed = closeout?.computed ?? null
   const saved = closeout?.closeout ?? null
@@ -235,6 +244,36 @@ export function MonthCloseoutTray({
       setIsBreakdownExpanded(window.matchMedia("(min-width: 900px)").matches)
     }
   }, [open, saved, canManageSurplusAllocations, availableAllocationCents, savedUnallocatedCents])
+
+  useEffect(() => {
+    if (!open || !showDecisionSection) {
+      return
+    }
+
+    let isActive = true
+    setIsFundsLoading(true)
+
+    void apiClient.getFunds({ status: "active", include_entries_summary: true })
+      .then((response) => {
+        if (isActive) {
+          setFunds(response.items)
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setFunds([])
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsFundsLoading(false)
+        }
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [open, showDecisionSection])
 
   const footerState = useMemo(() => {
     if (mode === "edit") {
@@ -287,6 +326,11 @@ export function MonthCloseoutTray({
 
       if (row.allocation_type === "rollover" && !row.target_month.trim()) {
         setError("Rollover allocations need a target month.")
+        return false
+      }
+
+      if (row.allocation_type === "fund" && !row.fund_id.trim()) {
+        setError("Fund allocations need a fund.")
         return false
       }
     }
@@ -382,6 +426,9 @@ export function MonthCloseoutTray({
         if (patch.allocation_type && patch.allocation_type !== "rollover") {
           next.target_month = ""
         }
+        if (patch.allocation_type && patch.allocation_type !== "fund") {
+          next.fund_id = ""
+        }
         if (patch.allocation_type === "rollover" && !next.target_month) {
           next.target_month = getNextMonthKey(month)
         }
@@ -449,6 +496,8 @@ export function MonthCloseoutTray({
             isBreakdownExpanded={isBreakdownExpanded}
             allocations={allocations}
             allocationTypeOptions={allocationTypeOptions}
+            funds={funds}
+            isFundsLoading={isFundsLoading}
             onDecisionChange={handleDecisionChange}
             onAddAllocation={addAllocation}
             onUpdateAllocation={updateAllocation}
@@ -584,7 +633,7 @@ function ReviewContent({
         />
       </div>
 
-      {!!saved?.stale_reasons?.length ? (
+      {saved?.stale_reasons?.length ? (
         <div className="rounded-3xl border border-border/60 bg-muted/30 p-4">
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Why it is stale</p>
           <ul className="mt-3 space-y-2 text-sm text-foreground">
@@ -619,6 +668,8 @@ function EditorContent({
   isBreakdownExpanded,
   allocations,
   allocationTypeOptions,
+  funds,
+  isFundsLoading,
   onDecisionChange,
   onAddAllocation,
   onUpdateAllocation,
@@ -644,6 +695,8 @@ function EditorContent({
   isBreakdownExpanded: boolean
   allocations: EditableAllocationRow[]
   allocationTypeOptions: MonthCloseoutAllocationType[]
+  funds: FundListItem[]
+  isFundsLoading: boolean
   onDecisionChange: (decision: CloseoutDecision) => void
   onAddAllocation: () => void
   onUpdateAllocation: (id: string, patch: Partial<EditableAllocationRow>) => void
@@ -689,6 +742,8 @@ function EditorContent({
             remainingAllocationCents={remainingAllocationCents}
             allocationTypeOptions={allocationTypeOptions}
             allocations={allocations}
+            funds={funds}
+            isFundsLoading={isFundsLoading}
             onAddAllocation={onAddAllocation}
             onUpdateAllocation={onUpdateAllocation}
             onRemoveAllocation={onRemoveAllocation}
@@ -938,6 +993,8 @@ function AllocationEditor({
   remainingAllocationCents,
   allocationTypeOptions,
   allocations,
+  funds,
+  isFundsLoading,
   onAddAllocation,
   onUpdateAllocation,
   onRemoveAllocation,
@@ -947,6 +1004,8 @@ function AllocationEditor({
   remainingAllocationCents: number
   allocationTypeOptions: MonthCloseoutAllocationType[]
   allocations: EditableAllocationRow[]
+  funds: FundListItem[]
+  isFundsLoading: boolean
   onAddAllocation: () => void
   onUpdateAllocation: (id: string, patch: Partial<EditableAllocationRow>) => void
   onRemoveAllocation: (id: string) => void
@@ -968,6 +1027,8 @@ function AllocationEditor({
             monthLabel={monthLabel}
             allocation={allocation}
             allocationTypeOptions={allocationTypeOptions}
+            funds={funds}
+            isFundsLoading={isFundsLoading}
             onUpdate={onUpdateAllocation}
             onRemove={onRemoveAllocation}
           />
@@ -986,12 +1047,16 @@ function AllocationEditorRow({
   monthLabel,
   allocation,
   allocationTypeOptions,
+  funds,
+  isFundsLoading,
   onUpdate,
   onRemove,
 }: {
   monthLabel: string
   allocation: EditableAllocationRow
   allocationTypeOptions: MonthCloseoutAllocationType[]
+  funds: FundListItem[]
+  isFundsLoading: boolean
   onUpdate: (id: string, patch: Partial<EditableAllocationRow>) => void
   onRemove: (id: string) => void
 }) {
@@ -1046,6 +1111,33 @@ function AllocationEditorRow({
               onChange={(event) => onUpdate(allocation.id, { target_month: event.target.value })}
               placeholder="YYYY-MM"
             />
+          </div>
+        ) : null}
+
+        {allocation.allocation_type === "fund" ? (
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor={`allocation-fund-${allocation.id}`}>Fund</Label>
+              <Button variant="ghost" size="sm" className="h-auto px-0 text-sm" asChild>
+                <Link href="/insights/funds?create=1">Create new fund</Link>
+              </Button>
+            </div>
+            <select
+              id={`allocation-fund-${allocation.id}`}
+              className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
+              value={allocation.fund_id}
+              onChange={(event) => onUpdate(allocation.id, { fund_id: event.target.value })}
+              disabled={isFundsLoading}
+            >
+              <option value="">
+                {isFundsLoading ? "Loading funds..." : funds.length ? "Choose a fund" : "No active funds yet"}
+              </option>
+              {funds.map((fund) => (
+                <option key={fund.id} value={fund.id}>
+                  {fund.name}
+                </option>
+              ))}
+            </select>
           </div>
         ) : null}
 
@@ -1260,7 +1352,7 @@ function CloseoutLedger({ allocations }: { allocations: MonthCloseoutAllocation[
               <div>
                 <p className="font-medium text-foreground">{getAllocationCardTitle(allocation.allocation_type, allocation.label)}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {getAllocationTypeLabel(allocation.allocation_type)}
+                  {allocation.fund_name?.trim() || getAllocationTypeLabel(allocation.allocation_type)}
                   {allocation.target_month ? ` • ${allocation.target_month}` : ""}
                 </p>
               </div>

@@ -2,6 +2,7 @@ import { createApiKeysApi } from "./api-keys"
 import { createAuthApi } from "./auth"
 import { createBudgetApi } from "./budget"
 import { ApiClientCore, ApiError, GLOBAL_API_ERROR_EVENT } from "./core"
+import { createFundsApi } from "./funds"
 import { createImportExportApi } from "./import-export"
 import { createMonthCloseoutsApi } from "./month-closeouts"
 import { createProfileApi } from "./profile"
@@ -17,6 +18,7 @@ type ApiClient = ApiClientCore
   & ReturnType<typeof createTaxonomyApi>
   & ReturnType<typeof createRecurringApi>
   & ReturnType<typeof createBudgetApi>
+  & ReturnType<typeof createFundsApi>
   & ReturnType<typeof createTransactionsApi>
   & ReturnType<typeof createImportExportApi>
   & ReturnType<typeof createMonthCloseoutsApi>
@@ -29,6 +31,7 @@ export const apiClient: ApiClient = Object.assign(
   createTaxonomyApi(core),
   createRecurringApi(core),
   createBudgetApi(core),
+  createFundsApi(core),
   createTransactionsApi(core),
   createImportExportApi(core),
   createMonthCloseoutsApi(core),
