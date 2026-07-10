@@ -1258,7 +1258,16 @@ function FundEntryDialog({
               id="fund-transaction-link"
               className="border-input focus-visible:border-ring focus-visible:ring-ring/50 h-11 rounded-xl border bg-transparent px-3 text-sm outline-none focus-visible:ring-[3px]"
               value={values.transaction_id}
-              onChange={(event) => setValues((current) => ({ ...current, transaction_id: event.target.value }))}
+              onChange={(event) => {
+                const transactionId = event.target.value
+                const selectedTransaction = transactions.find((transaction) => transaction.id === transactionId)
+
+                setValues((current) => ({
+                  ...current,
+                  transaction_id: transactionId,
+                  amount: selectedTransaction?.amount ?? current.amount,
+                }))
+              }}
             >
               <option value="">Choose a transaction</option>
               {transactions.map((transaction) => (
