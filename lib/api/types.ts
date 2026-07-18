@@ -566,6 +566,7 @@ export interface FundEntriesPage {
 
 export interface CreateFundRequest {
   name: string
+  /** Deprecated compatibility field. New UI derives goal behavior from goal_amount. */
   fund_type?: FundType
   goal_amount?: string | null
   target_month?: string | null
@@ -576,6 +577,7 @@ export interface CreateFundRequest {
 
 export interface UpdateFundRequest {
   name?: string
+  /** Deprecated compatibility field. New UI derives goal behavior from goal_amount. */
   fund_type?: FundType
   goal_amount?: string | null
   target_month?: string | null

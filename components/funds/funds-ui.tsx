@@ -53,7 +53,6 @@ import type {
   FundEntryType,
   FundListItem,
   FundStatus,
-  FundType,
   Tag,
   Transaction,
   UpdateFundEntryRequest,
@@ -80,15 +79,6 @@ type EntryIntent = "add" | "use"
 const fundFilterOptions: Array<{ value: FundsFilter; label: string }> = [
   { value: "active", label: "Active" },
   { value: "archived", label: "Archived" },
-]
-
-const fundTypeOptions: Array<{ value: FundType; label: string }> = [
-  { value: "goal", label: "Goal" },
-  { value: "emergency", label: "Emergency" },
-  { value: "buffer", label: "Buffer" },
-  { value: "debt", label: "Debt" },
-  { value: "investment", label: "Investment" },
-  { value: "other", label: "Other" },
 ]
 
 const budgetTrackingOptions: Array<{ value: FundBudgetTracking; label: string; helper: string }> = [
@@ -132,10 +122,6 @@ function parseAmount(value: string | null | undefined): number {
 
 function numberLabel(value: number, singular: string, plural = `${singular}s`): string {
   return `${value} ${value === 1 ? singular : plural}`
-}
-
-function fundTypeLabel(type: FundType): string {
-  return fundTypeOptions.find((option) => option.value === type)?.label ?? "Fund"
 }
 
 function entryTypeLabel(entry: FundEntry): string {
@@ -213,7 +199,7 @@ function buildEntryPayload(values: EntryFormState, intent: EntryIntent): CreateF
 
 interface FundFormState {
   name: string
-  fund_type: FundType
+  goal_enabled: boolean
   goal_amount: string
   target_month: string
   notes: string
@@ -237,7 +223,7 @@ interface EntryFormState {
 function getDefaultFundFormState(): FundFormState {
   return {
     name: "",
-    fund_type: "goal",
+    goal_enabled: false,
     goal_amount: "",
     target_month: "",
     notes: "",
@@ -252,7 +238,7 @@ function getFundFormState(fund?: FundListItem | FundDetail | null): FundFormStat
 
   return {
     name: fund.name,
-    fund_type: fund.fund_type,
+    goal_enabled: fund.goal_amount !== null,
     goal_amount: fund.goal_amount ?? "",
     target_month: fund.target_month ?? "",
     notes: fund.notes ?? "",
@@ -283,7 +269,7 @@ function renderFundShell(children: React.ReactNode) {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-standalone-safe-top">
+      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-8 lg:pb-0 pt-standalone-safe-top">
         {children}
       </main>
       <BottomNav />
@@ -372,12 +358,14 @@ export function FundsOverviewPage() {
   const hasCloseoutContributions = hasPositiveAmount(closeoutTotal)
 
   return renderFundShell(
-    <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-5 lg:space-y-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Funds</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Goals, buffers, and saved progress</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight text-foreground lg:mt-2 lg:text-3xl">
+            Goals, buffers, and saved progress
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground lg:mt-2">
             Track dedicated money without losing the monthly budget view.
           </p>
         </div>
@@ -400,21 +388,16 @@ export function FundsOverviewPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)] lg:gap-8">
-        <div className="space-y-5">
-          <Card className="border-0 lg:hidden">
-            <CardContent className="space-y-3 pt-6">
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">At a glance</p>
-              <div>
-                <p className="text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalBalance)}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Total saved</p>
-              </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span>{activeCountLabel(activeFundMetrics.length)}</span>
-                <span>{goalCountLabel(totalGoals)}</span>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)] lg:gap-8">
+        <div className="space-y-4 lg:space-y-5">
+          <div className="space-y-1 lg:hidden">
+            <p className="text-lg font-semibold tracking-tight text-foreground">
+              {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {activeCountLabel(activeFundMetrics.length)} <span aria-hidden="true">·</span> {goalCountLabel(totalGoals)}
+            </p>
+          </div>
 
           <section className="space-y-4">
             <div className="space-y-3">
@@ -422,7 +405,7 @@ export function FundsOverviewPage() {
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Your funds</p>
                 </div>
-                <Button className="sm:hidden rounded-full" onClick={() => {
+                <Button className="h-11 rounded-full px-3 text-sm sm:hidden" onClick={() => {
                   setDialogMode("create")
                   setSelectedFund(null)
                   setIsDialogOpen(true)
@@ -457,7 +440,7 @@ export function FundsOverviewPage() {
                 }}
               />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3.5 lg:space-y-4">
                 {funds.map((fund) => (
                   <FundListCard
                     key={fund.id}
@@ -481,22 +464,20 @@ export function FundsOverviewPage() {
             )}
           </section>
 
-          <Card className="border-0 lg:hidden">
-            <CardContent className="space-y-3 pt-6">
-              <div className="flex items-center gap-2">
-                <HandCoins className="size-4 text-muted-foreground" />
-                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
-              </div>
-              <p className="text-2xl font-semibold tracking-tight text-foreground">
-                {formatCurrency(closeoutTotal)} this year
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {hasCloseoutContributions
-                  ? "Moved into funds from closed months."
-                  : "No contributions from month closeouts yet."}
-              </p>
-            </CardContent>
-          </Card>
+          <section className="space-y-3 border-t border-border/70 pt-5 lg:hidden">
+            <div className="flex items-center gap-2">
+              <HandCoins className="size-4 text-muted-foreground" />
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
+            </div>
+            <p className="text-lg font-semibold tracking-tight text-foreground">
+              {formatCurrency(closeoutTotal)} this year
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {hasCloseoutContributions
+                ? "Moved into funds from closed months."
+                : "No contributions from month closeouts yet."}
+            </p>
+          </section>
         </div>
 
         <aside className="hidden lg:block">
@@ -661,8 +642,8 @@ function FundListCard({
 
   return (
     <Card className="overflow-hidden border border-border/50 shadow-sm transition-colors hover:border-border hover:bg-muted/20">
-      <CardContent className="relative p-5">
-        <div className="absolute right-5 top-4 z-10">
+      <CardContent className="relative p-4 lg:p-5">
+        <div className="absolute right-4 top-3 z-10 lg:right-5 lg:top-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -699,19 +680,19 @@ function FundListCard({
         <Link
           href={`/insights/funds/${fund.id}`}
           aria-label={`Open ${fund.name}`}
-          className="block space-y-3.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="block space-y-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:space-y-3.5"
         >
           <div className="pr-12">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold tracking-tight text-foreground">{fund.name}</h2>
-              <Badge variant="outline">{fundTypeLabel(fund.fund_type)}</Badge>
+              {hasGoal ? <Badge variant="outline">Goal</Badge> : null}
               {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
             </div>
           </div>
 
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(savedAmount)}</p>
+              <p className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">{formatCurrency(savedAmount)}</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {hasGoal ? `saved of ${formatCurrency(goalAmount)}` : "saved"}
               </p>
@@ -722,7 +703,7 @@ function FundListCard({
           </div>
 
           {hasGoal ? (
-            <div className="space-y-3">
+            <div className="space-y-2.5 lg:space-y-3">
               <div
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
                 role="progressbar"
@@ -733,7 +714,7 @@ function FundListCard({
               >
                 <div className="h-full rounded-full bg-primary" style={{ width: fundProgressWidth(fund.percent_funded) }} />
               </div>
-              <div className="space-y-1 text-sm">
+              <div className="space-y-0.5 text-sm lg:space-y-1">
                 <span className="font-medium text-foreground">
                   {remainingAmount === 0 ? "Goal reached" : `${formatCurrency(remainingAmount)} remaining`}
                 </span>
@@ -849,7 +830,7 @@ export function FundDetailPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-3xl font-semibold tracking-tight text-foreground">{fund.name}</h1>
-                    <Badge variant="outline">{fundTypeLabel(fund.fund_type)}</Badge>
+                    {fund.goal_amount ? <Badge variant="outline">Goal</Badge> : null}
                     {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
                   </div>
                   <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -874,13 +855,12 @@ export function FundDetailPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className={cn("grid gap-4", fund.goal_amount ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
                 <DetailStat label="Saved" value={formatCurrency(fund.current_balance)} />
                 <DetailStat label="Goal" value={fund.goal_amount ? formatCurrency(fund.goal_amount) : "Open-ended"} />
-                <DetailStat
-                  label={fund.goal_amount ? "Remaining" : "Progress"}
-                  value={fund.goal_amount ? formatCurrency(fund.remaining_amount ?? 0) : `${Math.round(parseAmount(fund.percent_funded ?? "0"))}% funded`}
-                />
+                {fund.goal_amount ? (
+                  <DetailStat label="Remaining" value={formatCurrency(fund.remaining_amount ?? 0)} />
+                ) : null}
               </div>
 
               {fund.goal_amount ? (
@@ -951,7 +931,7 @@ export function FundDetailPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="outline">{numberLabel(fund.entries_count, "entry")}</Badge>
-                  {fund.target_month ? <Badge variant="outline">Target {formatMonthLabel(fund.target_month) ?? fund.target_month}</Badge> : null}
+                  {fund.goal_amount && fund.target_month ? <Badge variant="outline">Target {formatMonthLabel(fund.target_month) ?? fund.target_month}</Badge> : null}
                 </div>
               </CardContent>
             </Card>
@@ -1117,11 +1097,18 @@ function FundDialog({
       return
     }
 
+    if (values.goal_enabled && parseAmount(values.goal_amount) <= 0) {
+      setError("Enter a goal amount or remove the savings goal.")
+      return
+    }
+
+    const goalAmount = values.goal_enabled ? values.goal_amount : null
+    const targetMonth = values.goal_enabled ? values.target_month || null : null
+
     const payload: CreateFundRequest | UpdateFundRequest = {
       name: values.name.trim(),
-      fund_type: values.fund_type,
-      goal_amount: values.goal_amount || null,
-      target_month: values.target_month || null,
+      goal_amount: goalAmount,
+      target_month: targetMonth,
       notes: values.notes.trim() || null,
       ...(mode === "create" ? { starting_balance: values.starting_balance || null } : {}),
     }
@@ -1155,7 +1142,7 @@ function FundDialog({
       description={mode === "create" ? "Track dedicated money without creating a new budget bucket." : fund?.name ?? "Fund details"}
       footer={
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-          <div className="text-sm text-muted-foreground">{error ?? "Funds are long-lived goals or envelopes."}</div>
+          <div className="text-sm text-muted-foreground">{error ?? ""}</div>
           <Button className="h-12 rounded-xl px-6" onClick={() => void submit()} disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : mode === "create" ? "Create fund" : "Save changes"}
           </Button>
@@ -1174,49 +1161,74 @@ function FundDialog({
           />
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="fund-type">Type</Label>
-          <Select
-            value={values.fund_type}
-            onValueChange={(value) => setValues((current) => ({ ...current, fund_type: value as FundType }))}
-          >
-            <SelectTrigger id="fund-type" className="h-11 w-full rounded-xl border-border/60">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {fundTypeOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <AmountInput
-          id="fund-goal"
-          name="fund-goal"
-          value={values.goal_amount}
-          onValueChange={(goal_amount) => setValues((current) => ({ ...current, goal_amount }))}
-          label="Goal amount"
-        />
-
         {mode === "create" ? (
-          <AmountInput
-            id="fund-starting-balance"
-            name="fund-starting-balance"
-            value={values.starting_balance}
-            onValueChange={(starting_balance) => setValues((current) => ({ ...current, starting_balance }))}
-            label="Starting balance"
-          />
+          <div className="grid gap-2">
+            <AmountInput
+              id="fund-starting-balance"
+              name="fund-starting-balance"
+              value={values.starting_balance}
+              onValueChange={(starting_balance) => setValues((current) => ({ ...current, starting_balance }))}
+              label="Starting balance"
+            />
+            <p className="text-sm text-muted-foreground">Money you've already set aside.</p>
+          </div>
         ) : null}
 
-        <div className="grid gap-2">
-          <Label htmlFor="fund-target-month">Target month</Label>
-          <FundTargetMonthPicker
-            value={values.target_month}
-            onChange={(target_month) => setValues((current) => ({ ...current, target_month }))}
-          />
+        <div className="grid gap-3">
+          {values.goal_enabled ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Goal</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="rounded-full text-muted-foreground"
+                onClick={() =>
+                  setValues((current) => ({
+                    ...current,
+                    goal_enabled: false,
+                    goal_amount: "",
+                    target_month: "",
+                  }))
+                }
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 justify-start rounded-xl border-border/60"
+              onClick={() => setValues((current) => ({ ...current, goal_enabled: true }))}
+            >
+              <Plus className="size-4" />
+              Add a savings goal
+            </Button>
+          )}
+
+          {values.goal_enabled ? (
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <AmountInput
+                  id="fund-goal"
+                  name="fund-goal"
+                  value={values.goal_amount}
+                  onValueChange={(goal_amount) => setValues((current) => ({ ...current, goal_amount }))}
+                  label="Goal amount"
+                />
+                <p className="text-sm text-muted-foreground">How much do you want to save?</p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="fund-target-month">Target month</Label>
+                <FundTargetMonthPicker
+                  value={values.target_month}
+                  onChange={(target_month) => setValues((current) => ({ ...current, target_month }))}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-2">

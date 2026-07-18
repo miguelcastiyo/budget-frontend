@@ -7,6 +7,8 @@ Last reviewed: 2026-07-17
 
 Funds is the dedicated savings-goals and reserved-money surface.
 
+Product rule: a Fund is a container for intentionally saved money. A Goal is an optional property of a Fund and is determined by the presence of `goal_amount`.
+
 It covers:
 
 - fund overview
@@ -69,11 +71,13 @@ The overview page shows:
 - filter chips for `active` and `archived`
 - per-fund cards with progress, target month, remaining amount, and contribution count
 
-Fund cards use full-card navigation to the fund detail route. Management actions stay secondary in the overflow menu, currently `Edit fund` plus archive or restore depending on fund status.
+Fund cards use full-card navigation to the fund detail route. Management actions stay secondary in the overflow menu, currently `Edit fund` plus archive or restore depending on fund status. Goal badges and progress UI are derived from `goal_amount`; open-ended Funds do not expose legacy type labels or goal placeholders.
 
 The overview sidebar is supporting context rather than a dashboard card. It presents compact active-fund totals and separates month-closeout context with a thin divider. Closeout copy is conditional: zero year-to-date closeout contributions says there are no closeout contributions yet, while non-zero totals say the money moved into funds from closed months.
 
-Create and edit fund dialogs use the shared month selector for optional target month selection instead of free-form `YYYY-MM` typing.
+On mobile, `At a glance` is compact inline context instead of mirroring the desktop sidebar. Month Closeouts is also rendered as an inline section with a divider rather than a full card, and the page shell keeps explicit bottom padding so content clears the fixed bottom navigation.
+
+Create and edit fund dialogs no longer expose Fund Type. Create starts with name, optional starting balance, notes, and a lightweight `Add a savings goal` action. Enabling a goal reveals `Goal amount` and optional `Target month`; removing the goal clears both fields before submit. The target month picker uses app-native controls instead of free-form `YYYY-MM` typing.
 
 If no funds exist, the empty state drives the user into `Create fund`.
 
@@ -124,7 +128,9 @@ The closeout tray:
 
 - Create a fund with and without a goal amount.
 - Create a fund with a starting balance.
-- Edit a fund name, type, target month, and notes.
+- Create a fund without choosing a type.
+- Edit a fund name, goal, target month, and notes.
+- Add and remove a savings goal on an existing fund without changing its contribution history.
 - Archive and restore a fund.
 - Add money with `fund_only`.
 - Add money with `create_transaction`.
