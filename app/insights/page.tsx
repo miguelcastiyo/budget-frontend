@@ -432,7 +432,7 @@ export default function InsightsPage() {
                   <p className="text-sm font-medium text-foreground">Funds</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Move from spending review into goal progress, fund-only entries, and closeout-funded savings.
+                  View savings goals.
                 </p>
               </div>
               <Button size="sm" variant="outline" className="rounded-full" asChild>

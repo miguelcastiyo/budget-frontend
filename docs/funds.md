@@ -1,7 +1,7 @@
 # Funds
 
 Status: Active  
-Last reviewed: 2026-07-09
+Last reviewed: 2026-07-17
 
 ## UX Overview
 
@@ -66,8 +66,14 @@ The overview page shows:
 - active fund count
 - count of funds with goals
 - yearly closeout contributions
-- filter chips for `active`, `archived`, and `all`
-- per-fund cards with progress, target month, and quick edit/archive actions
+- filter chips for `active` and `archived`
+- per-fund cards with progress, target month, remaining amount, and contribution count
+
+Fund cards use full-card navigation to the fund detail route. Management actions stay secondary in the overflow menu, currently `Edit fund` plus archive or restore depending on fund status.
+
+The overview sidebar is supporting context rather than a dashboard card. It presents compact active-fund totals and separates month-closeout context with a thin divider. Closeout copy is conditional: zero year-to-date closeout contributions says there are no closeout contributions yet, while non-zero totals say the money moved into funds from closed months.
+
+Create and edit fund dialogs use the shared month selector for optional target month selection instead of free-form `YYYY-MM` typing.
 
 If no funds exist, the empty state drives the user into `Create fund`.
 

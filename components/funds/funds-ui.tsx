@@ -7,9 +7,12 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
   Coins,
   FolderOpen,
   HandCoins,
+  MoreHorizontal,
   Pencil,
   PiggyBank,
   Plus,
@@ -25,6 +28,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -57,12 +66,13 @@ import {
   getCurrentMonthKey,
   getMonthDateRange,
   parseIsoDate,
+  parseMonthKey,
   toIsoDate,
 } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
-type FundsFilter = "active" | "archived" | "all"
+type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
 type EntryActionMode = "create" | "edit"
 type EntryIntent = "add" | "use"
@@ -70,7 +80,6 @@ type EntryIntent = "add" | "use"
 const fundFilterOptions: Array<{ value: FundsFilter; label: string }> = [
   { value: "active", label: "Active" },
   { value: "archived", label: "Archived" },
-  { value: "all", label: "All" },
 ]
 
 const fundTypeOptions: Array<{ value: FundType; label: string }> = [
@@ -101,6 +110,20 @@ const budgetTrackingOptions: Array<{ value: FundBudgetTracking; label: string; h
 ]
 
 const NO_CARD_SELECT_VALUE = "__none__"
+const monthPickerMonths = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]
 
 function parseAmount(value: string | null | undefined): number {
   const amount = Number.parseFloat(value ?? "")
@@ -134,6 +157,18 @@ function entryTypeLabel(entry: FundEntry): string {
 function fundProgressWidth(percent: string | null): string {
   const numeric = parseAmount(percent)
   return `${Math.max(0, Math.min(numeric, 100))}%`
+}
+
+function hasPositiveAmount(value: string | number | null | undefined): boolean {
+  return parseAmount(String(value ?? "")) > 0
+}
+
+function activeCountLabel(value: number): string {
+  return `${value} active`
+}
+
+function goalCountLabel(value: number): string {
+  return `${value} ${value === 1 ? "goal" : "goals"}`
 }
 
 function canEditEntry(entry: FundEntry): boolean {
@@ -261,9 +296,11 @@ export function FundsOverviewPage() {
   const searchParams = useSearchParams()
   const [filter, setFilter] = useState<FundsFilter>("active")
   const [funds, setFunds] = useState<FundListItem[]>([])
+  const [activeFundMetrics, setActiveFundMetrics] = useState<FundListItem[]>([])
   const [summary, setSummary] = useState<FundCloseoutSummaryResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
   const [dialogMode, setDialogMode] = useState<FundActionMode>("create")
   const [selectedFund, setSelectedFund] = useState<FundListItem | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -271,14 +308,41 @@ export function FundsOverviewPage() {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
+    setSummaryError(null)
 
     try {
-      const [fundsResponse, summaryResponse] = await Promise.all([
+      const metricsPromise =
+        filter === "active"
+          ? null
+          : apiClient.getFunds({ status: "active", include_entries_summary: true })
+
+      const [fundsResult, activeMetricsResult, summaryResult] = await Promise.allSettled([
         apiClient.getFunds({ status: filter, include_entries_summary: true }),
+        metricsPromise ?? Promise.resolve(null),
         apiClient.getFundCloseoutSummary(new Date().getFullYear()),
       ])
-      setFunds(fundsResponse.items)
-      setSummary(summaryResponse)
+
+      if (fundsResult.status === "rejected") {
+        throw fundsResult.reason
+      }
+
+      setFunds(fundsResult.value.items)
+
+      if (filter === "active") {
+        setActiveFundMetrics(fundsResult.value.items.filter((fund) => fund.status === "active"))
+      } else if (activeMetricsResult.status === "fulfilled" && activeMetricsResult.value) {
+        setActiveFundMetrics(activeMetricsResult.value.items.filter((fund) => fund.status === "active"))
+      } else {
+        setActiveFundMetrics([])
+        setSummaryError("Some supporting fund totals are unavailable right now.")
+      }
+
+      if (summaryResult.status === "fulfilled") {
+        setSummary(summaryResult.value)
+      } else {
+        setSummary(null)
+        setSummaryError("Closeout summary is unavailable right now.")
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -302,9 +366,10 @@ export function FundsOverviewPage() {
     }
   }, [searchParams])
 
-  const activeFunds = funds.filter((fund) => fund.status === "active")
-  const totalBalance = activeFunds.reduce((sum, fund) => sum + parseAmount(fund.current_balance), 0)
-  const totalGoals = activeFunds.filter((fund) => fund.goal_amount !== null).length
+  const totalBalance = activeFundMetrics.reduce((sum, fund) => sum + parseAmount(fund.current_balance), 0)
+  const totalGoals = activeFundMetrics.filter((fund) => fund.goal_amount !== null).length
+  const closeoutTotal = summary?.total_closeout_contributed ?? 0
+  const hasCloseoutContributions = hasPositiveAmount(closeoutTotal)
 
   return renderFundShell(
     <div className="space-y-6 lg:space-y-8">
@@ -335,167 +400,115 @@ export function FundsOverviewPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <Card className="overflow-hidden border-0 bg-[linear-gradient(135deg,rgba(246,239,224,0.9),rgba(255,255,255,0.98))]">
-          <CardContent className="grid gap-5 pt-6 sm:grid-cols-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Saved across active funds</p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalBalance)}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Active funds</p>
-              <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{activeFunds.length}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">With goals</p>
-              <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">{totalGoals}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)] lg:gap-8">
+        <div className="space-y-5">
+          <Card className="border-0 lg:hidden">
+            <CardContent className="space-y-3 pt-6">
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">At a glance</p>
+              <div>
+                <p className="text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalBalance)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">Total saved</p>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                <span>{activeCountLabel(activeFundMetrics.length)}</span>
+                <span>{goalCountLabel(totalGoals)}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-0">
-          <CardContent className="space-y-3 pt-6">
-            <div className="flex items-center gap-2">
-              <HandCoins className="size-4 text-muted-foreground" />
-              <p className="text-sm font-medium text-foreground">This year from closeouts</p>
-            </div>
-            <p className="text-3xl font-semibold tracking-tight text-foreground">
-              {formatCurrency(summary?.total_closeout_contributed ?? 0)}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {summary?.funds.length
-                ? `Across ${numberLabel(summary.funds.length, "fund")}`
-                : "No fund contributions from month closeouts yet."}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {fundFilterOptions.map((option) => (
-          <Button
-            key={option.value}
-            variant={filter === option.value ? "default" : "outline"}
-            className="rounded-full"
-            onClick={() => setFilter(option.value)}
-          >
-            {option.label}
-          </Button>
-        ))}
-        <Button className="sm:hidden rounded-full" onClick={() => {
-          setDialogMode("create")
-          setSelectedFund(null)
-          setIsDialogOpen(true)
-        }}>
-          <Plus className="size-4" />
-          New fund
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <Card className="border-0">
-          <CardContent className="flex items-center justify-center gap-3 pt-6">
-            <Spinner className="size-5" />
-            <span className="text-sm text-muted-foreground">Loading funds...</span>
-          </CardContent>
-        </Card>
-      ) : funds.length === 0 ? (
-        <Card className="border-0">
-          <CardContent className="space-y-3 pt-6">
-            <div className="flex items-center gap-3">
-              <FolderOpen className="size-5 text-muted-foreground" />
-              <p className="font-medium text-foreground">No funds here yet</p>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Create a fund for a goal, emergency cushion, debt payoff, or anything you want to reserve money for.
-            </p>
-            <Button className="w-full sm:w-auto" onClick={() => {
-              setDialogMode("create")
-              setSelectedFund(null)
-              setIsDialogOpen(true)
-            }}>
-              <Plus className="size-4" />
-              Create your first fund
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {funds.map((fund) => (
-            <Card key={fund.id} className="overflow-hidden border-0">
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-semibold tracking-tight text-foreground">{fund.name}</h2>
-                      <Badge variant="outline">{fundTypeLabel(fund.fund_type)}</Badge>
-                      {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {fund.target_month ? `Target ${formatMonthLabel(fund.target_month) ?? fund.target_month}` : "No target month"}
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    setDialogMode("edit")
-                    setSelectedFund(fund)
-                    setIsDialogOpen(true)
-                  }}>
-                    <Pencil className="size-4" />
-                    Edit
+          <section className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Your funds</p>
+                </div>
+                <Button className="sm:hidden rounded-full" onClick={() => {
+                  setDialogMode("create")
+                  setSelectedFund(null)
+                  setIsDialogOpen(true)
+                }}>
+                  <Plus className="size-4" />
+                  New fund
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {fundFilterOptions.map((option) => (
+                  <Button
+                    key={option.value}
+                    variant={filter === option.value ? "default" : "outline"}
+                    className="rounded-full"
+                    onClick={() => setFilter(option.value)}
+                  >
+                    {option.label}
                   </Button>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Saved</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{formatCurrency(fund.current_balance)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Goal</p>
-                    <p className="mt-2 text-lg font-semibold tracking-tight text-foreground">
-                      {fund.goal_amount ? formatCurrency(fund.goal_amount) : "Open-ended"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">Entries</p>
-                    <p className="mt-2 text-lg font-semibold tracking-tight text-foreground">{fund.entries_count}</p>
-                  </div>
-                </div>
+            {isLoading ? (
+              <FundsOverviewLoadingState />
+            ) : funds.length === 0 ? (
+              <FundsEmptyState
+                filter={filter}
+                onCreate={() => {
+                  setDialogMode("create")
+                  setSelectedFund(null)
+                  setIsDialogOpen(true)
+                }}
+              />
+            ) : (
+              <div className="space-y-4">
+                {funds.map((fund) => (
+                  <FundListCard
+                    key={fund.id}
+                    fund={fund}
+                    onEdit={() => {
+                      setDialogMode("edit")
+                      setSelectedFund(fund)
+                      setIsDialogOpen(true)
+                    }}
+                    onArchiveRestore={() =>
+                      void handleArchiveRestore(
+                        fund,
+                        fund.status === "active" ? "archive" : "restore",
+                        loadData,
+                        setError
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-                {fund.goal_amount ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">Funded</span>
-                      <span className="font-medium text-foreground">
-                        {Math.round(parseAmount(fund.percent_funded ?? "0"))}%
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted/70">
-                      <div className="h-full rounded-full bg-foreground/80" style={{ width: fundProgressWidth(fund.percent_funded) }} />
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild className="rounded-xl">
-                    <Link href={`/insights/funds/${fund.id}`}>Open fund</Link>
-                  </Button>
-                  {fund.status === "active" ? (
-                    <Button variant="outline" className="rounded-xl" onClick={() => void handleArchiveRestore(fund, "archive", loadData, setError)}>
-                      Archive
-                    </Button>
-                  ) : (
-                    <Button variant="outline" className="rounded-xl" onClick={() => void handleArchiveRestore(fund, "restore", loadData, setError)}>
-                      <RotateCcw className="size-4" />
-                      Restore
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <Card className="border-0 lg:hidden">
+            <CardContent className="space-y-3 pt-6">
+              <div className="flex items-center gap-2">
+                <HandCoins className="size-4 text-muted-foreground" />
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
+              </div>
+              <p className="text-2xl font-semibold tracking-tight text-foreground">
+                {formatCurrency(closeoutTotal)} this year
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {hasCloseoutContributions
+                  ? "Moved into funds from closed months."
+                  : "No contributions from month closeouts yet."}
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      )}
+
+        <aside className="hidden lg:block">
+          <FundsSidebar
+            totalBalance={totalBalance}
+            activeCount={activeFundMetrics.length}
+            totalGoals={totalGoals}
+            closeoutTotal={closeoutTotal}
+            summaryError={summaryError}
+          />
+        </aside>
+      </div>
 
       <FundDialog
         open={isDialogOpen}
@@ -509,6 +522,237 @@ export function FundsOverviewPage() {
         }}
       />
     </div>
+  )
+}
+
+function FundsOverviewLoadingState() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)]">
+      <Card className="border-0">
+        <CardContent className="space-y-5 pt-6">
+          <div className="h-6 w-40 rounded-full bg-muted/70" />
+          <div className="space-y-2">
+            <div className="h-10 w-32 rounded-full bg-muted/70" />
+            <div className="h-5 w-28 rounded-full bg-muted/60" />
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted/70" />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="h-5 w-32 rounded-full bg-muted/60" />
+            <div className="h-5 w-28 rounded-full bg-muted/60" />
+          </div>
+          <div className="h-5 w-36 rounded-full bg-muted/60" />
+        </CardContent>
+      </Card>
+      <Card className="hidden border-0 lg:block">
+        <CardContent className="space-y-4 pt-6">
+          <div className="h-4 w-24 rounded-full bg-muted/60" />
+          <div className="h-10 w-28 rounded-full bg-muted/70" />
+          <div className="h-px w-full bg-border/70" />
+          <div className="h-4 w-32 rounded-full bg-muted/60" />
+          <div className="h-4 w-36 rounded-full bg-muted/60" />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function FundsEmptyState({
+  filter,
+  onCreate,
+}: {
+  filter: FundsFilter
+  onCreate: () => void
+}) {
+  if (filter === "archived") {
+    return (
+      <Card className="border-0">
+        <CardContent className="space-y-3 pt-6">
+          <div className="flex items-center gap-3">
+            <FolderOpen className="size-5 text-muted-foreground" />
+            <p className="font-medium text-foreground">No archived funds</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="border-0">
+      <CardContent className="space-y-3 pt-6">
+        <div className="flex items-center gap-3">
+          <FolderOpen className="size-5 text-muted-foreground" />
+          <p className="font-medium text-foreground">No active funds yet</p>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Create a fund to start setting money aside for a goal, buffer, or future expense.
+        </p>
+        <Button className="w-full sm:w-auto" onClick={onCreate}>
+          <Plus className="size-4" />
+          New fund
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function FundsSidebar({
+  totalBalance,
+  activeCount,
+  totalGoals,
+  closeoutTotal,
+  summaryError,
+}: {
+  totalBalance: number
+  activeCount: number
+  totalGoals: number
+  closeoutTotal: string | number
+  summaryError: string | null
+}) {
+  const hasCloseoutContributions = hasPositiveAmount(closeoutTotal)
+
+  return (
+    <div className="space-y-6 pt-1">
+      <div className="space-y-3">
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">At a glance</p>
+        <div className="space-y-1">
+          <p className="text-xl font-semibold tracking-tight text-foreground">
+            {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {activeCountLabel(activeCount)} <span aria-hidden="true">·</span> {goalCountLabel(totalGoals)}
+          </p>
+        </div>
+      </div>
+
+      <div className="h-px bg-border/70" />
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <HandCoins className="size-4 text-muted-foreground" />
+          <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
+        </div>
+        <p className="text-xl font-semibold tracking-tight text-foreground">{formatCurrency(closeoutTotal)} this year</p>
+        <p className="text-sm text-muted-foreground">
+          {hasCloseoutContributions
+            ? "Moved into funds from closed months."
+            : "No contributions from month closeouts yet."}
+        </p>
+        {summaryError ? <p className="text-sm text-muted-foreground">{summaryError}</p> : null}
+      </div>
+    </div>
+  )
+}
+
+function FundListCard({
+  fund,
+  onEdit,
+  onArchiveRestore,
+}: {
+  fund: FundListItem
+  onEdit: () => void
+  onArchiveRestore: () => void
+}) {
+  const savedAmount = parseAmount(fund.current_balance)
+  const goalAmount = parseAmount(fund.goal_amount)
+  const hasGoal = goalAmount > 0
+  const percentFunded = Math.max(0, Math.min(Math.round(parseAmount(fund.percent_funded ?? "0")), 100))
+  const remainingAmount = Math.max(goalAmount - savedAmount, 0)
+  const targetLabel = fund.target_month ? formatMonthLabel(fund.target_month) ?? fund.target_month : null
+
+  return (
+    <Card className="overflow-hidden border border-border/50 shadow-sm transition-colors hover:border-border hover:bg-muted/20">
+      <CardContent className="relative p-5">
+        <div className="absolute right-5 top-4 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="rounded-full text-muted-foreground hover:text-foreground"
+                aria-label={`Fund actions for ${fund.name}`}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="size-4" />
+                Edit fund
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onArchiveRestore}>
+                {fund.status === "active" ? (
+                  <>
+                    <Trash2 className="size-4" />
+                    Archive fund
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="size-4" />
+                    Restore fund
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <Link
+          href={`/insights/funds/${fund.id}`}
+          aria-label={`Open ${fund.name}`}
+          className="block space-y-3.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <div className="pr-12">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">{fund.name}</h2>
+              <Badge variant="outline">{fundTypeLabel(fund.fund_type)}</Badge>
+              {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
+            </div>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(savedAmount)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {hasGoal ? `saved of ${formatCurrency(goalAmount)}` : "saved"}
+              </p>
+            </div>
+            {hasGoal ? (
+              <p className="pt-1 text-sm font-medium text-foreground">{percentFunded}%</p>
+            ) : null}
+          </div>
+
+          {hasGoal ? (
+            <div className="space-y-3">
+              <div
+                className="h-1.5 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-label={`${fund.name}: ${percentFunded} percent funded`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percentFunded}
+              >
+                <div className="h-full rounded-full bg-primary" style={{ width: fundProgressWidth(fund.percent_funded) }} />
+              </div>
+              <div className="space-y-1 text-sm">
+                <span className="font-medium text-foreground">
+                  {remainingAmount === 0 ? "Goal reached" : `${formatCurrency(remainingAmount)} remaining`}
+                </span>
+                {targetLabel ? <p className="text-muted-foreground">{`Target ${targetLabel}`}</p> : null}
+              </div>
+            </div>
+          ) : targetLabel ? (
+            <p className="text-sm text-muted-foreground">{`Target ${targetLabel}`}</p>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">{numberLabel(fund.entries_count, "contribution")}</span>
+            <span className="inline-flex size-7 items-center justify-center rounded-full text-muted-foreground" aria-hidden="true">
+              <ChevronRight className="size-4" />
+            </span>
+          </div>
+        </Link>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -969,11 +1213,9 @@ function FundDialog({
 
         <div className="grid gap-2">
           <Label htmlFor="fund-target-month">Target month</Label>
-          <Input
-            id="fund-target-month"
+          <FundTargetMonthPicker
             value={values.target_month}
-            onChange={(event) => setValues((current) => ({ ...current, target_month: event.target.value }))}
-            placeholder="YYYY-MM"
+            onChange={(target_month) => setValues((current) => ({ ...current, target_month }))}
           />
         </div>
 
@@ -989,6 +1231,115 @@ function FundDialog({
         </div>
       </div>
     </ResponsiveDialog>
+  )
+}
+
+function FundTargetMonthPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const currentMonth = getCurrentMonthKey()
+  const selectedMonth = value || currentMonth
+  const parsedMonth = parseMonthKey(selectedMonth) ?? parseMonthKey(currentMonth) ?? new Date()
+  const selectedYear = parsedMonth.getFullYear()
+  const [viewYear, setViewYear] = useState(selectedYear)
+  const selectedLabel = value ? formatMonthLabel(value) ?? value : "No target month"
+
+  useEffect(() => {
+    if (open) {
+      setViewYear(selectedYear)
+    }
+  }, [open, selectedYear])
+
+  const selectMonth = (monthIndex: number) => {
+    onChange(`${viewYear}-${String(monthIndex + 1).padStart(2, "0")}`)
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id="fund-target-month"
+          type="button"
+          variant="outline"
+          className="h-11 w-full justify-start rounded-xl border-border/60 px-3 font-normal hover:border-foreground/20"
+        >
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className={cn("truncate", !value && "text-muted-foreground")}>{selectedLabel}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(calc(100svw-2rem),24rem)] rounded-2xl p-4" align="start" avoidCollisions>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-10 rounded-full"
+              onClick={() => setViewYear((year) => year - 1)}
+              aria-label="Previous year"
+            >
+              <ChevronLeft className="size-5" />
+            </Button>
+            <p className="text-lg font-semibold text-foreground">{viewYear}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-10 rounded-full"
+              onClick={() => setViewYear((year) => year + 1)}
+              aria-label="Next year"
+            >
+              <ChevronRight className="size-5" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {monthPickerMonths.map((month, monthIndex) => {
+              const monthKey = `${viewYear}-${String(monthIndex + 1).padStart(2, "0")}`
+              const isSelected = value === monthKey
+              const isCurrent = currentMonth === monthKey
+
+              return (
+                <Button
+                  key={month}
+                  type="button"
+                  variant={isSelected ? "default" : "outline"}
+                  className={cn(
+                    "h-11 rounded-xl px-2 font-medium",
+                    !isSelected && "border-border/60 bg-background hover:bg-muted/30",
+                    isCurrent && !isSelected && "border-primary/40 text-foreground"
+                  )}
+                  aria-pressed={isSelected}
+                  onClick={() => selectMonth(monthIndex)}
+                >
+                  {month}
+                </Button>
+              )
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <p className="text-sm text-muted-foreground">
+              {value ? `Target ${formatMonthLabel(value) ?? value}` : "Optional goal timing"}
+            </p>
+            <div className="flex shrink-0 flex-wrap items-center gap-1">
+              <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => onChange(currentMonth)}>
+                This month
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="rounded-full" onClick={() => onChange("")}>
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
