@@ -65,19 +65,31 @@ GET /me/transactions?categories=savings
 The overview page shows:
 
 - total balance across active funds
-- active fund count
-- count of funds with goals
+- active fund state summary
 - yearly closeout contributions
 - filter chips for `active` and `archived`
 - per-fund cards with progress, target month, remaining amount, and contribution count
 
 Fund cards use full-card navigation to the fund detail route. Management actions stay secondary in the overflow menu, currently `Edit fund` plus archive or restore depending on fund status. Goal badges and progress UI are derived from `goal_amount`; open-ended Funds do not expose legacy type labels or goal placeholders.
 
+Active funds are grouped by frontend-derived presentation state, with no persisted lifecycle state:
+
+- no goal amount -> Open-ended
+- goal amount and balance at or below zero -> Not started
+- goal amount and balance between zero and the goal -> In progress
+- goal amount and balance at or above the goal -> Goal reached
+
+`Not started` and `In progress` funds render together under `In progress`, sorted by target month when present. `Open-ended` and `Goals reached` render as separate sections only when those states exist. Archived funds keep the existing archived view and are not grouped by presentation state.
+
+Goal reached is not the same as Archived. A reached goal remains active until the user explicitly archives it, and spending money below the goal automatically returns it to the in-progress presentation state.
+
 The overview sidebar is supporting context rather than a dashboard card. It presents compact active-fund totals and separates month-closeout context with a thin divider. Closeout copy is conditional: zero year-to-date closeout contributions says there are no closeout contributions yet, while non-zero totals say the money moved into funds from closed months.
 
 On mobile, `At a glance` is compact inline context instead of mirroring the desktop sidebar. Month Closeouts is also rendered as an inline section with a divider rather than a full card, and the page shell keeps explicit bottom padding so content clears the fixed bottom navigation.
 
-Create and edit fund dialogs no longer expose Fund Type. Create starts with name, optional starting balance, notes, and a lightweight `Add a savings goal` action. Enabling a goal reveals `Goal amount` and optional `Target month`; removing the goal clears both fields before submit. The target month picker uses app-native controls instead of free-form `YYYY-MM` typing.
+Create and edit fund dialogs no longer expose Fund Type. The form is goal-first: name, optional Savings Goal, optional Target Month, create-only Starting Balance, then optional Notes. Goal Amount is always visible and optional; blank or zero values create an open-ended Fund, while a positive value creates a goal Fund. Starting Balance is secondary and represents money already set aside before the Fund is created.
+
+Target Month belongs to the Savings Goal section. It is disabled until Goal Amount is positive, is cleared when Goal Amount is cleared, and is only sent when `goal_amount` exists. The target month picker uses app-native controls instead of free-form `YYYY-MM` typing.
 
 If no funds exist, the empty state drives the user into `Create fund`.
 

@@ -73,6 +73,13 @@ type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
 type EntryActionMode = "create" | "edit"
 type EntryIntent = "add" | "use"
+type FundPresentationState = "open_ended" | "not_started" | "in_progress" | "goal_reached"
+
+interface FundGroup {
+  key: string
+  label: string
+  funds: FundListItem[]
+}
 
 const fundFilterOptions: Array<{ value: FundsFilter; label: string }> = [
   { value: "active", label: "Active" },
@@ -118,8 +125,120 @@ function parseAmount(value: string | null | undefined): number {
   return Number.isFinite(amount) ? amount : 0
 }
 
+function moneyToCents(value: string | number | null | undefined): number {
+  const normalized = String(value ?? "0").trim().replace(/[$,]/g, "")
+  const match = normalized.match(/^(-)?(\d+)(?:\.(\d{0,2})\d*)?$/)
+
+  if (!match) {
+    return 0
+  }
+
+  const sign = match[1] ? -1 : 1
+  const dollars = Number.parseInt(match[2] ?? "0", 10)
+  const cents = Number.parseInt((match[3] ?? "").padEnd(2, "0"), 10)
+
+  return sign * (dollars * 100 + cents)
+}
+
 function numberLabel(value: number, singular: string, plural = `${singular}s`): string {
   return `${value} ${value === 1 ? singular : plural}`
+}
+
+function stateCountLabel(value: number, singular: string, plural = `${singular}s`): string | null {
+  return value > 0 ? numberLabel(value, singular, plural) : null
+}
+
+function getFundPresentationState(fund: FundListItem): FundPresentationState {
+  if (fund.goal_amount === null) {
+    return "open_ended"
+  }
+
+  const balanceCents = moneyToCents(fund.current_balance)
+  const goalCents = moneyToCents(fund.goal_amount)
+
+  if (balanceCents <= 0) {
+    return "not_started"
+  }
+
+  if (balanceCents >= goalCents) {
+    return "goal_reached"
+  }
+
+  return "in_progress"
+}
+
+function sortWorkingFunds(funds: FundListItem[]): FundListItem[] {
+  return funds
+    .map((fund, index) => ({ fund, index }))
+    .sort((left, right) => {
+      const leftTarget = left.fund.target_month
+      const rightTarget = right.fund.target_month
+
+      if (leftTarget && rightTarget && leftTarget !== rightTarget) {
+        return leftTarget.localeCompare(rightTarget)
+      }
+
+      if (leftTarget && !rightTarget) {
+        return -1
+      }
+
+      if (!leftTarget && rightTarget) {
+        return 1
+      }
+
+      return left.index - right.index
+    })
+    .map(({ fund }) => fund)
+}
+
+function groupActiveFunds(funds: FundListItem[]): FundGroup[] {
+  const workingTowardGoals: FundListItem[] = []
+  const openEnded: FundListItem[] = []
+  const goalsReached: FundListItem[] = []
+
+  funds.forEach((fund) => {
+    const state = getFundPresentationState(fund)
+
+    if (state === "open_ended") {
+      openEnded.push(fund)
+    } else if (state === "goal_reached") {
+      goalsReached.push(fund)
+    } else {
+      workingTowardGoals.push(fund)
+    }
+  })
+
+  return [
+    { key: "in_progress", label: "In progress", funds: sortWorkingFunds(workingTowardGoals) },
+    { key: "open_ended", label: "Open-ended", funds: openEnded },
+    { key: "goal_reached", label: "Goals reached", funds: goalsReached },
+  ].filter((group) => group.funds.length > 0)
+}
+
+function activeFundStateSummary(funds: FundListItem[]): string {
+  const counts = funds.reduce(
+    (result, fund) => {
+      const state = getFundPresentationState(fund)
+
+      if (state === "open_ended") {
+        result.openEnded += 1
+      } else if (state === "goal_reached") {
+        result.goalsReached += 1
+      } else {
+        result.inProgress += 1
+      }
+
+      return result
+    },
+    { inProgress: 0, openEnded: 0, goalsReached: 0 }
+  )
+  const labels = [
+    stateCountLabel(counts.inProgress, "in progress", "in progress"),
+    stateCountLabel(counts.openEnded, "ongoing", "ongoing"),
+    stateCountLabel(counts.goalsReached, "goal reached", "goals reached"),
+  ].filter((label): label is string => Boolean(label))
+
+  return labels.length > 0 ? labels.join(" · ") : "0 active"
 }
 
 function entryTypeLabel(entry: FundEntry): string {
@@ -145,14 +264,6 @@ function fundProgressWidth(percent: string | null): string {
 
 function hasPositiveAmount(value: string | number | null | undefined): boolean {
   return parseAmount(String(value ?? "")) > 0
-}
-
-function activeCountLabel(value: number): string {
-  return `${value} active`
-}
-
-function goalCountLabel(value: number): string {
-  return `${value} ${value === 1 ? "goal" : "goals"}`
 }
 
 function canEditEntry(entry: FundEntry): boolean {
@@ -216,7 +327,6 @@ function buildEntryPayload(values: EntryFormState, intent: EntryIntent): CreateF
 
 interface FundFormState {
   name: string
-  goal_enabled: boolean
   goal_amount: string
   target_month: string
   notes: string
@@ -240,7 +350,6 @@ interface EntryFormState {
 function getDefaultFundFormState(): FundFormState {
   return {
     name: "",
-    goal_enabled: false,
     goal_amount: "",
     target_month: "",
     notes: "",
@@ -255,7 +364,6 @@ function getFundFormState(fund?: FundListItem | FundDetail | null): FundFormStat
 
   return {
     name: fund.name,
-    goal_enabled: fund.goal_amount !== null,
     goal_amount: fund.goal_amount ?? "",
     target_month: fund.target_month ?? "",
     notes: fund.notes ?? "",
@@ -370,9 +478,10 @@ export function FundsOverviewPage() {
   }, [searchParams])
 
   const totalBalance = activeFundMetrics.reduce((sum, fund) => sum + parseAmount(fund.current_balance), 0)
-  const totalGoals = activeFundMetrics.filter((fund) => fund.goal_amount !== null).length
+  const activeSummaryLabel = activeFundStateSummary(activeFundMetrics)
   const closeoutTotal = summary?.total_closeout_contributed ?? 0
   const hasCloseoutContributions = hasPositiveAmount(closeoutTotal)
+  const fundGroups = filter === "active" ? groupActiveFunds(funds) : [{ key: "archived", label: "Archived funds", funds }]
 
   return renderFundShell(
     <div className="space-y-5 lg:space-y-8">
@@ -411,9 +520,7 @@ export function FundsOverviewPage() {
             <p className="text-lg font-semibold tracking-tight text-foreground">
               {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
             </p>
-            <p className="text-sm text-muted-foreground">
-              {activeCountLabel(activeFundMetrics.length)} <span aria-hidden="true">·</span> {goalCountLabel(totalGoals)}
-            </p>
+            <p className="text-sm text-muted-foreground">{activeSummaryLabel}</p>
           </div>
 
           <section className="space-y-4">
@@ -457,25 +564,29 @@ export function FundsOverviewPage() {
                 }}
               />
             ) : (
-              <div className="space-y-3.5 lg:space-y-4">
-                {funds.map((fund) => (
-                  <FundListCard
-                    key={fund.id}
-                    fund={fund}
-                    onEdit={() => {
-                      setDialogMode("edit")
-                      setSelectedFund(fund)
-                      setIsDialogOpen(true)
-                    }}
-                    onArchiveRestore={() =>
-                      void handleArchiveRestore(
-                        fund,
-                        fund.status === "active" ? "archive" : "restore",
-                        loadData,
-                        setError
-                      )
-                    }
-                  />
+              <div className="space-y-6 lg:space-y-7">
+                {fundGroups.map((group) => (
+                  <FundCollectionSection key={group.key} label={group.label}>
+                    {group.funds.map((fund) => (
+                      <FundListCard
+                        key={fund.id}
+                        fund={fund}
+                        onEdit={() => {
+                          setDialogMode("edit")
+                          setSelectedFund(fund)
+                          setIsDialogOpen(true)
+                        }}
+                        onArchiveRestore={() =>
+                          void handleArchiveRestore(
+                            fund,
+                            fund.status === "active" ? "archive" : "restore",
+                            loadData,
+                            setError
+                          )
+                        }
+                      />
+                    ))}
+                  </FundCollectionSection>
                 ))}
               </div>
             )}
@@ -500,8 +611,7 @@ export function FundsOverviewPage() {
         <aside className="hidden lg:block">
           <FundsSidebar
             totalBalance={totalBalance}
-            activeCount={activeFundMetrics.length}
-            totalGoals={totalGoals}
+            activeSummaryLabel={activeSummaryLabel}
             closeoutTotal={closeoutTotal}
             summaryError={summaryError}
           />
@@ -593,16 +703,23 @@ function FundsEmptyState({
   )
 }
 
+function FundCollectionSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+      <div className="space-y-3 lg:space-y-3.5">{children}</div>
+    </section>
+  )
+}
+
 function FundsSidebar({
   totalBalance,
-  activeCount,
-  totalGoals,
+  activeSummaryLabel,
   closeoutTotal,
   summaryError,
 }: {
   totalBalance: number
-  activeCount: number
-  totalGoals: number
+  activeSummaryLabel: string
   closeoutTotal: string | number
   summaryError: string | null
 }) {
@@ -616,9 +733,7 @@ function FundsSidebar({
           <p className="text-xl font-semibold tracking-tight text-foreground">
             {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
           </p>
-          <p className="text-sm text-muted-foreground">
-            {activeCountLabel(activeCount)} <span aria-hidden="true">·</span> {goalCountLabel(totalGoals)}
-          </p>
+          <p className="text-sm text-muted-foreground">{activeSummaryLabel}</p>
         </div>
       </div>
 
@@ -653,13 +768,16 @@ function FundListCard({
   const savedAmount = parseAmount(fund.current_balance)
   const goalAmount = parseAmount(fund.goal_amount)
   const hasGoal = goalAmount > 0
+  const presentationState = getFundPresentationState(fund)
+  const isNotStarted = presentationState === "not_started"
+  const isGoalReached = presentationState === "goal_reached"
   const percentFunded = Math.max(0, Math.min(Math.round(parseAmount(fund.percent_funded ?? "0")), 100))
   const remainingAmount = Math.max(goalAmount - savedAmount, 0)
   const targetLabel = fund.target_month ? formatMonthLabel(fund.target_month) ?? fund.target_month : null
 
   return (
     <Card className="overflow-hidden border border-border/50 shadow-sm transition-colors hover:border-border hover:bg-muted/20">
-      <CardContent className="relative p-4 lg:p-5">
+      <CardContent className="relative p-3.5 lg:p-4">
         <div className="absolute right-4 top-3 z-10 lg:right-5 lg:top-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -697,12 +815,12 @@ function FundListCard({
         <Link
           href={`/insights/funds/${fund.id}`}
           aria-label={`Open ${fund.name}`}
-          className="block space-y-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:space-y-3.5"
+          className="block space-y-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:space-y-3"
         >
           <div className="pr-12">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold tracking-tight text-foreground">{fund.name}</h2>
-              {hasGoal ? <Badge variant="outline">Goal</Badge> : null}
+              {isGoalReached ? <Badge variant="outline">Goal reached</Badge> : hasGoal ? <Badge variant="outline">Goal</Badge> : null}
               {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
             </div>
           </div>
@@ -711,16 +829,18 @@ function FundListCard({
             <div>
               <p className="text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">{formatCurrency(savedAmount)}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {hasGoal ? `saved of ${formatCurrency(goalAmount)}` : "saved"}
+                {isGoalReached ? `Goal ${formatCurrency(goalAmount)}` : hasGoal ? `of ${formatCurrency(goalAmount)} goal` : "saved"}
               </p>
             </div>
             {hasGoal ? (
-              <p className="pt-1 text-sm font-medium text-foreground">{percentFunded}%</p>
+              <p className="pt-1 text-sm font-medium text-foreground">
+                {isGoalReached ? "Goal reached" : isNotStarted ? "Not started" : `${percentFunded}%`}
+              </p>
             ) : null}
           </div>
 
           {hasGoal ? (
-            <div className="space-y-2.5 lg:space-y-3">
+            <div className="space-y-2 lg:space-y-2.5">
               <div
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
                 role="progressbar"
@@ -731,15 +851,13 @@ function FundListCard({
               >
                 <div className="h-full rounded-full bg-primary" style={{ width: fundProgressWidth(fund.percent_funded) }} />
               </div>
-              <div className="space-y-0.5 text-sm lg:space-y-1">
-                <span className="font-medium text-foreground">
-                  {remainingAmount === 0 ? "Goal reached" : `${formatCurrency(remainingAmount)} remaining`}
-                </span>
-                {targetLabel ? <p className="text-muted-foreground">{`Target ${targetLabel}`}</p> : null}
-              </div>
+              {isGoalReached ? null : (
+                <div className="space-y-0.5 text-sm">
+                  <span className="font-medium text-foreground">{`${formatCurrency(remainingAmount)} remaining`}</span>
+                  {targetLabel ? <p className="text-muted-foreground">{`Target ${targetLabel}`}</p> : null}
+                </div>
+              )}
             </div>
-          ) : targetLabel ? (
-            <p className="text-sm text-muted-foreground">{`Target ${targetLabel}`}</p>
           ) : null}
 
           <div className="flex items-center justify-between gap-3 text-sm">
@@ -1140,13 +1258,15 @@ function FundDialog({
       return
     }
 
-    if (values.goal_enabled && parseAmount(values.goal_amount) <= 0) {
-      setError("Enter a goal amount or remove the savings goal.")
+    const goalAmountValue = parseAmount(values.goal_amount)
+
+    if (goalAmountValue < 0) {
+      setError("Goal amount cannot be negative.")
       return
     }
 
-    const goalAmount = values.goal_enabled ? values.goal_amount : null
-    const targetMonth = values.goal_enabled ? values.target_month || null : null
+    const goalAmount = goalAmountValue > 0 ? values.goal_amount : null
+    const targetMonth = goalAmount ? values.target_month || null : null
 
     const payload: CreateFundRequest | UpdateFundRequest = {
       name: values.name.trim(),
@@ -1204,78 +1324,69 @@ function FundDialog({
           />
         </div>
 
-        {mode === "create" ? (
+        <div className="grid gap-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Savings goal</p>
+            <span className="text-xs text-muted-foreground">Optional</span>
+          </div>
+
           <div className="grid gap-2">
             <AmountInput
-              id="fund-starting-balance"
-              name="fund-starting-balance"
-              value={values.starting_balance}
-              onValueChange={(starting_balance) => setValues((current) => ({ ...current, starting_balance }))}
-              label="Starting balance"
+              id="fund-goal"
+              name="fund-goal"
+              value={values.goal_amount}
+              onValueChange={(goal_amount) =>
+                setValues((current) => ({
+                  ...current,
+                  goal_amount,
+                  target_month: parseAmount(goal_amount) > 0 ? current.target_month : "",
+                }))
+              }
+              label="Goal amount"
             />
-            <p className="text-sm text-muted-foreground">Money you've already set aside.</p>
+            <p className="text-sm text-muted-foreground">How much do you want to save?</p>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <Label htmlFor="fund-target-month">Target month</Label>
+              <span className="text-xs text-muted-foreground">Optional</span>
+            </div>
+            <FundTargetMonthPicker
+              value={values.target_month}
+              disabled={parseAmount(values.goal_amount) <= 0}
+              onChange={(target_month) => setValues((current) => ({ ...current, target_month }))}
+            />
+            {parseAmount(values.goal_amount) <= 0 ? (
+              <p className="text-sm text-muted-foreground">Add a goal amount before choosing a target month.</p>
+            ) : null}
+          </div>
+        </div>
+
+        {mode === "create" ? (
+          <div className="grid gap-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Starting balance</p>
+              <span className="text-xs text-muted-foreground">Optional</span>
+            </div>
+            <div className="grid gap-2">
+              <AmountInput
+                id="fund-starting-balance"
+                name="fund-starting-balance"
+                value={values.starting_balance}
+                onValueChange={(starting_balance) => setValues((current) => ({ ...current, starting_balance }))}
+                label="Starting balance"
+              />
+              <p className="text-sm text-muted-foreground">Money you've already set aside.</p>
+            </div>
           </div>
         ) : null}
 
-        <div className="grid gap-3">
-          {values.goal_enabled ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Goal</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="rounded-full text-muted-foreground"
-                onClick={() =>
-                  setValues((current) => ({
-                    ...current,
-                    goal_enabled: false,
-                    goal_amount: "",
-                    target_month: "",
-                  }))
-                }
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 justify-start rounded-xl border-border/60"
-              onClick={() => setValues((current) => ({ ...current, goal_enabled: true }))}
-            >
-              <Plus className="size-4" />
-              Add a savings goal
-            </Button>
-          )}
-
-          {values.goal_enabled ? (
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <AmountInput
-                  id="fund-goal"
-                  name="fund-goal"
-                  value={values.goal_amount}
-                  onValueChange={(goal_amount) => setValues((current) => ({ ...current, goal_amount }))}
-                  label="Goal amount"
-                />
-                <p className="text-sm text-muted-foreground">How much do you want to save?</p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="fund-target-month">Target month</Label>
-                <FundTargetMonthPicker
-                  value={values.target_month}
-                  onChange={(target_month) => setValues((current) => ({ ...current, target_month }))}
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
-
         <div className="grid gap-2">
-          <Label htmlFor="fund-notes">Notes</Label>
+          <div className="flex items-baseline justify-between gap-3">
+            <Label htmlFor="fund-notes">Notes</Label>
+            <span className="text-xs text-muted-foreground">Optional</span>
+          </div>
           <Textarea
             id="fund-notes"
             rows={3}
@@ -1291,9 +1402,11 @@ function FundDialog({
 
 function FundTargetMonthPicker({
   value,
+  disabled = false,
   onChange,
 }: {
   value: string
+  disabled?: boolean
   onChange: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -1310,7 +1423,17 @@ function FundTargetMonthPicker({
     }
   }, [open, selectedYear])
 
+  useEffect(() => {
+    if (disabled && value) {
+      onChange("")
+    }
+  }, [disabled, onChange, value])
+
   const selectMonth = (monthIndex: number) => {
+    if (disabled) {
+      return
+    }
+
     onChange(`${viewYear}-${String(monthIndex + 1).padStart(2, "0")}`)
     setOpen(false)
   }
@@ -1322,6 +1445,7 @@ function FundTargetMonthPicker({
           id="fund-target-month"
           type="button"
           variant="outline"
+          disabled={disabled}
           className="h-11 w-full justify-start rounded-xl border-border/60 px-3 font-normal hover:border-foreground/20"
         >
           <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
