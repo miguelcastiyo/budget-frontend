@@ -5,16 +5,14 @@ import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
-  ArrowUpRight,
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  Coins,
   FolderOpen,
   HandCoins,
+  Minus,
   MoreHorizontal,
   Pencil,
-  PiggyBank,
   Plus,
   RotateCcw,
   Trash2,
@@ -161,6 +159,25 @@ function canEditEntry(entry: FundEntry): boolean {
   return entry.source_type === "manual" || entry.source_type === "starting_balance" || entry.source_type === "correction"
 }
 
+function buildBalanceBreakdownRows(fund: FundDetail, entries: FundEntry[]) {
+  const manualContributionTotal = entries
+    .filter((entry) => entry.source_type === "manual" && entry.direction === "in")
+    .reduce((sum, entry) => sum + parseAmount(entry.amount), 0)
+  const linkedContributionTotal = parseAmount(fund.source_breakdown.transaction)
+  const contributionTotal = manualContributionTotal + linkedContributionTotal
+  const withdrawalTotal = entries
+    .filter((entry) => entry.direction === "out")
+    .reduce((sum, entry) => sum + parseAmount(entry.amount), 0)
+
+  return [
+    { label: "Starting balance", amount: parseAmount(fund.source_breakdown.starting_balance) },
+    { label: "Contributions", amount: contributionTotal },
+    { label: "Withdrawals", amount: -withdrawalTotal },
+    { label: "Month closeouts", amount: parseAmount(fund.source_breakdown.month_closeout) },
+    { label: "Corrections", amount: parseAmount(fund.source_breakdown.correction) },
+  ].filter((row) => row.amount !== 0)
+}
+
 function startOfCurrentMonth(): string {
   const range = getMonthDateRange(getCurrentMonthKey())
   return range?.date_from ?? toIsoDate(new Date())
@@ -269,7 +286,7 @@ function renderFundShell(children: React.ReactNode) {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
-      <main className="max-w-lg lg:max-w-6xl mx-auto px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-8 lg:pb-0 pt-standalone-safe-top">
+      <main className="mx-auto max-w-lg px-5 pb-[calc(var(--bottom-nav-height)+var(--bottom-nav-page-gap)+env(safe-area-inset-bottom,0px)+3rem)] pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pb-0">
         {children}
       </main>
       <BottomNav />
@@ -787,6 +804,15 @@ export function FundDetailPage() {
     void loadData()
   }, [loadData])
 
+  const savedAmount = fund ? parseAmount(fund.current_balance) : 0
+  const goalAmount = fund ? parseAmount(fund.goal_amount) : 0
+  const hasGoal = goalAmount > 0
+  const percentFunded = fund ? Math.max(0, Math.min(Math.round(parseAmount(fund.percent_funded ?? "0")), 100)) : 0
+  const remainingAmount = fund ? Math.max(goalAmount - savedAmount, 0) : 0
+  const targetLabel = fund?.target_month ? formatMonthLabel(fund.target_month) ?? fund.target_month : null
+  const notesPreview = fund?.notes?.trim()
+  const balanceBreakdownRows = fund ? buildBalanceBreakdownRows(fund, entries) : []
+
   return renderFundShell(
     <div className="space-y-6 lg:space-y-8">
       <div className="flex items-center gap-3">
@@ -824,59 +850,90 @@ export function FundDetailPage() {
             </Card>
           ) : null}
 
-          <Card className="overflow-hidden border-0 bg-[linear-gradient(135deg,rgba(245,238,228,0.92),rgba(255,255,255,0.99))]">
-            <CardContent className="space-y-5 pt-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+          <Card className="overflow-hidden border border-border/40 bg-card [background-image:radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_42%),linear-gradient(135deg,var(--card),var(--secondary))]">
+            <CardContent className="space-y-5 p-5 lg:space-y-6 lg:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-3xl font-semibold tracking-tight text-foreground">{fund.name}</h1>
-                    {fund.goal_amount ? <Badge variant="outline">Goal</Badge> : null}
+                    <h1 className="text-3xl font-semibold tracking-tight text-foreground lg:text-4xl">{fund.name}</h1>
+                    {hasGoal ? <Badge variant="outline">Goal</Badge> : null}
                     {fund.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
                   </div>
-                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                    {fund.notes?.trim() || "Dedicated money tracked through one shared ledger."}
-                  </p>
+                  {notesPreview ? <p className="max-w-2xl text-sm text-muted-foreground">{notesPreview}</p> : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => setFundDialogOpen(true)}>
-                    <Pencil className="size-4" />
-                    Edit fund
-                  </Button>
-                  {fund.status === "active" ? (
-                    <Button variant="outline" onClick={() => void handleArchiveRestore(fund, "archive", loadData, setError)}>
-                      Archive
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="-mr-2 rounded-full text-muted-foreground hover:text-foreground"
+                      aria-label={`Fund actions for ${fund.name}`}
+                    >
+                      <MoreHorizontal className="size-5" />
                     </Button>
-                  ) : (
-                    <Button variant="outline" onClick={() => void handleArchiveRestore(fund, "restore", loadData, setError)}>
-                      <RotateCcw className="size-4" />
-                      Restore
-                    </Button>
-                  )}
-                </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-xl">
+                    <DropdownMenuItem onClick={() => setFundDialogOpen(true)}>
+                      <Pencil className="size-4" />
+                      Edit fund
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => void handleArchiveRestore(fund, fund.status === "active" ? "archive" : "restore", loadData, setError)}
+                    >
+                      {fund.status === "active" ? (
+                        <>
+                          <Trash2 className="size-4" />
+                          Archive fund
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="size-4" />
+                          Restore fund
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
-              <div className={cn("grid gap-4", fund.goal_amount ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
-                <DetailStat label="Saved" value={formatCurrency(fund.current_balance)} />
-                <DetailStat label="Goal" value={fund.goal_amount ? formatCurrency(fund.goal_amount) : "Open-ended"} />
-                {fund.goal_amount ? (
-                  <DetailStat label="Remaining" value={formatCurrency(fund.remaining_amount ?? 0)} />
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-4xl font-semibold tracking-tight text-foreground lg:text-5xl">
+                      {formatCurrency(savedAmount)} <span className="text-base font-medium tracking-normal text-muted-foreground">saved</span>
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {hasGoal ? `of ${formatCurrency(goalAmount)} goal` : "No fixed goal"}
+                    </p>
+                  </div>
+                  {hasGoal ? <p className="pt-2 text-lg font-semibold text-foreground">{percentFunded}%</p> : null}
+                </div>
+
+                {hasGoal ? (
+                  <div className="space-y-3">
+                    <div
+                      className="h-2 overflow-hidden rounded-full bg-muted/70"
+                      role="progressbar"
+                      aria-label={`${fund.name}: ${percentFunded} percent funded`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={percentFunded}
+                    >
+                      <div className="h-full rounded-full bg-foreground/80" style={{ width: fundProgressWidth(fund.percent_funded) }} />
+                    </div>
+                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-medium text-foreground">
+                        {remainingAmount === 0 ? "Goal reached" : `${formatCurrency(remainingAmount)} remaining`}
+                      </span>
+                      {targetLabel ? <span className="text-muted-foreground">{`Target ${targetLabel}`}</span> : null}
+                    </div>
+                  </div>
                 ) : null}
               </div>
 
-              {fund.goal_amount ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-muted-foreground">Goal progress</span>
-                    <span className="font-medium text-foreground">{Math.round(parseAmount(fund.percent_funded ?? "0"))}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted/70">
-                    <div className="h-full rounded-full bg-foreground/80" style={{ width: fundProgressWidth(fund.percent_funded) }} />
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <Button
+                  className="h-12 rounded-full"
                   disabled={fund.status !== "active"}
                   onClick={() => {
                     setEntryDialogMode("create")
@@ -889,6 +946,7 @@ export function FundDetailPage() {
                   Add money
                 </Button>
                 <Button
+                  className="h-12 rounded-full"
                   variant="outline"
                   disabled={fund.status !== "active"}
                   onClick={() => {
@@ -898,109 +956,98 @@ export function FundDetailPage() {
                     setEntryDialogOpen(true)
                   }}
                 >
-                  <ArrowUpRight className="size-4" />
+                  <Minus className="size-4" />
                   Use money
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <Card className="border-0">
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-center gap-2">
-                  <PiggyBank className="size-4 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">Where the balance came from</p>
-                </div>
-                <SourceBreakdownRow label="Month closeouts" amount={fund.source_breakdown.month_closeout} />
-                <SourceBreakdownRow label="Savings transactions" amount={fund.source_breakdown.transaction} />
-                <SourceBreakdownRow label="Manual fund moves" amount={fund.source_breakdown.manual} />
-                <SourceBreakdownRow label="Starting balance" amount={fund.source_breakdown.starting_balance} />
-                <SourceBreakdownRow label="Corrections" amount={fund.source_breakdown.correction} />
-              </CardContent>
-            </Card>
-
-            <Card className="border-0">
-              <CardContent className="space-y-4 pt-6">
-                <div className="flex items-center gap-2">
-                  <Coins className="size-4 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">Closeout summary</p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Contributions from month closeouts are included in this balance and appear here as normal ledger entries.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{numberLabel(fund.entries_count, "entry")}</Badge>
-                  {fund.goal_amount && fund.target_month ? <Badge variant="outline">Target {formatMonthLabel(fund.target_month) ?? fund.target_month}</Badge> : null}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="border-0">
-            <CardContent className="space-y-4 pt-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Ledger</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Every contribution, withdrawal, and closeout-linked move.</p>
-                </div>
+          <Card className="border-0 bg-transparent shadow-none lg:bg-card lg:shadow-sm">
+            <CardContent className="space-y-3 px-0 pt-0 lg:p-6">
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Balance breakdown</p>
+              <div className="divide-y divide-border/70 rounded-3xl border border-border/60 bg-card lg:rounded-2xl">
+                {balanceBreakdownRows.map((row) => (
+                  <SourceBreakdownRow key={row.label} label={row.label} amount={row.amount} />
+                ))}
+                <SourceBreakdownRow label="Current balance" amount={savedAmount} emphasis />
               </div>
-
-              {entries.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center">
-                  <p className="font-medium text-foreground">No entries yet</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Add money to start tracking progress.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {entries.map((entry) => (
-                    <div key={entry.id} className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium text-foreground">{entryTypeLabel(entry)}</p>
-                            <Badge variant="outline">{entry.direction === "in" ? "In" : "Out"}</Badge>
-                            {entry.source_month ? <Badge variant="outline">{formatMonthLabel(entry.source_month) ?? entry.source_month}</Badge> : null}
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {formatDateTimeValue(entry.entry_date, { month: "short", day: "numeric", year: "numeric" })}
-                          </p>
-                          {entry.note ? <p className="mt-2 text-sm text-muted-foreground">{entry.note}</p> : null}
-                        </div>
-                        <div className="flex flex-col items-start gap-2 sm:items-end">
-                          <p className={cn("text-lg font-semibold tracking-tight", entry.direction === "in" ? "text-emerald-700" : "text-foreground")}>
-                            {entry.direction === "in" ? "+" : "-"}
-                            {formatCurrency(entry.amount)}
-                          </p>
-                          {canEditEntry(entry) ? (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedEntry(entry)
-                                  setEntryDialogMode("edit")
-                                  setEntryIntent(entry.direction === "out" ? "use" : "add")
-                                  setEntryDialogOpen(true)
-                                }}
-                              >
-                                <Pencil className="size-4" />
-                                Edit
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(entry)}>
-                                <Trash2 className="size-4" />
-                                Delete
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </CardContent>
           </Card>
+
+          <section className="space-y-4 lg:rounded-3xl lg:bg-card lg:p-6 lg:shadow-sm">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Ledger</p>
+                <span className="text-sm text-muted-foreground">{numberLabel(fund.entries_count, "entry")}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">Every contribution and withdrawal from this fund.</p>
+            </div>
+
+            {entries.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center">
+                <p className="font-medium text-foreground">No entries yet</p>
+                <p className="mt-2 text-sm text-muted-foreground">Add money to start tracking progress.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/70">
+                {entries.map((entry) => (
+                  <div key={entry.id} className="flex items-center gap-3 py-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate font-medium text-foreground">{entry.note?.trim() || entryTypeLabel(entry)}</p>
+                        {entry.source_month ? (
+                          <Badge variant="outline" className="shrink-0">
+                            {formatMonthLabel(entry.source_month) ?? entry.source_month}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {formatDateTimeValue(entry.entry_date, { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <p className={cn("text-base font-semibold tracking-tight", entry.direction === "in" ? "text-success" : "text-foreground")}>
+                        {entry.direction === "in" ? "+" : "-"}
+                        {formatCurrency(entry.amount)}
+                      </p>
+                      {canEditEntry(entry) ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="rounded-full text-muted-foreground hover:text-foreground"
+                              aria-label={`Entry actions for ${entryTypeLabel(entry)}`}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedEntry(entry)
+                                setEntryDialogMode("edit")
+                                setEntryIntent(entry.direction === "out" ? "use" : "add")
+                                setEntryDialogOpen(true)
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                              Edit entry
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setDeleteTarget(entry)}>
+                              <Trash2 className="size-4" />
+                              Delete entry
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           <FundDialog
             open={fundDialogOpen}
@@ -1049,20 +1096,16 @@ export function FundDetailPage() {
   )
 }
 
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-    </div>
-  )
-}
+function SourceBreakdownRow({ label, amount, emphasis = false }: { label: string; amount: number; emphasis?: boolean }) {
+  const isNegative = amount < 0
 
-function SourceBreakdownRow({ label, amount }: { label: string; amount: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground">{formatCurrency(amount)}</span>
+    <div className={cn("flex items-center justify-between gap-3 px-4 py-3", emphasis ? "bg-muted/30" : null)}>
+      <span className={cn("text-sm", emphasis ? "font-medium text-foreground" : "text-muted-foreground")}>{label}</span>
+      <span className="font-medium text-foreground">
+        {isNegative ? "-" : ""}
+        {formatCurrency(Math.abs(amount))}
+      </span>
     </div>
   )
 }

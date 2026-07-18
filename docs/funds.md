@@ -85,14 +85,21 @@ If no funds exist, the empty state drives the user into `Create fund`.
 
 The detail page shows:
 
-- saved balance
-- goal and remaining amount
-- goal progress bar when a goal amount exists
-- source breakdown across closeouts, savings transactions, manual entries, starting balance, and corrections
-- full ledger list
 - `Add money` and `Use money` actions for active funds
+- a strong fund summary card with name, optional `Goal` badge, optional notes preview, saved balance, and primary actions
+- goal amount, progress, remaining amount, and target month only when `goal_amount` exists
+- a balance breakdown section with non-zero source totals and an explicit current balance row
+- a full, flattened ledger list as the primary activity history
 
-Editable ledger actions are intentionally limited to manual, starting-balance, and correction entries. Transaction-linked and closeout-linked entries stay source-of-truth driven.
+Fund management actions are secondary and live in the summary overflow menu: `Edit fund` plus archive or restore depending on status. Open-ended funds do not show a goal badge, goal placeholder, progress bar, remaining amount, or target month.
+
+The previous standalone Closeout Summary card was removed. Closeout totals now appear only as part of Balance Breakdown and closeout-linked activity appears in the ledger.
+
+Balance Breakdown uses derived source totals with user-facing labels: Starting balance, Contributions, Withdrawals, Month closeouts, Corrections, and Current balance. Zero-value source rows are hidden by default, and the ledger entry count does not appear in this section.
+
+Ledger entries render as flat rows directly on the page background on mobile, with subtle dividers instead of nested cards. The Ledger heading owns the entry count and uses compact helper text. Editable ledger actions are intentionally limited to manual, starting-balance, and correction entries and are exposed through each row's overflow menu. Transaction-linked and closeout-linked entries stay source-of-truth driven and do not expose edit/delete actions from the fund detail screen.
+
+The Funds shell uses bottom-navigation-safe page padding on mobile so the Ledger heading, rows, row overflow menus, and final content can scroll fully above the fixed bottom navigation and safe-area inset.
 
 ## Entry Flows
 
