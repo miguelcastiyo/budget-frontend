@@ -342,8 +342,7 @@ export default function BudgetSettingsPage() {
         </div>
       </header>
 
-      {/* Extra mobile bottom padding keeps the final card scrollable above the fixed nav and iOS home indicator. */}
-      <main className="mx-auto max-w-lg space-y-3 px-4 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-3 sm:space-y-4 sm:px-5 sm:pt-5 lg:max-w-6xl lg:px-8 lg:pb-0 lg:pt-8">
+      <main className="mx-auto max-w-lg space-y-3 px-4 pt-3 sm:space-y-4 sm:px-5 sm:pt-5 lg:max-w-6xl lg:px-8 lg:pb-0 lg:pt-8">
         {budgetError && <p className="text-sm text-destructive">{budgetError}</p>}
         {versionsError && <p className="text-sm text-muted-foreground">{versionsError}</p>}
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}

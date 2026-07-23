@@ -46,8 +46,15 @@
   --sidebar-accent-foreground: #1F2327;
   --sidebar-border: #DED8CC;
   --sidebar-ring: #6F8064;
-  --bottom-nav-height: 4.75rem;
-  --bottom-nav-page-gap: 1.5rem;
+  --mobile-nav-height: 4.25rem;
+  --mobile-nav-edge-gap: 0.75rem;
+  --mobile-nav-content-gap: 1.5rem;
+  --mobile-nav-surface: rgb(255 255 255 / 64%);
+  --mobile-nav-solid-fallback: #FFFFFF;
+  --mobile-nav-border: rgb(255 255 255 / 72%);
+  --mobile-nav-blur: 18px;
+  --mobile-nav-saturation: 135%;
+  --mobile-nav-shadow: 0 8px 24px rgb(31 35 39 / 14%), 0 1px 3px rgb(31 35 39 / 8%);
 }
 
 .auth-light {
@@ -117,6 +124,10 @@
   --sidebar-accent-foreground: #F4F1EA;
   --sidebar-border: #2A3036;
   --sidebar-ring: #7A8C6F;
+  --mobile-nav-surface: rgb(23 26 29 / 76%);
+  --mobile-nav-solid-fallback: #171A1D;
+  --mobile-nav-border: rgb(244 241 234 / 18%);
+  --mobile-nav-shadow: 0 10px 28px rgb(0 0 0 / 32%), 0 1px 3px rgb(0 0 0 / 24%);
 }
 
 @theme inline {
@@ -184,7 +195,127 @@
 
 @layer utilities {
   .pb-mobile-nav {
-    padding-bottom: calc(var(--bottom-nav-height) + var(--bottom-nav-page-gap) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--mobile-nav-height) + var(--mobile-nav-edge-gap) + env(safe-area-inset-bottom, 0px) + var(--mobile-nav-content-gap));
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    z-index: 30;
+    right: max(1.25rem, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--mobile-nav-edge-gap) + env(safe-area-inset-bottom, 0px));
+    left: max(1.25rem, env(safe-area-inset-left, 0px));
+    height: var(--mobile-nav-height);
+    overflow: visible;
+    border: 1px solid var(--mobile-nav-border);
+    border-radius: 1.75rem;
+    background: var(--mobile-nav-solid-fallback);
+    box-shadow: var(--mobile-nav-shadow);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    min-width: 0;
+    min-height: 44px;
+    height: 100%;
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    border-radius: 1rem;
+    color: var(--muted-foreground);
+    transition: transform 140ms ease, color 160ms ease, background-color 160ms ease, opacity 140ms ease;
+  }
+
+  .mobile-nav-item:hover {
+    color: var(--foreground);
+  }
+
+  .mobile-nav-item:active {
+    transform: scale(0.96);
+  }
+
+  .mobile-nav-item:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .mobile-nav-icon {
+    display: inline-flex;
+    height: 1.75rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+  }
+
+  .mobile-nav-icon-active {
+    width: 2rem;
+    height: 2rem;
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    color: var(--foreground);
+  }
+
+  .mobile-nav-item-active {
+    color: var(--foreground);
+  }
+
+  .mobile-nav-item-active .mobile-nav-label {
+    font-weight: 650;
+  }
+
+  .mobile-nav-item-primary {
+    color: var(--primary-foreground);
+  }
+
+  .mobile-nav-item-primary .mobile-nav-label {
+    color: var(--muted-foreground);
+  }
+
+  .mobile-nav-item-primary .mobile-nav-icon {
+    height: 2.25rem;
+    width: 2.75rem;
+    background: var(--primary);
+    box-shadow: 0 3px 8px rgb(31 35 39 / 14%);
+  }
+
+  .mobile-nav-label {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1rem;
+  }
+
+  .mobile-nav-item-transactions .mobile-nav-icon > svg {
+    stroke-width: 2.1;
+  }
+
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .mobile-bottom-nav {
+      background: var(--mobile-nav-surface);
+      -webkit-backdrop-filter: blur(var(--mobile-nav-blur)) saturate(var(--mobile-nav-saturation));
+      backdrop-filter: blur(var(--mobile-nav-blur)) saturate(var(--mobile-nav-saturation));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-nav-item {
+      transition: none;
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    .mobile-bottom-nav {
+      background: var(--mobile-nav-solid-fallback);
+      border-color: var(--border);
+    }
+
+    .mobile-nav-item {
+      color: var(--foreground);
+    }
   }
 
   .pt-safe-header {

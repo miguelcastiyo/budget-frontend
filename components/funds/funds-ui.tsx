@@ -394,7 +394,7 @@ function renderFundShell(children: React.ReactNode) {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
-      <main className="mx-auto max-w-lg px-5 pb-[calc(var(--bottom-nav-height)+var(--bottom-nav-page-gap)+env(safe-area-inset-bottom,0px)+3rem)] pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pb-0">
+      <main className="mx-auto max-w-lg px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8">
         {children}
       </main>
       <BottomNav />

@@ -1,20 +1,80 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Receipt, LineChart, Settings, Plus, X } from "lucide-react"
+import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 
-const primaryNavItems = [
-  { href: "/", icon: LayoutDashboard, label: "Overview" },
-  { href: "/transactions", icon: Receipt, label: "Transactions" },
+const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
+
+type MobileNavRouteItem = {
+  type: "route"
+  href: string
+  label: string
+  icon: ComponentType<{ className?: string }>
+}
+
+type MobileNavActionItem = {
+  type: "action"
+  label: string
+  action: "log-transaction"
+  icon: ComponentType<{ className?: string }>
+}
+
+type MobileNavItem = MobileNavRouteItem | MobileNavActionItem
+
+const mobileNavItems: MobileNavItem[] = [
+  { type: "route", href: "/", icon: LayoutDashboard, label: "Overview" },
+  { type: "route", href: "/transactions", icon: Receipt, label: "Transactions" },
+  { type: "action", action: "log-transaction", icon: Plus, label: "Log" },
+  { type: "route", href: "/insights", icon: LineChart, label: "Insights" },
+  { type: "route", href: "/settings", icon: Settings, label: "Settings" },
 ]
 
-const secondaryNavItems = [
-  { href: "/insights", icon: LineChart, label: "Insights" },
-]
+function isRouteActive(pathname: string, href: string): boolean {
+  return pathname === href || (href !== "/" && pathname.startsWith(href))
+}
+
+interface MobileBottomNavItemProps {
+  item: MobileNavItem
+  href?: string
+  isActive?: boolean
+  onAction?: () => void
+}
+
+function MobileBottomNavItem({ item, href, isActive = false, onAction }: MobileBottomNavItemProps) {
+  const Icon = item.icon
+  const className = cn(
+    "mobile-nav-item",
+    item.type === "action" && "mobile-nav-item-primary",
+    item.type === "route" && item.href === "/transactions" && "mobile-nav-item-transactions",
+    item.type === "route" && isActive && "mobile-nav-item-active"
+  )
+  const content = (
+    <>
+      <span className={cn("mobile-nav-icon", item.type === "route" && isActive && "mobile-nav-icon-active")}>
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <span className="mobile-nav-label">{item.label}</span>
+    </>
+  )
+
+  if (item.type === "route") {
+    return (
+      <Link href={href ?? item.href} className={className} aria-current={isActive ? "page" : undefined}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button type="button" onClick={onAction} className={className} aria-label="Log transaction">
+      {content}
+    </button>
+  )
+}
 
 interface BottomNavProps {
   onAddClick?: () => void
@@ -66,92 +126,35 @@ export function BottomNav({
   }
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 backdrop-blur-xl lg:hidden"
-      style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.25rem)" }}
-    >
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-1 pt-1.5">
-        {primaryNavItems.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== "/" && pathname.startsWith(item.href))
+    <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary">
+      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-center gap-0.5 px-1.5 py-1">
+        {mobileNavItems.map((item) => {
+          if (item.type === "action") {
+            return (
+              <div key={item.action} className="relative flex h-full items-center justify-center">
+                {shouldShowCoachmark && (
+                  <div className="absolute bottom-[calc(100%+0.75rem)] left-1/2 z-10 w-56 -translate-x-1/2 rounded-xl border border-border/60 bg-background/95 p-3 shadow-lg backdrop-blur">
+                    <button
+                      type="button"
+                      onClick={dismissCoachmark}
+                      className="absolute right-1.5 top-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      aria-label="Dismiss add transaction tip"
+                    >
+                      <X className="size-3.5" aria-hidden="true" />
+                    </button>
+                    <p className="pr-6 text-xs font-medium text-foreground">{addCoachmarkText}</p>
+                    <div className="absolute bottom-[-6px] left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-border/60 bg-background/95" />
+                  </div>
+                )}
+                <MobileBottomNavItem item={item} onAction={handleAddClick} />
+              </div>
+            )
+          }
+
+          const isActive = isRouteActive(pathname, item.href)
           const href = item.href === "/transactions" ? transactionsHref : item.href
-          
-          return (
-            <Link
-              key={item.href}
-              href={href}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors",
-                isActive 
-                  ? "text-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <item.icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </Link>
-          )
+          return <MobileBottomNavItem key={item.href} item={item} href={href} isActive={isActive} />
         })}
-
-        <div className="relative flex items-center justify-center">
-          {shouldShowCoachmark && (
-            <div className="absolute bottom-18 left-1/2 z-10 w-56 -translate-x-1/2 rounded-xl border border-border/60 bg-background/95 p-3 shadow-lg backdrop-blur">
-              <button
-                type="button"
-                onClick={dismissCoachmark}
-                className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                aria-label="Dismiss add transaction tip"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-              <p className="pr-6 text-xs font-medium text-foreground">{addCoachmarkText}</p>
-              <div className="absolute bottom-[-6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-b border-r border-border/60 bg-background/95" />
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={handleAddClick}
-            className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-            aria-label={addLabel}
-          >
-            <Plus className="w-6 h-6" />
-            <span className="text-[10px] font-medium">{addLabel}</span>
-          </button>
-        </div>
-
-        {secondaryNavItems.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== "/" && pathname.startsWith(item.href))
-          
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors",
-                isActive 
-                  ? "text-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <item.icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </Link>
-          )
-        })}
-
-        <Link
-          href="/settings"
-          className={cn(
-            "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-colors",
-            pathname.startsWith("/settings")
-              ? "text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Settings className={cn("w-6 h-6", pathname.startsWith("/settings") && "stroke-[2.5]")} />
-          <span className="text-[10px] font-medium">Settings</span>
-        </Link>
       </div>
     </nav>
   )
@@ -163,8 +166,6 @@ interface FloatingAddButtonProps {
   showCoachmark?: boolean
   coachmarkText?: string
 }
-
-const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
 
 export function FloatingAddButton({
   onClick,
@@ -205,21 +206,22 @@ export function FloatingAddButton({
           <button
             type="button"
             onClick={dismissCoachmark}
-            className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+            className="absolute right-1.5 top-1.5 inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent/70 hover:text-foreground"
             aria-label="Dismiss add transaction tip"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="size-3.5" />
           </button>
           <p className="pr-6 text-xs font-medium text-foreground">{coachmarkText}</p>
-          <div className="absolute bottom-[-6px] right-7 h-3 w-3 rotate-45 border-b border-r border-border/60 bg-background/95" />
+          <div className="absolute bottom-[-6px] right-7 size-3 rotate-45 border-b border-r border-border/60 bg-background/95" />
         </div>
       )}
       <button
+        type="button"
         onClick={handleClick}
         className="inline-flex h-14 w-14 cursor-pointer items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 lg:w-auto lg:px-5"
       >
-        <Plus className="w-7 h-7 lg:w-5 lg:h-5" />
-        <span aria-hidden className="hidden lg:inline text-sm font-semibold">{label}</span>
+        <Plus className="size-7 lg:size-5" aria-hidden="true" />
+        <span aria-hidden className="hidden text-sm font-semibold lg:inline">{label}</span>
         <span className="sr-only">{label}</span>
       </button>
     </div>

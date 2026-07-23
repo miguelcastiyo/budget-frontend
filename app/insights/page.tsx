@@ -402,7 +402,7 @@ export default function InsightsPage() {
     <div className="min-h-[100svh] w-full max-w-[100svw] overflow-x-hidden bg-background pb-mobile-nav">
       <Header />
 
-      <main className="mx-auto box-border w-full max-w-[100svw] space-y-3 overflow-x-hidden px-4 pb-[calc(3.5rem+env(safe-area-inset-bottom))] pt-standalone-safe-top sm:px-5 lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
+      <main className="mx-auto box-border w-full max-w-[100svw] space-y-3 overflow-x-hidden px-4 pt-standalone-safe-top sm:px-5 lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
         <section className="space-y-3 lg:space-y-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>

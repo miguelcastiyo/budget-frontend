@@ -32,6 +32,12 @@ Current users:
 - Settings -> Invites create flow
 - Settings -> API Keys create and reveal flows
 
+## Mobile Bottom Navigation
+
+`components/layout/bottom-nav.tsx` owns the five-position mobile navigation: Overview, Transactions, Log, Insights, and Settings. Destination items are links with route-aware `aria-current` state; Log is an action button that opens the existing transaction tray and never changes the route.
+
+The nav is a floating, safe-area-aware glass surface on mobile only. Its geometry and fallback/glass tokens live in `app/globals.css`; pages use the shared `pb-mobile-nav` utility for content clearance instead of reserving a page-specific footer height. The surface uses CSS `@supports` for backdrop-filter enhancement, with solid light/dark fallbacks for browsers without it. Modal and tray layers remain above the nav at the existing z-index level. The center Log action remains the strongest visual anchor, while destination active indicators stay intentionally quiet and inactive icon weights remain balanced.
+
 ## Responsive Confirmation Dialog / Tray
 
 Use `components/ui/responsive-confirm-dialog.tsx` for destructive or confirm/cancel flows that should behave as:
