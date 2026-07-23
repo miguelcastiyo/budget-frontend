@@ -163,19 +163,13 @@ export function TransactionList({
 
   if (transactions.length === 0) {
     return (
-      <Card className="p-8 border-0 shadow-sm text-center">
-        <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{emptyDescription}</p>
-        {onEmptyAction && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={onEmptyAction}
-            className="mt-4 rounded-full px-4"
-          >
-            {emptyActionLabel}
-          </Button>
-        )}
+      <Card className={cn("overflow-hidden border-0 shadow-sm", className)} style={style}>
+        {title && <div className="flex items-center justify-between border-b border-border/50 px-5 py-3"><h3 className="font-semibold text-base">{title}</h3><div>{headerRight}</div></div>}
+        <div className="p-8 text-center">
+          <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{emptyDescription}</p>
+          {onEmptyAction && <Button type="button" size="sm" onClick={onEmptyAction} className="mt-4 rounded-full px-4">{emptyActionLabel}</Button>}
+        </div>
       </Card>
     )
   }

@@ -11,9 +11,7 @@ import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { TransactionDetailSheet } from "@/components/budget/transaction-detail-sheet"
 import { ErrorDialog, type ErrorDialogState } from "@/components/common/error-dialog"
 import { Button } from "@/components/ui/button"
-import { Card as UiCard } from "@/components/ui/card"
 import {
-  Calendar,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   ChevronDown,
@@ -87,6 +85,7 @@ export default function TransactionsPage() {
   const [deletingTransactionId, setDeletingTransactionId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [tags, setTags] = useState<Tag[]>([])
+  const [quickPickTags, setQuickPickTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<Card[]>([])
 
   const [preset, setPreset] = useState<Preset | "all">("all")
@@ -208,13 +207,15 @@ export default function TransactionsPage() {
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [tagsResponse, cardsResponse, transactionsSummary] = await Promise.all([
+      const [tagsResponse, quickPicksResponse, cardsResponse, transactionsSummary] = await Promise.all([
         apiClient.getTags(),
+        apiClient.getTagQuickPicks(5),
         apiClient.getCards(),
         apiClient.getTransactions({ page: 1, page_size: 1, sort: "date_desc" }),
       ])
 
       setTags(tagsResponse.items)
+      setQuickPickTags(quickPicksResponse.items)
       setCards(cardsResponse.items)
       setHasAnyTransactions(transactionsSummary.total_items > 0)
     } catch (err) {
@@ -322,6 +323,29 @@ export default function TransactionsPage() {
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }, [pathname, router, searchParams])
 
+  const hasActiveFilters = Boolean(
+    debouncedSearchQuery.trim() || preset !== "all" || customDateRange || selectedCategories.length ||
+    selectedTags.length || selectedCards.length || splitFilter !== "all" || queryMonthLabel
+  )
+
+  const clearAllFilters = useCallback(() => {
+    setPreset("all")
+    setCustomDateRange(null)
+    setSelectedCategories([])
+    setSelectedTags([])
+    setSelectedCards([])
+    setSplitFilter("all")
+    if (searchParams.get("month")) {
+      clearMonthFilter()
+    }
+  }, [clearMonthFilter, searchParams])
+
+  const transactionTitle = isLoading
+    ? "Loading..."
+    : hasActiveFilters
+      ? `Transactions · ${totalItems.toLocaleString()} ${totalItems === 1 ? "match" : "matches"}`
+      : `Transactions · ${totalItems.toLocaleString()}`
+
   const stats = useMemo(() => {
     return {
       totalSpent: Number.parseFloat(summary.total_spent),
@@ -366,6 +390,7 @@ export default function TransactionsPage() {
       selectedCards,
       onCardsChange: setSelectedCards,
       tags,
+      quickPickTags,
       cards,
       searchQuery,
       onSearchChange: setSearchQuery,
@@ -408,6 +433,7 @@ export default function TransactionsPage() {
       setSplitFilter,
       splitFilter,
       tags,
+      quickPickTags,
     ]
   )
 
@@ -425,27 +451,6 @@ export default function TransactionsPage() {
       />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-standalone-safe-top">
-        {queryMonthLabel && customDateRange && (
-          <UiCard className="p-3 mb-4 border border-primary/20 bg-primary/5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="w-4 h-4 text-primary" />
-                <span>
-                  Showing transactions for <span className="font-semibold">{queryMonthLabel}</span>
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded-full px-3"
-                onClick={clearMonthFilter}
-              >
-                Clear
-              </Button>
-            </div>
-          </UiCard>
-        )}
-
         <div
           className={cn(
             "lg:grid lg:gap-8",
@@ -481,35 +486,28 @@ export default function TransactionsPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-2 lg:hidden">
-              <TransactionStatsGrid
-                compact
-                totalSpent={stats.totalSpent}
-                count={stats.count}
-                avgTransaction={stats.avgTransaction}
-                splitCount={stats.splitCount}
-              />
-            </div>
-
-            <div className="hidden lg:grid lg:grid-cols-4 gap-3">
-              <TransactionStatsGrid
-                totalSpent={stats.totalSpent}
-                count={stats.count}
-                avgTransaction={stats.avgTransaction}
-                splitCount={stats.splitCount}
-              />
-            </div>
+            {totalItems > 0 && (
+              <>
+                <div className="grid grid-cols-1 gap-2 lg:hidden">
+                  <TransactionStatsGrid compact totalSpent={stats.totalSpent} count={stats.count} avgTransaction={stats.avgTransaction} splitCount={stats.splitCount} />
+                </div>
+                <div className="hidden grid-cols-1 gap-3 lg:grid">
+                  <TransactionStatsGrid totalSpent={stats.totalSpent} count={stats.count} avgTransaction={stats.avgTransaction} splitCount={stats.splitCount} />
+                </div>
+              </>
+            )}
 
             <TransactionList
               transactions={transactions}
-              title={isLoading ? "Loading..." : "Transactions"}
-              emptyTitle={hasAnyTransactions ? "No matching transactions" : "No transactions yet"}
+              title={transactionTitle}
+              emptyTitle={hasAnyTransactions && hasActiveFilters ? "No matching transactions" : "No transactions yet"}
               emptyDescription={
-                hasAnyTransactions
-                  ? "Try adjusting filters or add a new transaction."
+                hasAnyTransactions && hasActiveFilters
+                  ? "Try removing or adjusting some filters."
                   : "Add your first transaction to start tracking spending."
               }
-              onEmptyAction={() => setShowAddTransaction(true)}
+              emptyActionLabel={hasAnyTransactions && hasActiveFilters ? "Clear filters" : "Add Transaction"}
+              onEmptyAction={hasAnyTransactions && hasActiveFilters ? clearAllFilters : () => setShowAddTransaction(true)}
               headerRight={
                 <div className="flex items-center gap-2">
                   <div className="inline-flex items-center rounded-lg border border-border/70 p-0.5 bg-background">
