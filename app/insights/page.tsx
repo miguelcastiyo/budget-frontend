@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import {
@@ -20,13 +20,7 @@ import { Calendar as AppCalendar } from "@/components/ui/calendar"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ApiError, apiClient } from "@/lib/api/client"
 import type {
   Category,
@@ -40,8 +34,6 @@ import type {
 import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
-import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
-import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { cn } from "@/lib/utils"
 
 type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "all_time" | "custom"
@@ -1052,92 +1044,70 @@ function NotableSpendingGroupSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const swipeDismiss = useSwipeDismiss({
-    open,
-    onDismiss: () => onOpenChange(false),
-    scrollRef,
-  })
-
   if (!group) {
     return null
   }
 
-  const TagIcon = getTagIcon(group.tag.name, group.tag.icon_key)
   const transactionsDescending = [...group.transactions].sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        {...swipeDismiss}
-        ref={scrollRef}
-        side="bottom"
-        className="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),42rem)] overflow-y-auto rounded-t-3xl px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:mx-auto sm:max-w-xl sm:px-6"
-      >
-        <div data-swipe-handle="true" className={`${mobileDrawerHandleClassName} mt-1 sm:hidden`} aria-hidden="true" />
-        <SheetHeader className="px-0 pb-4 pt-3">
-          <div className="flex min-w-0 items-center gap-4 pr-8">
-            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", getCategoryColorClass(group.category))}>
-              <TagIcon className="h-5 w-5 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-left text-xl">{group.expense}</SheetTitle>
-              <SheetDescription className="mt-1 text-left text-2xl font-semibold text-foreground">
-                -{formatMoney(group.totalAmount)} total
-              </SheetDescription>
-            </div>
+    <ResponsiveDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={group.expense}
+      description={`-${formatMoney(group.totalAmount)} total`}
+      mobileSize="compact"
+      desktopClassName="sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem]"
+      bodyClassName="pb-6"
+    >
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-secondary/50 p-4">
+          <p className="text-sm font-medium">
+            {group.count} payments · {formatMoney(group.amountEach)} each
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatCompactDateRange(group.firstDate, group.lastDate)}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
+              <TagGlyph className="h-3 w-3 text-muted-foreground" />
+              <span className="truncate">{group.tag.name}</span>
+            </span>
+            <TransactionPresenceIndicators
+              hasCard={Boolean(group.cardName)}
+              hasNotes={group.transactions.some((transaction) => Boolean(transaction.notes))}
+              className="rounded-full border border-border/70 bg-background px-2 py-1"
+              iconClassName="h-3 w-3"
+            />
           </div>
-        </SheetHeader>
-
-        <div className="space-y-4 pb-4">
-          <div className="rounded-2xl bg-secondary/50 p-4">
-            <p className="text-sm font-medium">
-              {group.count} payments · {formatMoney(group.amountEach)} each
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {formatCompactDateRange(group.firstDate, group.lastDate)}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium">
-                <TagGlyph className="h-3 w-3 text-muted-foreground" />
-                <span className="truncate">{group.tag.name}</span>
-              </span>
-              <TransactionPresenceIndicators
-                hasCard={Boolean(group.cardName)}
-                hasNotes={group.transactions.some((transaction) => Boolean(transaction.notes))}
-                className="rounded-full border border-border/70 bg-background px-2 py-1"
-                iconClassName="h-3 w-3"
-              />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold">Transactions</h3>
-            <div className="mt-2 divide-y divide-border/60 rounded-2xl border border-border/60 bg-card">
-              {transactionsDescending.map((transaction) => (
-                <div key={transaction.transaction_id} className="flex items-center justify-between gap-3 px-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{format(dateFromIso(transaction.date), "MMM d, yyyy")}</p>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <p className="truncate">{transaction.expense}</p>
-                      <TransactionPresenceIndicators
-                        hasCard={Boolean(transaction.card_name)}
-                        hasNotes={Boolean(transaction.notes)}
-                      />
-                    </div>
-                  </div>
-                  <p className="shrink-0 text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Button asChild className="h-11 w-full rounded-xl">
-            <Link href="/transactions">View transactions</Link>
-          </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div>
+          <h3 className="text-sm font-semibold">Transactions</h3>
+          <div className="mt-2 divide-y divide-border/60 rounded-2xl border border-border/60 bg-card">
+            {transactionsDescending.map((transaction) => (
+              <div key={transaction.transaction_id} className="flex items-center justify-between gap-3 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{format(dateFromIso(transaction.date), "MMM d, yyyy")}</p>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <p className="truncate">{transaction.expense}</p>
+                    <TransactionPresenceIndicators
+                      hasCard={Boolean(transaction.card_name)}
+                      hasNotes={Boolean(transaction.notes)}
+                    />
+                  </div>
+                </div>
+                <p className="shrink-0 text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Button asChild className="h-11 w-full rounded-xl">
+          <Link href="/transactions">View transactions</Link>
+        </Button>
+      </div>
+    </ResponsiveDialog>
   )
 }
 
