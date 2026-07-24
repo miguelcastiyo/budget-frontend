@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
+import { formatCurrency } from "@/lib/formatters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
@@ -251,7 +252,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <FundsShortcutCard />
+          <FundsShortcutCard savingsPlan={overview?.savings_plan ?? null} />
 
           <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
             <div className="flex items-center justify-between">
@@ -356,7 +357,7 @@ export default function DashboardPage() {
   )
 }
 
-function FundsShortcutCard() {
+function FundsShortcutCard({ savingsPlan }: { savingsPlan: MonthOverviewResponse["savings_plan"] | null }) {
   return (
     <Card className="border-0 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -365,12 +366,11 @@ function FundsShortcutCard() {
             <Folder className="size-4 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">Funds</p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            View savings goals.
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{savingsPlan?.has_budget ? `${formatCurrency(savingsPlan.saved_amount)} saved of ${formatCurrency(savingsPlan.budget_amount ?? "0")} planned` : "View savings goals."}</p>
+          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(savingsPlan.planned_to_funds)} directed to Funds{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
         </div>
         <Button size="sm" variant="outline" className="rounded-full" asChild>
-          <Link href="/insights/funds">Open</Link>
+          <Link href={savingsPlan?.has_budget ? `/funds/savings-plan?month=${getCurrentMonthKey()}` : "/insights/funds"}>{savingsPlan?.has_budget ? "View plan" : "Open"}</Link>
         </Button>
       </div>
     </Card>

@@ -576,6 +576,75 @@ export interface FundEntriesPage {
   total_items: number
 }
 
+export type SavingsPlanPaceStatus =
+  | "unavailable"
+  | "no_goal"
+  | "no_target"
+  | "overdue"
+  | "goal_met"
+  | "on_track_calculable"
+
+export interface SavingsPlanFundPace {
+  status: SavingsPlanPaceStatus
+  planning_basis_balance: string | null
+  goal_shortfall: string | null
+  months_remaining: number | null
+  recommended_amount: string | null
+}
+
+export interface SavingsPlanFundItem {
+  fund: {
+    id: string
+    name: string
+    status: FundStatus
+    goal_amount: string | null
+    target_month: string | null
+    current_balance: string
+  }
+  planned_amount: string
+  transaction_contributed: string
+  closeout_contributed: string
+  progress_amount: string
+  remaining_planned: string
+  over_plan_amount: string
+  pace: SavingsPlanFundPace
+}
+
+export interface SavingsPlanResponse {
+  month: string
+  status: "missing_budget" | "active" | "closed"
+  is_editable: boolean
+  has_plan: boolean
+  budget: {
+    has_budget: boolean
+    resolved_effective_month: string | null
+    savings_budget: string | null
+  }
+  summary: {
+    saved_amount: string
+    remaining_to_save: string
+    over_saved_amount: string
+    planned_to_funds: string
+    unassigned_budget: string
+    transaction_directed_to_funds: string
+    saved_outside_funds: string
+    closeout_directed_to_funds: string
+    is_overallocated: boolean
+    overallocation_amount: string
+  }
+  goal_pacing: {
+    status: "unavailable" | "historical" | "available"
+    recommended_total: string | null
+    gap_to_savings_budget: string | null
+    headroom_vs_savings_budget: string | null
+  }
+  funds: SavingsPlanFundItem[]
+}
+
+export interface ReplaceSavingsPlanRequest {
+  allocations: Array<{ fund_id: string; amount: string }>
+}
+
 export interface CreateFundRequest {
   name: string
   /** Deprecated compatibility field. New UI derives goal behavior from goal_amount. */
@@ -670,6 +739,21 @@ export interface MonthOverviewResponse {
   categories: MonthOverviewCategoryItem[]
   tags: MonthOverviewTag[]
   recurring: MonthOverviewRecurringSummary
+  savings_plan: {
+    has_budget: boolean
+    has_plan: boolean
+    budget_amount: string | null
+    saved_amount: string
+    remaining_to_save: string
+    over_saved_amount: string
+    planned_to_funds: string
+    unassigned_budget: string
+    transaction_directed_to_funds: string
+    saved_outside_funds: string
+    is_overallocated: boolean
+    overallocation_amount: string
+    needs_attention: boolean
+  }
   recent_transactions: Transaction[]
   status_cards: MonthOverviewStatusCard[]
 }

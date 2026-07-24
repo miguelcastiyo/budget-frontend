@@ -927,9 +927,9 @@ export function AddTransactionSheet({
                             </div>
                           ) : null
                         })() : (
-                          <Button type="button" variant="outline" className="h-10 rounded-xl px-3 text-sm font-medium" onClick={() => setContextPickerOpen(true)}>
-                            <Plus className="h-4 w-4" />Add
-                          </Button>
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                            Create a context to use it for this transaction.
+                          </div>
                         )}
                       </div>
 

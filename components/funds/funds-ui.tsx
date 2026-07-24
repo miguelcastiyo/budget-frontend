@@ -68,6 +68,7 @@ import {
 } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
+import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 
 type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
@@ -504,6 +505,8 @@ export function FundsOverviewPage() {
           New fund
         </Button>
       </div>
+
+      <SavingsPlanInlineSummary />
 
       {error ? (
         <Card className="border-0">
@@ -1080,6 +1083,8 @@ export function FundDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <SavingsPlanFundContext fundId={fund.id} />
 
           <Card className="border-0 bg-transparent shadow-none lg:bg-card lg:shadow-sm">
             <CardContent className="space-y-3 px-0 pt-0 lg:p-6">
