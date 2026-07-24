@@ -328,7 +328,19 @@ export default function DashboardPage() {
         }}
         mode="edit"
         transaction={editingTransaction}
-        onTransactionUpdated={() => void loadDashboardData()}
+        onTransactionUpdated={(updatedTransaction) => {
+          setEditingTransaction(null)
+          setOverview((current) => current
+            ? {
+                ...current,
+                recent_transactions: current.recent_transactions.map((currentTransaction) =>
+                  currentTransaction.id === updatedTransaction.id ? updatedTransaction : currentTransaction
+                ),
+              }
+            : current
+          )
+          void loadDashboardData()
+        }}
       />
 
       <MonthCloseoutTray
