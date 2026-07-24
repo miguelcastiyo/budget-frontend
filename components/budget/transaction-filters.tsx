@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { CalendarIcon, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react"
-import type { Card, Category, Preset, SplitFilter, Tag } from "@/lib/api/types"
+import type { Card, Category, Context, Preset, SplitFilter, Tag } from "@/lib/api/types"
 import { formatDateValue, parseIsoDate, transactionFilterPresets } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
@@ -22,9 +22,12 @@ interface TransactionFiltersProps {
   onCategoriesChange: (categories: Category[]) => void
   selectedTags: string[]
   onTagsChange: (tags: string[]) => void
+  selectedContexts: string[]
+  onContextsChange: (contexts: string[]) => void
   selectedCards: string[]
   onCardsChange: (cards: string[]) => void
   tags: Tag[]
+  contexts: Context[]
   quickPickTags?: Tag[]
   cards: Card[]
   searchQuery: string
@@ -144,9 +147,12 @@ export function TransactionFilters({
   onCategoriesChange,
   selectedTags,
   onTagsChange,
+  selectedContexts,
+  onContextsChange,
   selectedCards,
   onCardsChange,
   tags,
+  contexts,
   quickPickTags = [],
   cards,
   searchQuery,
@@ -193,11 +199,12 @@ export function TransactionFilters({
     (preset !== "all" ? 1 : 0) +
     selectedCategories.length +
     selectedTags.length +
+    selectedContexts.length +
     selectedCards.length +
     (splitFilter !== "all" ? 1 : 0) +
     (searchQuery.trim() ? 1 : 0)
   const hasClearableFilters = Boolean(
-    monthFilterLabel || customDateRange || preset !== "all" || selectedCategories.length || selectedTags.length || selectedCards.length || splitFilter !== "all"
+    monthFilterLabel || customDateRange || preset !== "all" || selectedCategories.length || selectedTags.length || selectedContexts.length || selectedCards.length || splitFilter !== "all"
   )
   const selectedPresetLabel = preset !== "all"
     ? transactionFilterPresets.find((item) => item.value === preset)?.label
@@ -215,6 +222,7 @@ export function TransactionFilters({
     }
     onCategoriesChange([])
     onTagsChange([])
+    onContextsChange([])
     onCardsChange([])
     onSplitFilterChange("all")
   }
@@ -298,6 +306,11 @@ export function TransactionFilters({
       key: `tag-${id}`,
       label: tags.find((tag) => tag.id === id)?.name ?? "Tag",
       onClick: () => onTagsChange(selectedTags.filter((value) => value !== id)),
+    })),
+    ...selectedContexts.map((id) => ({
+      key: `context-${id}`,
+      label: contexts.find((context) => context.id === id)?.name ?? "Context",
+      onClick: () => onContextsChange(selectedContexts.filter((value) => value !== id)),
     })),
     ...selectedCards.map((id) => ({
       key: `card-${id}`,
@@ -404,6 +417,11 @@ export function TransactionFilters({
               <section>
                 <FilterSectionHeader title="Tags" meta={selectedTags.length ? `${selectedTags.length} selected` : undefined} />
                 <FilterChoiceGroup items={tags.map((tag) => ({ value: tag.id, label: tag.name }))} selected={selectedTags} onToggle={(value) => toggleValue(value, selectedTags, onTagsChange)} />
+              </section>
+
+              <section>
+                <FilterSectionHeader title="Contexts" meta={selectedContexts.length ? `${selectedContexts.length} selected` : undefined} />
+                <FilterChoiceGroup items={contexts.map((context) => ({ value: context.id, label: context.name }))} selected={selectedContexts} onToggle={(value) => toggleValue(value, selectedContexts, onContextsChange)} />
               </section>
 
               <section>

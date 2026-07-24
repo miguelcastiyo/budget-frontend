@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TagIconPicker } from "@/components/settings/tag-icon-picker"
-import { getTagIcon } from "@/lib/tag-icons"
+import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 
 interface InlineCreateTagControlProps {
@@ -23,6 +23,19 @@ interface InlineCreateTagControlProps {
 interface InlineCreateCardControlProps {
   name: string
   onNameChange: (value: string) => void
+  onCancel: () => void
+  onSubmit: () => void
+  isSubmitting: boolean
+  subtitle: string
+  surfaceClassName?: string
+  compact?: boolean
+}
+
+interface InlineCreateContextControlProps {
+  name: string
+  iconKey: string
+  onNameChange: (value: string) => void
+  onIconKeyChange: (value: string) => void
   onCancel: () => void
   onSubmit: () => void
   isSubmitting: boolean
@@ -125,6 +138,58 @@ export function InlineCreateCardControl({
           className={cn("rounded-xl px-4", buttonHeightClassName)}
         >
           {isSubmitting ? "Adding..." : "Add card"}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export function InlineCreateContextControl({
+  name,
+  iconKey,
+  onNameChange,
+  onIconKeyChange,
+  onCancel,
+  onSubmit,
+  isSubmitting,
+  subtitle,
+  surfaceClassName = "bg-card",
+  compact = false,
+}: InlineCreateContextControlProps) {
+  const ContextInputIcon = getContextIcon(name || "Context", iconKey || null)
+  const inputHeightClassName = compact ? "h-11 sm:h-10" : "h-12"
+  const buttonHeightClassName = compact ? "h-11 sm:h-10" : "h-12"
+
+  return (
+    <div className={cn("min-w-0 overflow-hidden rounded-xl border border-border/60 p-3", surfaceClassName)}>
+      <InlineCreateHeader title="Create context" subtitle={subtitle} onCancel={onCancel} cancelLabel="Cancel new context" />
+      <div className="grid min-w-0 gap-3">
+        <div className="relative min-w-0">
+          <ContextInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Context name"
+            value={name}
+            onChange={(event) => onNameChange(event.target.value)}
+            className={cn("rounded-xl border-border/60 pl-10", inputHeightClassName)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault()
+                onSubmit()
+              }
+            }}
+          />
+        </div>
+        <TagIconPicker
+          tagName={name}
+          value={iconKey}
+          onChange={onIconKeyChange}
+          entityLabel="Context"
+          label={<Label className="text-xs font-medium text-muted-foreground">Icon</Label>}
+          fadeClassName="from-card via-card/80 to-transparent"
+          wrapOnDesktop={false}
+        />
+        <Button type="button" onClick={onSubmit} disabled={!name.trim() || isSubmitting} className={cn("w-full rounded-xl px-4", buttonHeightClassName)}>
+          {isSubmitting ? "Adding..." : "Add context"}
         </Button>
       </div>
     </div>

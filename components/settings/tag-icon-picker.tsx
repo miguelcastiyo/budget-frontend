@@ -11,6 +11,7 @@ interface TagIconPickerProps {
   label?: ReactNode
   fadeClassName?: string
   wrapOnDesktop?: boolean
+  entityLabel?: string
 }
 
 export function TagIconPicker({
@@ -20,9 +21,10 @@ export function TagIconPicker({
   label = <p className="text-xs font-medium text-muted-foreground">Icon</p>,
   fadeClassName = "from-background via-background/80 to-transparent sm:hidden",
   wrapOnDesktop = true,
+  entityLabel = "Tag",
 }: TagIconPickerProps) {
   const selectedIconOption = TAG_ICON_OPTIONS.find((option) => option.key === value)
-  const AutoIcon = getTagIcon(tagName || "Tag", null)
+  const AutoIcon = getTagIcon(tagName || entityLabel, null)
   const PreviewIcon = selectedIconOption?.icon ?? AutoIcon
   const iconLabel = selectedIconOption?.label ?? "Auto"
   const iconItems: FormChipRailItem[] = [
@@ -59,7 +61,7 @@ export function TagIconPicker({
         items={iconItems}
         value={value}
         onValueChange={onChange}
-        ariaLabel="Choose a tag icon"
+        ariaLabel={`Choose a ${entityLabel.toLowerCase()} icon`}
         fadeClassName={fadeClassName}
         chipClassName="h-10 font-medium"
         wrapOnDesktop={wrapOnDesktop}

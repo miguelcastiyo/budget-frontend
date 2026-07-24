@@ -18,6 +18,7 @@ export function validateTransactionNotes(value: string): string | null {
 
 export function buildTransactionMoreDetailsSummary(input: {
   cardName?: string | null
+  contextName?: string | null
   isSplit?: boolean
   hasRecurring?: boolean
   hasNotes?: boolean
@@ -25,6 +26,7 @@ export function buildTransactionMoreDetailsSummary(input: {
   const active: string[] = []
 
   if (input.cardName) active.push(input.cardName)
+  if (input.contextName) active.push(input.contextName)
   if (input.isSplit) active.push("Split")
   if (input.hasRecurring) active.push("Recurring")
   if (input.hasNotes) active.push("Note added")

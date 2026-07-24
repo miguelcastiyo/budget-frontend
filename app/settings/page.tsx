@@ -21,6 +21,7 @@ import {
   LogOut,
   Pencil,
   Database,
+  Layers,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
@@ -275,6 +276,12 @@ export default function SettingsPage() {
                 label="Tags"
                 description="Categories for your spending"
                 href="/settings/tags"
+              />
+              <SettingsItem
+                icon={<Layers className="w-5 h-5 text-muted-foreground" />}
+                label="Contexts"
+                description="Trips, events, and projects"
+                href="/settings/contexts"
               />
               <SettingsItem
                 icon={<CreditCard className="w-5 h-5 text-muted-foreground" />}

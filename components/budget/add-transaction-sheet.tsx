@@ -24,6 +24,7 @@ import type {
   RecurringBillingType,
   Tag,
   Card as CardType,
+  Context,
   Transaction,
   TransactionSuggestion,
   CreateTransactionRequest,
@@ -32,7 +33,7 @@ import type {
 import { Calendar } from "@/components/ui/calendar"
 import { AmountInput } from "@/components/budget/amount-input"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
-import { InlineCreateCardControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
+import { InlineCreateCardControl, InlineCreateContextControl, InlineCreateTagControl } from "@/components/budget/inline-create-controls"
 import { TransactionNotesField } from "@/components/budget/transaction-notes-field"
 import {
   Popover,
@@ -52,7 +53,7 @@ import {
 } from "@/lib/transaction-notes"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
-import { getTagIcon } from "@/lib/tag-icons"
+import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -86,12 +87,17 @@ export function AddTransactionSheet({
   const [tags, setTags] = useState<Tag[]>([])
   const [quickPickTags, setQuickPickTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<CardType[]>([])
+  const [contexts, setContexts] = useState<Context[]>([])
 
   const [showNewTag, setShowNewTag] = useState(false)
   const [newTagName, setNewTagName] = useState("")
   const [newTagIconKey, setNewTagIconKey] = useState("")
   const [showNewCard, setShowNewCard] = useState(false)
   const [newCardName, setNewCardName] = useState("")
+  const [contextId, setContextId] = useState("")
+  const [showNewContext, setShowNewContext] = useState(false)
+  const [newContextName, setNewContextName] = useState("")
+  const [newContextIconKey, setNewContextIconKey] = useState("")
   const [showMoreDetails, setShowMoreDetails] = useState(false)
 
   const [isLoadingTaxonomy, setIsLoadingTaxonomy] = useState(false)
@@ -99,6 +105,7 @@ export function AddTransactionSheet({
   const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([])
   const [isCreatingTag, setIsCreatingTag] = useState(false)
   const [isCreatingCard, setIsCreatingCard] = useState(false)
+  const [isCreatingContext, setIsCreatingContext] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notesError, setNotesError] = useState<string | null>(null)
 
@@ -143,15 +150,17 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const [tagsResponse, cardsResponse, quickPickTagsResponse] = await Promise.all([
+      const [tagsResponse, cardsResponse, quickPickTagsResponse, contextsResponse] = await Promise.all([
         apiClient.getTags(),
         apiClient.getCards(),
         apiClient.getTagQuickPicks(5).catch(() => ({ items: [] })),
+        apiClient.getContexts().catch(() => ({ items: [] })),
       ])
 
       setTags(tagsResponse.items)
       setQuickPickTags(quickPickTagsResponse.items.length > 0 ? quickPickTagsResponse.items : tagsResponse.items.slice(0, 5))
       setCards(sortCards(cardsResponse.items))
+      setContexts(contextsResponse.items)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -178,13 +187,17 @@ export function AddTransactionSheet({
       setIsSplit(transaction.is_split)
       setTagId(transaction.tag.id)
       setCardId(transaction.card?.id ?? "")
+      setContextId(transaction.context?.id ?? "")
       setNotes(transaction.notes ?? "")
       setShowNewTag(false)
       setNewTagName("")
       setNewTagIconKey("")
       setShowNewCard(false)
       setNewCardName("")
-      setShowMoreDetails(Boolean(transaction.card || transaction.is_split || transaction.recurring_expense_id != null))
+      setShowNewContext(false)
+      setNewContextName("")
+      setNewContextIconKey("")
+      setShowMoreDetails(Boolean(transaction.card || transaction.context || transaction.is_split || transaction.recurring_expense_id != null))
       setMakeRecurring(false)
       setRecurringBillingType("day_of_month")
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
@@ -267,6 +280,7 @@ export function AddTransactionSheet({
     setIsSplit(false)
     setTagId("")
     setCardId("")
+    setContextId("")
     setNotes("")
     setDate(now)
     setShowNewTag(false)
@@ -274,6 +288,9 @@ export function AddTransactionSheet({
     setNewTagIconKey("")
     setShowNewCard(false)
     setNewCardName("")
+    setShowNewContext(false)
+    setNewContextName("")
+    setNewContextIconKey("")
     setShowMoreDetails(false)
     setMakeRecurring(false)
     setSuggestions([])
@@ -358,6 +375,25 @@ export function AddTransactionSheet({
     }
   }
 
+  const handleCreateContext = async () => {
+    const name = newContextName.trim()
+    if (!name) return
+    setIsCreatingContext(true)
+    setError(null)
+    try {
+      const created = await apiClient.createContext({ name, icon_key: newContextIconKey || null })
+      setContexts((previous) => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setContextId(created.id)
+      setNewContextName("")
+      setNewContextIconKey("")
+      setShowNewContext(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.error.message : "Unable to create context")
+    } finally {
+      setIsCreatingContext(false)
+    }
+  }
+
   const normalizeAmount = (value: string): string | null => {
     const parsed = Number.parseFloat(value.trim())
     if (!Number.isFinite(parsed) || parsed < 0) {
@@ -378,6 +414,7 @@ export function AddTransactionSheet({
     notes: normalizeTransactionNotesForSubmit(notes),
     tag_id: tagId,
     card_id: cardId || undefined,
+    context_id: contextId || null,
   }
   const baselineTransactionPayload = isEditMode && transaction
     ? {
@@ -389,6 +426,7 @@ export function AddTransactionSheet({
       notes: transaction.notes,
       tag_id: transaction.tag.id,
       card_id: transaction.card?.id || undefined,
+      context_id: transaction.context?.id || null,
     }
     : null
   const hasEditChanges = !isEditMode || !baselineTransactionPayload
@@ -430,6 +468,7 @@ export function AddTransactionSheet({
           notes: normalizedNotes,
           tag_id: tagId,
           card_id: cardId || undefined,
+          context_id: contextId || null,
         }
         const updated = await apiClient.updateTransaction(transaction.id, payload)
 
@@ -464,6 +503,9 @@ export function AddTransactionSheet({
 
         if (cardId) {
           payload.card_id = cardId
+        }
+        if (contextId) {
+          payload.context_id = contextId
         }
         if (normalizedNotes !== null) {
           payload.notes = normalizedNotes
@@ -580,6 +622,7 @@ export function AddTransactionSheet({
       ? (cards.find((card) => card.id === cardId)?.name ?? (transaction?.card?.id === cardId ? transaction.card.name : null))
       : null,
     isSplit,
+    contextName: contextId ? (contexts.find((context) => context.id === contextId)?.name ?? transaction?.context?.name ?? null) : null,
     hasRecurring: makeRecurring || transactionAlreadyRecurring,
     hasNotes: normalizeTransactionNotesForSubmit(notes) !== null,
   })
@@ -858,6 +901,83 @@ export function AddTransactionSheet({
 
                   {showMoreDetails && (
                     <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden border-t border-border/50 p-4">
+                      <div className="min-w-0 max-w-full space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Context <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                          {!showNewContext && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewContextIconKey("")
+                                setShowNewContext(true)
+                              }}
+                              className="flex cursor-pointer items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              New context
+                            </button>
+                          )}
+                        </div>
+                        {showNewContext ? (
+                          <InlineCreateContextControl
+                            name={newContextName}
+                            iconKey={newContextIconKey}
+                            onNameChange={setNewContextName}
+                            onIconKeyChange={setNewContextIconKey}
+                            onCancel={() => {
+                              setShowNewContext(false)
+                              setNewContextName("")
+                              setNewContextIconKey("")
+                            }}
+                            onSubmit={() => void handleCreateContext()}
+                            isSubmitting={isCreatingContext}
+                            subtitle="It will be selected for this transaction."
+                            surfaceClassName="bg-background"
+                          />
+                        ) : contexts.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                            Create a context to use it for this transaction.
+                          </div>
+                        ) : (
+                          <FormChipRail
+                            items={[
+                              {
+                                value: "",
+                                label: "No context",
+                                icon: <Plus className="h-4 w-4 shrink-0" />,
+                                selectedTone: "neutral",
+                              },
+                              ...contexts.map((context) => {
+                                const ContextIcon = getContextIcon(context.name, context.icon_key)
+                                return {
+                                  value: context.id,
+                                  label: context.name,
+                                  icon: <ContextIcon className="h-4 w-4 shrink-0" />,
+                                  ariaLabel: context.name,
+                                  title: context.name,
+                                }
+                              }),
+                              ...(isLoadingTaxonomy && contexts.length === 0
+                                ? [{
+                                  value: "__loading_contexts",
+                                  label: "Loading contexts...",
+                                  selectedTone: "neutral" as const,
+                                  disabled: true,
+                                }]
+                                : []),
+                            ]}
+                            value={contextId}
+                            onValueChange={(value) => {
+                              if (value !== "__loading_contexts") {
+                                setContextId(value)
+                              }
+                            }}
+                            ariaLabel="Choose a context"
+                            fadeClassName="from-card via-card/80 to-transparent"
+                          />
+                        )}
+                      </div>
+
                       <div className="min-w-0 max-w-full space-y-2">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">

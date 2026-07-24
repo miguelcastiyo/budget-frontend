@@ -27,6 +27,7 @@ import type { DateRangeFilter } from "@/lib/date-filters"
 import type {
   Card,
   Category,
+  Context,
   Preset,
   SortOrder,
   SplitFilter,
@@ -88,11 +89,13 @@ export default function TransactionsPage() {
   const [tags, setTags] = useState<Tag[]>([])
   const [quickPickTags, setQuickPickTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<Card[]>([])
+  const [contexts, setContexts] = useState<Context[]>([])
 
   const [preset, setPreset] = useState<Preset | "all">("all")
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedCards, setSelectedCards] = useState<string[]>([])
+  const [selectedContexts, setSelectedContexts] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [sortOrder, setSortOrder] = useState<SortOrder>("date_desc")
@@ -194,6 +197,9 @@ export default function TransactionsPage() {
     if (selectedCards.length > 0) {
       filters.card_ids = selectedCards.join(",")
     }
+    if (selectedContexts.length > 0) {
+      filters.context_ids = selectedContexts.join(",")
+    }
     if (splitFilter !== "all") {
       filters.is_split = splitFilter
     }
@@ -204,20 +210,22 @@ export default function TransactionsPage() {
     }
 
     return filters
-  }, [customDateRange, debouncedSearchQuery, preset, selectedCards, selectedCategories, selectedTags, sortOrder, splitFilter])
+  }, [customDateRange, debouncedSearchQuery, preset, selectedCards, selectedCategories, selectedContexts, selectedTags, sortOrder, splitFilter])
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [tagsResponse, quickPicksResponse, cardsResponse, transactionsSummary] = await Promise.all([
+      const [tagsResponse, quickPicksResponse, cardsResponse, contextsResponse, transactionsSummary] = await Promise.all([
         apiClient.getTags(),
         apiClient.getTagQuickPicks(5),
         apiClient.getCards(),
+        apiClient.getContexts(),
         apiClient.getTransactions({ page: 1, page_size: 1, sort: "date_desc" }),
       ])
 
       setTags(tagsResponse.items)
       setQuickPickTags(quickPicksResponse.items)
       setCards(cardsResponse.items)
+      setContexts(contextsResponse.items)
       setHasAnyTransactions(transactionsSummary.total_items > 0)
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
@@ -351,7 +359,7 @@ export default function TransactionsPage() {
 
   const hasActiveFilters = Boolean(
     debouncedSearchQuery.trim() || preset !== "all" || customDateRange || selectedCategories.length ||
-    selectedTags.length || selectedCards.length || splitFilter !== "all" || queryMonthLabel
+    selectedTags.length || selectedContexts.length || selectedCards.length || splitFilter !== "all" || queryMonthLabel
   )
 
   const clearAllFilters = useCallback(() => {
@@ -359,6 +367,7 @@ export default function TransactionsPage() {
     setCustomDateRange(null)
     setSelectedCategories([])
     setSelectedTags([])
+    setSelectedContexts([])
     setSelectedCards([])
     setSplitFilter("all")
     if (searchParams.get("month")) {
@@ -416,9 +425,12 @@ export default function TransactionsPage() {
       onCategoriesChange: setSelectedCategories,
       selectedTags,
       onTagsChange: setSelectedTags,
+      selectedContexts,
+      onContextsChange: setSelectedContexts,
       selectedCards,
       onCardsChange: setSelectedCards,
       tags,
+      contexts,
       quickPickTags,
       cards,
       searchQuery,
@@ -454,11 +466,13 @@ export default function TransactionsPage() {
       selectedCards,
       selectedCategories,
       selectedTags,
+      selectedContexts,
       setDesktopFiltersCollapsed,
       setSearchQuery,
       setSelectedCards,
       setSelectedCategories,
       setSelectedTags,
+      setSelectedContexts,
       setSplitFilter,
       splitFilter,
       tags,
