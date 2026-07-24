@@ -361,7 +361,7 @@ export default function TagsSettingsPage() {
               }}
             />
           </div>
-          <TagIconPicker tagName={newTagName} value={newTagIconKey} onChange={setNewTagIconKey} />
+          <TagIconPicker tagName={newTagName} value={newTagIconKey} onChange={setNewTagIconKey} desktopGridColumns={7} />
         </div>
       </ResponsiveDialog>
 
@@ -418,7 +418,7 @@ export default function TagsSettingsPage() {
               }}
             />
           </div>
-          <TagIconPicker tagName={editingName} value={editingIconKey} onChange={setEditingIconKey} />
+          <TagIconPicker tagName={editingName} value={editingIconKey} onChange={setEditingIconKey} desktopGridColumns={7} />
         </div>
       </ResponsiveDialog>
 

@@ -3,6 +3,9 @@
 import type { ReactNode } from "react"
 import { FormChipRail, type FormChipRailItem } from "@/components/budget/form-chip-rail"
 import { getTagIcon, TAG_ICON_OPTIONS } from "@/lib/tag-icons"
+import type { LucideIcon } from "lucide-react"
+
+type IconOption = { key: string; label: string; icon: LucideIcon }
 
 interface TagIconPickerProps {
   tagName: string
@@ -12,6 +15,9 @@ interface TagIconPickerProps {
   fadeClassName?: string
   wrapOnDesktop?: boolean
   entityLabel?: string
+  iconOptions?: readonly IconOption[]
+  iconResolver?: (name: string, iconKey?: string | null) => LucideIcon
+  desktopGridColumns?: 4 | 5 | 6 | 7 | 8
 }
 
 export function TagIconPicker({
@@ -22,9 +28,12 @@ export function TagIconPicker({
   fadeClassName = "from-background via-background/80 to-transparent sm:hidden",
   wrapOnDesktop = true,
   entityLabel = "Tag",
+  iconOptions = TAG_ICON_OPTIONS,
+  iconResolver = getTagIcon,
+  desktopGridColumns,
 }: TagIconPickerProps) {
-  const selectedIconOption = TAG_ICON_OPTIONS.find((option) => option.key === value)
-  const AutoIcon = getTagIcon(tagName || entityLabel, null)
+  const selectedIconOption = iconOptions.find((option) => option.key === value)
+  const AutoIcon = iconResolver(tagName || entityLabel, null)
   const PreviewIcon = selectedIconOption?.icon ?? AutoIcon
   const iconLabel = selectedIconOption?.label ?? "Auto"
   const iconItems: FormChipRailItem[] = [
@@ -35,7 +44,7 @@ export function TagIconPicker({
       ariaLabel: "Use automatic icon",
       title: "Auto icon",
     },
-    ...TAG_ICON_OPTIONS.map((option) => {
+    ...iconOptions.map((option) => {
       const Icon = option.icon
       return {
         value: option.key,
@@ -47,6 +56,15 @@ export function TagIconPicker({
       } satisfies FormChipRailItem
     }),
   ]
+  const gridClassName = desktopGridColumns
+    ? ({
+        4: "sm:grid sm:grid-cols-4",
+        5: "sm:grid sm:grid-cols-5",
+        6: "sm:grid sm:grid-cols-6",
+        7: "sm:grid sm:grid-cols-7",
+        8: "sm:grid sm:grid-cols-8",
+      } as const)[desktopGridColumns]
+    : undefined
 
   return (
     <div className="min-w-0 space-y-2">
@@ -63,7 +81,8 @@ export function TagIconPicker({
         onValueChange={onChange}
         ariaLabel={`Choose a ${entityLabel.toLowerCase()} icon`}
         fadeClassName={fadeClassName}
-        chipClassName="h-10 font-medium"
+        chipClassName="h-10 font-medium sm:w-full"
+        trackClassName={gridClassName}
         wrapOnDesktop={wrapOnDesktop}
       />
     </div>

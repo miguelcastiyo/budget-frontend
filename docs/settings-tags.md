@@ -13,7 +13,7 @@ The Settings -> Tags page manages the available tag library used to organize tra
 - Desktop uses a wider management surface, an explicit "New tag" action, compact rows, and an overflow menu for row actions.
 - The list card includes a simple header with the current tag count.
 - Create and edit preserve auto icon behavior, manual icon selection, validation, and the existing API calls.
-- The icon picker keeps horizontal scrolling on mobile and wraps on desktop so options do not clip.
+- The icon picker keeps horizontal scrolling on mobile and uses a balanced fixed seven-column grid on desktop because the available tag icon set is finite.
 
 ## Remove Language
 

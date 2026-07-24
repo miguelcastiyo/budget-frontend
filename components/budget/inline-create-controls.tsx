@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TagIconPicker } from "@/components/settings/tag-icon-picker"
-import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
+import { CONTEXT_ICON_OPTIONS, getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 
 interface InlineCreateTagControlProps {
@@ -184,6 +184,8 @@ export function InlineCreateContextControl({
           value={iconKey}
           onChange={onIconKeyChange}
           entityLabel="Context"
+          iconOptions={CONTEXT_ICON_OPTIONS}
+          iconResolver={getContextIcon}
           label={<Label className="text-xs font-medium text-muted-foreground">Icon</Label>}
           fadeClassName="from-card via-card/80 to-transparent"
           wrapOnDesktop={false}

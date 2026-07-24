@@ -1,7 +1,9 @@
 import type { LucideIcon } from "lucide-react"
 import {
   BookOpen,
+  Building2,
   Briefcase,
+  CalendarDays,
   Car,
   Coffee,
   CreditCard,
@@ -12,6 +14,11 @@ import {
   Heart,
   Home,
   Lightbulb,
+  Landmark,
+  MapPinned,
+  Milestone,
+  Mountain,
+  Globe2,
   PiggyBank,
   Plane,
   Receipt,
@@ -19,6 +26,9 @@ import {
   ShoppingCart,
   Smartphone,
   Tag,
+  PartyPopper,
+  FolderKanban,
+  TentTree,
   TrendingUp,
   Wallet,
   Wrench,
@@ -50,8 +60,21 @@ export const TAG_ICON_OPTIONS = [
 ] as const
 
 export type TagIconKey = (typeof TAG_ICON_OPTIONS)[number]["key"]
-export type ContextIconKey = TagIconKey
-export const CONTEXT_ICON_OPTIONS = TAG_ICON_OPTIONS
+
+export const CONTEXT_ICON_OPTIONS = [
+  { key: "map_pinned", label: "Place", icon: MapPinned },
+  { key: "calendar_days", label: "Calendar", icon: CalendarDays },
+  { key: "party_popper", label: "Event", icon: PartyPopper },
+  { key: "building", label: "Building", icon: Building2 },
+  { key: "folder_kanban", label: "Project", icon: FolderKanban },
+  { key: "tent_tree", label: "Outdoors", icon: TentTree },
+  { key: "mountain", label: "Adventure", icon: Mountain },
+  { key: "landmark", label: "Landmark", icon: Landmark },
+  { key: "globe", label: "World", icon: Globe2 },
+  { key: "milestone", label: "Milestone", icon: Milestone },
+] as const
+
+export type ContextIconKey = (typeof CONTEXT_ICON_OPTIONS)[number]["key"]
 
 const iconByKey: Record<TagIconKey, LucideIcon> = TAG_ICON_OPTIONS.reduce(
   (acc, option) => {
@@ -110,5 +133,37 @@ export function getTagIcon(tagName: string, iconKey?: string | null): LucideIcon
   return iconByKey.tag
 }
 
-export const getContextIconByKey = getTagIconByKey
-export const getContextIcon = getTagIcon
+const contextIconByKey: Record<ContextIconKey, LucideIcon> = CONTEXT_ICON_OPTIONS.reduce(
+  (acc, option) => {
+    acc[option.key] = option.icon
+    return acc
+  },
+  {} as Record<ContextIconKey, LucideIcon>
+)
+
+const CONTEXT_ICON_RULES: Array<{ keywords: string[]; iconKey: ContextIconKey }> = [
+  { keywords: ["trip", "travel", "place", "city", "apartment", "home"], iconKey: "map_pinned" },
+  { keywords: ["event", "christmas", "birthday", "holiday", "party"], iconKey: "party_popper" },
+  { keywords: ["project", "renovation", "move", "work"], iconKey: "folder_kanban" },
+  { keywords: ["japan", "world", "international", "country"], iconKey: "globe" },
+  { keywords: ["mountain", "camp", "outdoor", "hike"], iconKey: "mountain" },
+]
+
+export function getContextIconByKey(iconKey?: string | null): LucideIcon | null {
+  if (!iconKey) return null
+  return contextIconByKey[iconKey as ContextIconKey] ?? null
+}
+
+export function getContextIcon(contextName: string, iconKey?: string | null): LucideIcon {
+  const explicitIcon = getContextIconByKey(iconKey)
+  if (explicitIcon) return explicitIcon
+
+  const normalized = contextName.toLowerCase().trim()
+  for (const rule of CONTEXT_ICON_RULES) {
+    if (rule.keywords.some((keyword) => normalized.includes(keyword))) {
+      return contextIconByKey[rule.iconKey]
+    }
+  }
+
+  return contextIconByKey.map_pinned
+}
