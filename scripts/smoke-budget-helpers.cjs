@@ -24,6 +24,7 @@ const dateFilters = require("../lib/date-filters.ts")
 const formatters = require("../lib/formatters.ts")
 const insights = require("../lib/insights.ts")
 const monthCloseout = require("../lib/month-closeout.ts")
+const transactionCollection = require("../lib/transaction-collection.ts")
 const recurringStatus = require("../app/settings/recurring/_lib/recurring-status.ts")
 const recurringSeries = require("../app/settings/recurring/_lib/recurring-series.ts")
 
@@ -100,6 +101,23 @@ assertEqual(
   }),
   false,
   "hourly income form requires hours"
+)
+
+const transactionOne = { id: "txn_1", expense: "One" }
+const transactionTwo = { id: "txn_2", expense: "Two" }
+const updatedTransactionOne = { id: "txn_1", expense: "Updated One" }
+assertDeepEqual(
+  transactionCollection.replaceTransaction([transactionOne, transactionTwo], updatedTransactionOne),
+  [updatedTransactionOne, transactionTwo],
+  "transaction replacement updates only the matching loaded row"
+)
+assertDeepEqual(
+  transactionCollection.mergeTransactionPages([
+    [transactionOne, transactionTwo],
+    [updatedTransactionOne, { id: "txn_3", expense: "Three" }],
+  ]),
+  [transactionOne, transactionTwo, { id: "txn_3", expense: "Three" }],
+  "transaction page merge preserves order and removes duplicate IDs"
 )
 
 const allocationState = {

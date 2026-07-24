@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { mergeTransactionPages, replaceTransaction } from "@/lib/transaction-collection"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
@@ -287,6 +288,31 @@ export default function TransactionsPage() {
     await Promise.all([loadTransactionsData(), loadReferenceData()])
   }, [loadReferenceData, loadTransactionsData])
 
+  // Collection mutation invariant: mutating an item must preserve filters, sort,
+  // search, loaded pagination depth, and the user's current scroll context.
+  const revalidateLoadedTransactions = useCallback(async (loadedPageCount: number) => {
+    try {
+      const responses = await Promise.all(
+        Array.from({ length: loadedPageCount }, (_, index) => apiClient.getTransactions({
+          ...activeTransactionFilters,
+          page: index + 1,
+          page_size: TRANSACTIONS_PAGE_SIZE,
+        }))
+      )
+
+      const firstResponse = responses[0]
+      if (!firstResponse) {
+        return
+      }
+
+      setTransactions(mergeTransactionPages(responses.map((response) => response.items)))
+      setTotalItems(firstResponse.total_items)
+      setSummary(firstResponse.summary)
+    } catch (err) {
+      setError(transactionError(err, "Unable to refresh transactions"))
+    }
+  }, [activeTransactionFilters])
+
   const dismissError = useCallback(() => {
     setError(null)
   }, [])
@@ -363,18 +389,21 @@ export default function TransactionsPage() {
     try {
       setError(null)
       await apiClient.deleteTransaction(transactionId)
+      setTransactions((current) => current.filter((transaction) => transaction.id !== transactionId))
       setSelectedTransaction((current) => (current?.id === transactionId ? null : current))
-      await refreshTransactionSurface()
+      void revalidateLoadedTransactions(currentPage)
     } catch (err) {
       setError(transactionError(err, "Unable to delete transaction"))
     } finally {
       setDeletingTransactionId(null)
     }
-  }, [refreshTransactionSurface])
+  }, [currentPage, revalidateLoadedTransactions])
 
-  const handleTransactionUpdated = () => {
+  const handleTransactionUpdated = (updatedTransaction: Transaction) => {
+    setTransactions((current) => replaceTransaction(current, updatedTransaction))
+    setEditingTransaction(null)
     setSelectedTransaction(null)
-    void refreshTransactionSurface()
+    void revalidateLoadedTransactions(currentPage)
   }
 
   const remainingTransactions = Math.max(totalItems - transactions.length, 0)
