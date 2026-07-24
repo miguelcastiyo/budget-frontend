@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Sparkles } from "lucide-react"
+import { PiggyBank } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
-import { formatCurrency } from "@/lib/formatters"
+import { formatCurrency, formatSavingsCurrency } from "@/lib/formatters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
@@ -360,18 +360,20 @@ export default function DashboardPage() {
 function FundsShortcutCard({ savingsPlan }: { savingsPlan: MonthOverviewResponse["savings_plan"] | null }) {
   return (
     <Card className="border-0 p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-muted-foreground" />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <PiggyBank className="size-4 shrink-0 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">Savings plan</p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">{savingsPlan?.has_budget ? `${formatCurrency(savingsPlan.saved_amount)} saved · ${formatCurrency(savingsPlan.budget_amount ?? "0")} budgeted` : "Decide where your monthly Savings should go."}</p>
-          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(savingsPlan.planned_to_funds)} of {formatCurrency(savingsPlan.budget_amount ?? "0")} assigned to Funds{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
+          <Button size="sm" variant="outline" className="shrink-0 rounded-full" asChild>
+            <Link href={`/funds/savings-plan?month=${getCurrentMonthKey()}`}>{savingsPlan?.has_plan ? "View plan" : "Plan savings"}</Link>
+          </Button>
         </div>
-        <Button size="sm" variant="outline" className="rounded-full" asChild>
-          <Link href={`/funds/savings-plan?month=${getCurrentMonthKey()}`}>{savingsPlan?.has_plan ? "View plan" : "Plan savings"}</Link>
-        </Button>
+        <div className="min-w-0">
+          <p className="whitespace-normal text-sm text-muted-foreground">{savingsPlan?.has_budget ? `${formatSavingsCurrency(savingsPlan.saved_amount)} saved · ${formatSavingsCurrency(savingsPlan.budget_amount ?? "0")} budgeted` : "Decide where your monthly Savings should go."}</p>
+          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{formatSavingsCurrency(savingsPlan.planned_to_funds)} of {formatSavingsCurrency(savingsPlan.budget_amount ?? "0")} assigned to Funds{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
+        </div>
       </div>
     </Card>
   )
