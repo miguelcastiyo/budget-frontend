@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger
 import { CalendarIcon, ChevronDown, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react"
 import type { Card, Category, Context, Preset, SplitFilter, Tag } from "@/lib/api/types"
 import { formatDateValue, parseIsoDate, transactionFilterPresets } from "@/lib/date-filters"
+import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
@@ -39,6 +40,7 @@ interface TransactionFiltersProps {
   customDateRange?: { date_from: string; date_to: string } | null
   onCustomDateRangeChange: (range: { date_from: string; date_to: string } | null) => void
   desktopSidebarToggle?: ReactNode
+  desktopMode?: boolean
 }
 
 const categories: { value: Category; label: string }[] = [
@@ -122,6 +124,109 @@ function FilterSectionHeader({
   )
 }
 
+function TagIconPreview({ tag }: { tag: Tag }) {
+  const Icon = getTagIcon(tag.name, tag.icon_key)
+  return <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+}
+
+function ContextIconPreview({ context }: { context: Context }) {
+  const Icon = getContextIcon(context.name, context.icon_key)
+  return <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+}
+
+function CompactFilterSection({
+  label,
+  options,
+  selectedValues,
+  onToggle,
+  collapsedLimit = 4,
+}: {
+  label: string
+  options: { value: string; label: string; icon?: ReactNode }[]
+  selectedValues: string[]
+  onToggle: (value: string) => void
+  collapsedLimit?: number
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const selected = options.filter((option) => selectedValues.includes(option.value))
+  const unselected = options.filter((option) => !selectedValues.includes(option.value))
+  const orderedOptions = [...selected, ...unselected]
+  const visibleOptions = showAll ? orderedOptions : orderedOptions.slice(0, Math.max(collapsedLimit, selected.length))
+  const hiddenCount = Math.max(orderedOptions.length - visibleOptions.length, 0)
+  const selectedSummary = selected.length === 0
+    ? "All"
+    : selected.length <= 2
+      ? selected.map((option) => option.label).join(", ")
+      : `${selected.slice(0, 2).map((option) => option.label).join(", ")} +${selected.length - 2}`
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-2">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+        {selected.length > 0 && <span className="text-[10px] font-medium text-muted-foreground">{selected.length}</span>}
+      </div>
+      {options.length === 0 ? (
+        <p className="px-2 text-xs text-muted-foreground">No {label.toLocaleLowerCase()} yet</p>
+      ) : (
+        <div className="grid gap-0.5">
+          {!expanded ? (
+            <button
+              type="button"
+              aria-expanded={false}
+              onClick={() => { setShowAll(false); setExpanded(true) }}
+              className="flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {selected[0]?.icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">{selected[0].icon}</span>}
+              <span className="min-w-0 flex-1 truncate" title={selectedSummary}>{selectedSummary}</span>
+              <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </button>
+          ) : (
+            <>
+              {visibleOptions.map((option) => {
+                const isSelected = selectedValues.includes(option.value)
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => onToggle(option.value)}
+                    className={cn(
+                      "flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-xs transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      isSelected && "bg-primary/10 font-medium text-foreground"
+                    )}
+                  >
+                    {option.icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">{option.icon}</span>}
+                    <span className="min-w-0 flex-1 truncate" title={option.label}>{option.label}</span>
+                    {isSelected && <span aria-hidden="true" className="shrink-0 text-primary">✓</span>}
+                  </button>
+                )
+              })}
+              {(hiddenCount > 0 || visibleOptions.length > 0) && (
+                <button
+                  type="button"
+                  aria-expanded={true}
+                  onClick={() => {
+                    if (hiddenCount > 0) {
+                      setShowAll(true)
+                    } else {
+                      setShowAll(false)
+                      setExpanded(false)
+                    }
+                  }}
+                  className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  {hiddenCount > 0 ? `Show ${hiddenCount} more` : "Show less"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function FilterChoiceGroup({
   items,
   selected,
@@ -164,6 +269,7 @@ export function TransactionFilters({
   customDateRange,
   onCustomDateRangeChange,
   desktopSidebarToggle,
+  desktopMode = false,
 }: TransactionFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [customRangeExpanded, setCustomRangeExpanded] = useState(Boolean(customDateRange))
@@ -342,7 +448,7 @@ export function TransactionFilters({
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-2">
+      <div className={cn("flex min-w-0 items-center gap-2", desktopMode && "hidden")}>
         <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="sm" className="h-10 shrink-0 rounded-full border border-border/70 bg-background px-2.5 text-muted-foreground hover:border-border hover:text-foreground">
@@ -457,7 +563,104 @@ export function TransactionFilters({
         <ShortcutRail items={shortcuts} />
       </div>
 
-      {activeChips.length > 0 && (
+      {desktopMode && (
+        <div className="space-y-5">
+          <section className="space-y-2">
+            <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Date</p>
+            <div className="grid gap-1">
+              {datePresets.slice(0, 2).map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => selectPreset(item.value)}
+                  className={cn(
+                    "flex min-h-9 items-center rounded-lg px-2 text-left text-sm transition-colors hover:bg-muted/60",
+                    preset === item.value && !customDateRange && "bg-secondary font-medium text-foreground"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => { setCustomRangeExpanded(true); setFiltersOpen(true) }}
+                className={cn(
+                  "flex min-h-9 items-center rounded-lg px-2 text-left text-sm transition-colors hover:bg-muted/60",
+                  customDateRange && "bg-secondary font-medium text-foreground"
+                )}
+              >
+                Custom range
+              </button>
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex items-center justify-between px-2">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Filters</p>
+              {hasClearableFilters && <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-muted-foreground hover:text-foreground">Clear</button>}
+            </div>
+            <div className="space-y-5">
+              <section className="space-y-2">
+                <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Category</p>
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {categories.map((category) => (
+                    <ChoiceChip
+                      key={category.value}
+                      label={category.label}
+                      selected={selectedCategories.includes(category.value)}
+                      onClick={() => toggleValue(category.value, selectedCategories, onCategoriesChange)}
+                      className="min-h-8 px-2.5 py-1 text-xs"
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <CompactFilterSection
+                label="Tags"
+                options={tags.map((tag) => ({ value: tag.id, label: tag.name, icon: <TagIconPreview tag={tag} /> }))}
+                selectedValues={selectedTags}
+                onToggle={(value) => toggleValue(value, selectedTags, onTagsChange)}
+                collapsedLimit={8}
+              />
+              <CompactFilterSection
+                label="Contexts"
+                options={contexts.map((context) => ({
+                  value: context.id,
+                  label: context.name,
+                  icon: <ContextIconPreview context={context} />,
+                }))}
+                selectedValues={selectedContexts}
+                onToggle={(value) => toggleValue(value, selectedContexts, onContextsChange)}
+                collapsedLimit={8}
+              />
+              <CompactFilterSection
+                label="Cards"
+                options={cards.map((card) => ({ value: card.id, label: card.name }))}
+                selectedValues={selectedCards}
+                onToggle={(value) => toggleValue(value, selectedCards, onCardsChange)}
+                collapsedLimit={8}
+              />
+
+              <section className="space-y-2">
+                <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Split</p>
+                <div className="flex flex-wrap gap-1.5 px-1">
+                  {[{ value: "all", label: "All" }, { value: "split", label: "Split" }, { value: "not_split", label: "Not split" }].map((item) => (
+                    <ChoiceChip
+                      key={item.value}
+                      label={item.label}
+                      selected={splitFilter === item.value}
+                      onClick={() => onSplitFilterChange(item.value === "all" ? "all" : item.value as SplitFilter)}
+                      className="min-h-8 px-2.5 py-1 text-xs"
+                    />
+                  ))}
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {!desktopMode && activeChips.length > 0 && (
         <div className="flex min-w-0 items-start gap-2">
           <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {activeChips.map((chip) => (

@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/formatters"
 import { mergeTransactionPages, replaceTransaction } from "@/lib/transaction-collection"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
@@ -503,7 +504,7 @@ export default function TransactionsPage() {
           )}
         >
           <div className="mb-6 lg:mb-0">
-            <div className="lg:sticky lg:top-24">
+            <div className="lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1 [scrollbar-width:thin]">
               <div className="hidden lg:block">
                 {desktopFiltersCollapsed ? (
                   <div className="flex justify-center">
@@ -518,12 +519,29 @@ export default function TransactionsPage() {
                     </button>
                   </div>
                 ) : (
-                  <TransactionFilters {...transactionFiltersProps} />
+                  <>
+                    <TransactionFilters {...transactionFiltersProps} desktopMode />
+                    {totalItems > 0 && (
+                      <section className="mt-8 border-t border-border/60 px-2 pt-5">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Current view</p>
+                        <div className="mt-4 grid gap-4">
+                          <div>
+                            <p className="text-xl font-semibold tracking-tight">{formatCurrency(stats.totalSpent.toFixed(2))}</p>
+                            <p className="text-xs text-muted-foreground">Total spent</p>
+                          </div>
+                          <div>
+                            <p className="text-xl font-semibold tracking-tight">{formatCurrency(stats.avgTransaction.toFixed(2))}</p>
+                            <p className="text-xs text-muted-foreground">Average transaction</p>
+                          </div>
+                        </div>
+                      </section>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="lg:hidden">
-                <TransactionFilters {...transactionFiltersProps} />
+                <TransactionFilters {...transactionFiltersProps} desktopMode={false} />
               </div>
             </div>
           </div>
@@ -533,9 +551,6 @@ export default function TransactionsPage() {
               <>
                 <div className="grid grid-cols-1 gap-2 lg:hidden">
                   <TransactionStatsGrid compact totalSpent={stats.totalSpent} count={stats.count} avgTransaction={stats.avgTransaction} splitCount={stats.splitCount} />
-                </div>
-                <div className="hidden grid-cols-1 gap-3 lg:grid">
-                  <TransactionStatsGrid totalSpent={stats.totalSpent} count={stats.count} avgTransaction={stats.avgTransaction} splitCount={stats.splitCount} />
                 </div>
               </>
             )}
