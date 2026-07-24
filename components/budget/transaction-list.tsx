@@ -11,7 +11,7 @@ import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { TransactionPresenceIndicators } from "@/components/budget/transaction-presence-indicators"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/lib/api/types"
-import { ChevronRight, ChevronsDown, Tag } from "lucide-react"
+import { ChevronRight, ChevronsDown } from "lucide-react"
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -24,7 +24,7 @@ interface TransactionListProps {
   className?: string
   style?: CSSProperties
   compact?: boolean
-  showMetadataChips?: boolean
+  activeContextIds?: string[]
   showScrollHint?: boolean
   headerRight?: ReactNode
   emptyTitle?: string
@@ -82,7 +82,7 @@ export function TransactionList({
   className,
   style,
   compact = false,
-  showMetadataChips = false,
+  activeContextIds = [],
   showScrollHint = false,
   headerRight,
   emptyTitle = "No transactions found",
@@ -93,7 +93,6 @@ export function TransactionList({
   const listRef = useRef<HTMLDivElement | null>(null)
   const [canScrollDown, setCanScrollDown] = useState(false)
   const isInteractive = !readOnly && Boolean(onTransactionClick)
-  const useInlineCompactMetadata = compact && !showMetadataChips
   const groupedTransactions = groupByDate(transactions)
   const showViewAllInHeader = showViewAll && viewAllPlacement === "header"
   const showViewAllInBottom = showViewAll && viewAllPlacement === "bottom"
@@ -203,6 +202,10 @@ export function TransactionList({
                   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
                   const ContextIcon = transaction.context ? getContextIcon(transaction.context.name, transaction.context.icon_key) : null
                   const hasNotes = Boolean(transaction.notes)
+                  const showContext = Boolean(
+                    transaction.context &&
+                    !(activeContextIds.length === 1 && activeContextIds[0] === transaction.context.id)
+                  )
                   return isInteractive ? (
                     <button
                       key={transaction.id}
@@ -226,35 +229,19 @@ export function TransactionList({
                             </span>
                           )}
                         </div>
-                        {useInlineCompactMetadata ? (
-                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                            <p className="truncate">{transaction.tag.name}</p>
-                            {transaction.context && ContextIcon && <span className="inline-flex min-w-0 items-center gap-1 truncate"><ContextIcon className="h-3 w-3 shrink-0" />{transaction.context.name}</span>}
-                            <TransactionPresenceIndicators
-                              hasCard={Boolean(transaction.card)}
-                              hasNotes={hasNotes}
-                            />
-                          </div>
-                        ) : (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                              <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
-                              <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
-                            </span>
-                            {transaction.context && ContextIcon && (
-                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                <ContextIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                <span className="truncate max-w-[170px]">{transaction.context.name}</span>
+                        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <span className="min-w-0 truncate">{transaction.tag.name}</span>
+                          {showContext && transaction.context && ContextIcon && (
+                            <>
+                              <span aria-hidden="true" className="shrink-0">·</span>
+                              <span className="inline-flex min-w-0 flex-1 items-center gap-1 truncate" title={transaction.context.name}>
+                                <ContextIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{transaction.context.name}</span>
                               </span>
-                            )}
-                            <TransactionPresenceIndicators
-                              hasCard={Boolean(transaction.card)}
-                              hasNotes={hasNotes}
-                              className="rounded-full border border-border/70 bg-background px-2 py-1"
-                              iconClassName="h-3 w-3"
-                            />
-                          </div>
-                        )}
+                            </>
+                          )}
+                          <TransactionPresenceIndicators hasNotes={hasNotes} />
+                        </div>
                       </div>
                       
                       <div className="text-right shrink-0 ml-2">
@@ -284,35 +271,19 @@ export function TransactionList({
                             </span>
                           )}
                         </div>
-                        {useInlineCompactMetadata ? (
-                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                            <p className="truncate">{transaction.tag.name}</p>
-                            {transaction.context && ContextIcon && <span className="inline-flex min-w-0 items-center gap-1 truncate"><ContextIcon className="h-3 w-3 shrink-0" />{transaction.context.name}</span>}
-                            <TransactionPresenceIndicators
-                              hasCard={Boolean(transaction.card)}
-                              hasNotes={hasNotes}
-                            />
-                          </div>
-                        ) : (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                              <Tag className="w-3 h-3 text-muted-foreground shrink-0" />
-                              <span className="truncate max-w-[170px]">{transaction.tag.name}</span>
-                            </span>
-                            {transaction.context && ContextIcon && (
-                              <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-foreground">
-                                <ContextIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                <span className="truncate max-w-[170px]">{transaction.context.name}</span>
+                        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          <span className="min-w-0 truncate">{transaction.tag.name}</span>
+                          {showContext && transaction.context && ContextIcon && (
+                            <>
+                              <span aria-hidden="true" className="shrink-0">·</span>
+                              <span className="inline-flex min-w-0 flex-1 items-center gap-1 truncate" title={transaction.context.name}>
+                                <ContextIcon aria-hidden="true" className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{transaction.context.name}</span>
                               </span>
-                            )}
-                            <TransactionPresenceIndicators
-                              hasCard={Boolean(transaction.card)}
-                              hasNotes={hasNotes}
-                              className="rounded-full border border-border/70 bg-background px-2 py-1"
-                              iconClassName="h-3 w-3"
-                            />
-                          </div>
-                        )}
+                            </>
+                          )}
+                          <TransactionPresenceIndicators hasNotes={hasNotes} />
+                        </div>
                       </div>
 
                       <div className="text-right shrink-0 ml-2">

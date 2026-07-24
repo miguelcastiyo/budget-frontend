@@ -543,6 +543,7 @@ export default function TransactionsPage() {
             <TransactionList
               transactions={transactions}
               title={transactionTitle}
+              activeContextIds={selectedContexts}
               emptyTitle={hasAnyTransactions && hasActiveFilters ? "No matching transactions" : "No transactions yet"}
               emptyDescription={
                 hasAnyTransactions && hasActiveFilters

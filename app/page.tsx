@@ -287,7 +287,6 @@ export default function DashboardPage() {
                 title="Recent Transactions"
                 showViewAll
                 compact
-                showMetadataChips
                 showScrollHint
                 emptyTitle="No transactions this month"
                 emptyDescription="Add your first transaction to start tracking."
