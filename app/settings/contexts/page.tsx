@@ -12,7 +12,7 @@ import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dial
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { TagIconPicker } from "@/components/settings/tag-icon-picker"
 import { ApiError, apiClient } from "@/lib/api/client"
-import { CONTEXT_ICON_OPTIONS, getContextIcon } from "@/lib/tag-icons"
+import { CONTEXT_ICON_OPTIONS, getContextIcon, getContextIconByKey } from "@/lib/tag-icons"
 import type { Context } from "@/lib/api/types"
 
 export default function ContextsSettingsPage() {
@@ -49,7 +49,9 @@ export default function ContextsSettingsPage() {
   const startEdit = (item: Context) => {
     setEditingId(item.id)
     setEditingName(item.name)
-    setEditingIconKey(item.icon_key ?? "")
+    // Older Context records may contain keys from the previous palette. Treat
+    // those as Auto so editing can always be saved with the current palette.
+    setEditingIconKey(item.icon_key && getContextIconByKey(item.icon_key) ? item.icon_key : "")
   }
 
   const cancelEdit = () => {
