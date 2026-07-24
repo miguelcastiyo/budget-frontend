@@ -67,6 +67,7 @@ import {
   toIsoDate,
 } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
+import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 
@@ -486,6 +487,10 @@ export function FundsOverviewPage() {
 
   return renderFundShell(
     <div className="space-y-5 lg:space-y-8">
+      <Button variant="ghost" size="sm" className="-ml-3 rounded-full px-3" asChild>
+        <Link href="/insights"><ArrowLeft className="size-4" />Insights</Link>
+      </Button>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Funds</p>
@@ -519,19 +524,10 @@ export function FundsOverviewPage() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)] lg:gap-8">
         <div className="space-y-4 lg:space-y-5">
-          <div className="space-y-1 lg:hidden">
-            <p className="text-lg font-semibold tracking-tight text-foreground">
-              {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
-            </p>
-            <p className="text-sm text-muted-foreground">{activeSummaryLabel}</p>
-          </div>
-
           <section className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Your funds</p>
-                </div>
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Your funds</p>
                 <Button className="h-11 rounded-full px-3 text-sm sm:hidden" onClick={() => {
                   setDialogMode("create")
                   setSelectedFund(null)
@@ -553,6 +549,13 @@ export function FundsOverviewPage() {
                   </Button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-lg font-semibold tracking-tight text-foreground">
+                {formatSavingsCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">saved</span>
+              </p>
+              <p className="text-sm text-muted-foreground">{activeSummaryLabel}</p>
             </div>
 
             {isLoading ? (
@@ -595,7 +598,7 @@ export function FundsOverviewPage() {
             )}
           </section>
 
-          <section className="space-y-3 border-t border-border/70 pt-5 lg:hidden">
+          {hasCloseoutContributions ? <section className="space-y-3 border-t border-border/70 pt-5 lg:hidden">
             <div className="flex items-center gap-2">
               <HandCoins className="size-4 text-muted-foreground" />
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
@@ -608,16 +611,11 @@ export function FundsOverviewPage() {
                 ? "Moved into funds from closed months."
                 : "No contributions from month closeouts yet."}
             </p>
-          </section>
+          </section> : null}
         </div>
 
         <aside className="hidden lg:block">
-          <FundsSidebar
-            totalBalance={totalBalance}
-            activeSummaryLabel={activeSummaryLabel}
-            closeoutTotal={closeoutTotal}
-            summaryError={summaryError}
-          />
+          <FundsSidebar closeoutTotal={closeoutTotal} summaryError={summaryError} />
         </aside>
       </div>
 
@@ -716,38 +714,26 @@ function FundCollectionSection({ label, children }: { label: string; children: R
 }
 
 function FundsSidebar({
-  totalBalance,
-  activeSummaryLabel,
   closeoutTotal,
   summaryError,
 }: {
-  totalBalance: number
-  activeSummaryLabel: string
   closeoutTotal: string | number
   summaryError: string | null
 }) {
   const hasCloseoutContributions = hasPositiveAmount(closeoutTotal)
 
+  if (!hasCloseoutContributions) {
+    return null
+  }
+
   return (
     <div className="space-y-6 pt-1">
-      <div className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">At a glance</p>
-        <div className="space-y-1">
-          <p className="text-xl font-semibold tracking-tight text-foreground">
-            {formatCurrency(totalBalance)} <span className="text-sm font-normal text-muted-foreground">total saved</span>
-          </p>
-          <p className="text-sm text-muted-foreground">{activeSummaryLabel}</p>
-        </div>
-      </div>
-
-      <div className="h-px bg-border/70" />
-
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <HandCoins className="size-4 text-muted-foreground" />
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">From month closeouts</p>
         </div>
-        <p className="text-xl font-semibold tracking-tight text-foreground">{formatCurrency(closeoutTotal)} this year</p>
+        <p className="text-xl font-semibold tracking-tight text-foreground">{formatSavingsCurrency(closeoutTotal)} this year</p>
         <p className="text-sm text-muted-foreground">
           {hasCloseoutContributions
             ? "Moved into funds from closed months."
@@ -837,7 +823,7 @@ function FundListCard({
             </div>
             {hasGoal ? (
               <p className="pt-1 text-sm font-medium text-foreground">
-                {isGoalReached ? "Goal reached" : isNotStarted ? "Not started" : `${percentFunded}%`}
+              {isGoalReached ? "100%" : isNotStarted ? "Not started" : `${percentFunded}%`}
               </p>
             ) : null}
           </div>

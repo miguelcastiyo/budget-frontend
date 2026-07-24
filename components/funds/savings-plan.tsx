@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { apiClient } from "@/lib/api/client"
 import { formatSavingsCurrency } from "@/lib/formatters"
-import { formatMonthLabel, getCurrentMonthKey } from "@/lib/date-filters"
+import { formatMonthLabel, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { useReplaceSavingsPlan, useSavingsPlan } from "@/lib/savings-plan"
 import type { SavingsPlanFundItem } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
@@ -18,12 +18,12 @@ function amount(value: string | null | undefined) {
   return Number.parseFloat(value ?? "0") || 0
 }
 
-function MoneyProgress({ value, target, label }: { value: string; target: string; label?: string }) {
+function MoneyProgress({ value, target, label, compactSummary = false }: { value: string; target: string; label?: string; compactSummary?: boolean }) {
   const percent = target && amount(target) > 0 ? Math.min((amount(value) / amount(target)) * 100, 100) : 0
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-semibold tracking-tight">{formatSavingsCurrency(value)} <span className="font-normal text-muted-foreground">of {formatSavingsCurrency(target)}</span></span>
+        <span className="font-semibold tracking-tight">{compactSummary ? <>{formatSavingsCurrency(value)} <span className="font-normal text-muted-foreground">saved · {formatSavingsCurrency(target)} budgeted</span></> : <>{formatSavingsCurrency(value)} <span className="font-normal text-muted-foreground">of {formatSavingsCurrency(target)}</span></>}</span>
         {label ? <span className="text-sm text-muted-foreground">{label}</span> : null}
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Savings progress">
@@ -68,13 +68,13 @@ export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { mon
   if (isLoading) return <div className="space-y-3 border-y border-border/70 py-5"><div className="h-3 w-24 animate-pulse rounded bg-muted" /><div className="h-7 w-44 animate-pulse rounded bg-muted" /></div>
   if (!data) return null
   const budget = data.budget.savings_budget
+  const monthName = formatMonthValue(month, { month: "long" }) ?? month
   return (
-    <section className="space-y-3 border-y border-border/70 py-5">
+    <section className="space-y-3 border-y border-border/70 py-4">
       <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">This month</p>
-      {!budget ? <><p className="font-semibold">Set {formatMonthLabel(month) ?? month}’s budget before creating a Savings Plan.</p><Link className="text-sm font-medium underline underline-offset-4" href="/settings/budget">Set monthly budget →</Link></> : <>
-        <MoneyProgress value={data.summary.saved_amount} target={budget} label={data.summary.over_saved_amount !== "0.00" ? `${formatSavingsCurrency(data.summary.over_saved_amount)} above plan` : `${formatSavingsCurrency(data.summary.remaining_to_save)} left to save`} />
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground"><span>{formatSavingsCurrency(data.summary.planned_to_funds)} planned for Funds</span><span>{formatSavingsCurrency(data.summary.unassigned_budget)} not assigned</span></div>
-        <Link className="text-sm font-medium text-foreground underline underline-offset-4" href={`/funds/savings-plan?month=${month}`}>{data.has_plan ? `View ${formatMonthLabel(month) ?? month} plan →` : `Create ${formatMonthLabel(month) ?? month} plan →`}</Link>
+      {!budget ? <><p className="font-semibold">No Savings budget for {monthName}</p><Button asChild variant="outline" size="sm" className="rounded-full"><Link href="/settings/budget">Set budget</Link></Button></> : <>
+        <MoneyProgress value={data.summary.saved_amount} target={budget} compactSummary label={data.summary.over_saved_amount !== "0.00" ? `${formatSavingsCurrency(data.summary.over_saved_amount)} over` : undefined} />
+        <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{amount(data.summary.unassigned_budget) > 0 ? `${formatSavingsCurrency(data.summary.unassigned_budget)} available to assign` : "Fully assigned"}</span><Button asChild variant="outline" size="sm" className="shrink-0 rounded-full"><Link href={`/funds/savings-plan?month=${month}`}>{data.has_plan ? "View plan" : `Plan ${formatMonthValue(month, { month: "long" }) ?? month}`}</Link></Button></div>
       </>}
     </section>
   )
