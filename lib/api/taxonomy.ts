@@ -1,5 +1,5 @@
 import type { ApiClientCore } from "./core"
-import type { Card, CreateNamedEntityRequest, Tag, TagQuickPicksResponse, UpdateCardRequest } from "./types"
+import type { Card, Context, CreateNamedEntityRequest, Tag, TagQuickPicksResponse, UpdateCardRequest } from "./types"
 
 export function createTaxonomyApi(core: ApiClientCore) {
   return {
@@ -31,6 +31,30 @@ export function createTaxonomyApi(core: ApiClientCore) {
 
     async deleteTag(tagId: string): Promise<void> {
       return core.request<void>(`/me/tags/${tagId}`, {
+        method: "DELETE",
+      })
+    },
+
+    async getContexts(): Promise<{ items: Context[] }> {
+      return core.request<{ items: Context[] }>("/me/contexts")
+    },
+
+    async createContext(data: CreateNamedEntityRequest): Promise<Context> {
+      return core.request<Context>("/me/contexts", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+    },
+
+    async updateContext(contextId: string, data: CreateNamedEntityRequest): Promise<Context> {
+      return core.request<Context>(`/me/contexts/${contextId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      })
+    },
+
+    async deleteContext(contextId: string): Promise<void> {
+      return core.request<void>(`/me/contexts/${contextId}`, {
         method: "DELETE",
       })
     },

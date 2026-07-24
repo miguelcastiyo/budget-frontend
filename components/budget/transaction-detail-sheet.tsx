@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatCategory, getCategoryColorClass } from "@/lib/formatters"
-import { getTagIcon } from "@/lib/tag-icons"
+import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import type { Transaction } from "@/lib/api/types"
 import { CalendarDays, Tag as TagGlyph, CreditCard, Folder, Users, Pencil, Trash2, FileText } from "lucide-react"
 import {
@@ -62,6 +62,7 @@ export function TransactionDetailSheet({
 
   if (!transaction) return null
   const TagIcon = getTagIcon(transaction.tag.name, transaction.tag.icon_key)
+  const ContextIcon = transaction.context ? getContextIcon(transaction.context.name, transaction.context.icon_key) : null
 
   const handleDelete = () => {
     onDelete(transaction.id)
@@ -103,6 +104,18 @@ export function TransactionDetailSheet({
                 <p className="font-medium">{formatDate(transaction.date)}</p>
               </div>
             </div>
+
+            {transaction.context && ContextIcon && (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-background flex items-center justify-center">
+                  <ContextIcon className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Context</p>
+                  <p className="font-medium">{transaction.context.name}</p>
+                </div>
+              </div>
+            )}
             
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-background flex items-center justify-center">

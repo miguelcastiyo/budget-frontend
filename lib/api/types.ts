@@ -147,6 +147,12 @@ export interface Tag {
   icon_key: string | null
 }
 
+export interface Context {
+  id: string
+  name: string
+  icon_key: string | null
+}
+
 export interface TagQuickPicksResponse {
   items: Tag[]
 }
@@ -358,6 +364,7 @@ export interface Transaction {
   source: "manual" | "import"
   recurring_expense_id: string | null
   tag: Tag
+  context: Context | null
   card: Card | null
   created_at: string
   updated_at: string
@@ -372,6 +379,8 @@ export interface CreateTransactionRequest {
   notes?: string | null
   tag_id?: string
   tag?: { name: string }
+  context_id?: string | null
+  context?: { name: string; icon_key?: string | null }
   card_id?: string | null
   card?: { name: string }
 }
@@ -385,6 +394,8 @@ export interface UpdateTransactionRequest {
   notes?: string | null
   tag_id?: string
   tag?: { name: string }
+  context_id?: string | null
+  context?: { name: string; icon_key?: string | null } | null
   card_id?: string | null
   card?: { name: string }
 }
@@ -411,6 +422,7 @@ export interface TransactionFilters {
   q?: string
   categories?: string
   tag_ids?: string
+  context_ids?: string
   card_ids?: string
   is_split?: Exclude<SplitFilter, "all">
   page?: number

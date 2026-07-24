@@ -50,6 +50,8 @@ export const TAG_ICON_OPTIONS = [
 ] as const
 
 export type TagIconKey = (typeof TAG_ICON_OPTIONS)[number]["key"]
+export type ContextIconKey = TagIconKey
+export const CONTEXT_ICON_OPTIONS = TAG_ICON_OPTIONS
 
 const iconByKey: Record<TagIconKey, LucideIcon> = TAG_ICON_OPTIONS.reduce(
   (acc, option) => {
@@ -107,3 +109,6 @@ export function getTagIcon(tagName: string, iconKey?: string | null): LucideIcon
 
   return iconByKey.tag
 }
+
+export const getContextIconByKey = getTagIconByKey
+export const getContextIcon = getTagIcon
