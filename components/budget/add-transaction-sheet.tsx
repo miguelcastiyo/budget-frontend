@@ -927,9 +927,15 @@ export function AddTransactionSheet({
                             </div>
                           ) : null
                         })() : (
-                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
-                            Create a context to use it for this transaction.
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setContextPickerOpen(true)}
+                            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-dashed border-border/60 px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            aria-label="Choose a context for this transaction"
+                          >
+                            <span>Choose a context for this transaction</span>
+                            <Plus className="h-4 w-4 shrink-0" />
+                          </button>
                         )}
                       </div>
 
