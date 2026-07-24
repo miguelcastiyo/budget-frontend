@@ -20,6 +20,10 @@ export function toIsoDate(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+export function getLocalDateKey(date = new Date()): string {
+  return toIsoDate(date)
+}
+
 export function getCurrentMonthKey(date = new Date()): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")

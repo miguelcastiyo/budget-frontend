@@ -1,10 +1,10 @@
 "use client"
 
-import { getCurrentMonthKey } from "@/lib/date-filters"
 import type { RecurringExpense, RecurringBillingType } from "@/lib/api/types"
-import { formatDateValue } from "@/lib/date-filters"
+import { formatDateValue, getLocalDateKey } from "@/lib/date-filters"
+import { getCommitmentDisplayStatus, type CommitmentDisplayStatus } from "./recurring-status"
 
-export type CommitmentOccurrenceStatus = "generated" | "upcoming" | "not_generated"
+export type CommitmentOccurrenceStatus = CommitmentDisplayStatus
 export type CommitmentLifecycleStatus = "active" | "paused" | "ended" | "starts_later"
 export type CommitmentSeriesState = "current" | "has_scheduled_change" | "changed_this_month"
 
@@ -49,21 +49,8 @@ export function getRecurringOccurrenceStatus(
   selectedMonth: string,
   today = new Date()
 ): CommitmentOccurrenceStatus {
-  if (rule.generated_for_month) {
-    return "generated"
-  }
-
-  const currentMonth = getCurrentMonthKey(today)
-  if (selectedMonth < currentMonth) {
-    return "not_generated"
-  }
-
-  if (selectedMonth > currentMonth) {
-    return "upcoming"
-  }
-
-  const todayIso = `${selectedMonth}-${String(today.getDate()).padStart(2, "0")}`
-  return rule.projected_date_for_month >= todayIso ? "upcoming" : "not_generated"
+  void selectedMonth
+  return getCommitmentDisplayStatus(rule, getLocalDateKey(today))
 }
 
 export function groupRecurringRulesBySeries(items: RecurringExpense[]): Map<string, RecurringExpense[]> {
@@ -166,12 +153,12 @@ export function buildRecurringSeriesEntries(
 
 export function getOccurrenceStatusLabel(status: CommitmentOccurrenceStatus): string {
   switch (status) {
-    case "generated":
+    case "logged":
       return "Logged"
     case "upcoming":
       return "Upcoming"
-    case "not_generated":
-      return "Not generated"
+    case "due":
+      return "Due"
   }
 }
 

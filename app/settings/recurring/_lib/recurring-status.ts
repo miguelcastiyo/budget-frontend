@@ -1,7 +1,20 @@
 "use client"
 
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
 import type { RecurringExpense } from "@/lib/api/types"
+
+export type CommitmentDisplayStatus = "upcoming" | "logged" | "due"
+
+export function getCommitmentDisplayStatus(
+  item: Pick<RecurringExpense, "projected_date_for_month" | "generated_for_month">,
+  today = getLocalDateKey()
+): CommitmentDisplayStatus {
+  if (item.projected_date_for_month > today) {
+    return "upcoming"
+  }
+
+  return item.generated_for_month ? "logged" : "due"
+}
 
 export type RecurringDisplayStatus =
   | "generated"
@@ -29,14 +42,17 @@ export function getRecurringDisplayStatus(
     return "paused"
   }
 
-  if (item.generated_for_month) {
+  const commitmentStatus = getCommitmentDisplayStatus(item, getLocalDateKey(today))
+  if (commitmentStatus === "logged") {
     return "generated"
   }
 
+  if (commitmentStatus === "upcoming") {
+    return "upcoming"
+  }
+
   const currentMonth = getCurrentMonthKey(today)
-  const todayIso = currentMonth === selectedMonth
-    ? `${selectedMonth}-${String(today.getDate()).padStart(2, "0")}`
-    : null
+  const todayIso = currentMonth === selectedMonth ? getLocalDateKey(today) : null
 
   if (todayIso && item.projected_date_for_month === todayIso) {
     return "due_today"

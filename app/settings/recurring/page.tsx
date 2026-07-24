@@ -51,7 +51,7 @@ import {
   type RecurringSeriesEntry,
 } from "./_lib/recurring-series"
 
-type RecurringFilter = "all" | "upcoming" | "generated" | "changes"
+type RecurringFilter = "all" | "upcoming" | "logged" | "changes"
 type DetailTrayMode = "details" | "schedule_change"
 
 export default function RecurringSettingsPage() {
@@ -155,8 +155,8 @@ export default function RecurringSettingsPage() {
     () => seriesEntries.length,
     [seriesEntries]
   )
-  const generatedCount = useMemo(
-    () => seriesEntries.filter((entry) => entry.occurrenceStatus === "generated").length,
+  const loggedCount = useMemo(
+    () => seriesEntries.filter((entry) => entry.occurrenceStatus === "logged").length,
     [seriesEntries]
   )
   const upcomingCount = useMemo(
@@ -447,7 +447,7 @@ export default function RecurringSettingsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                   <p>{activeItemsCount} active</p>
-                  <p>{generatedCount} logged</p>
+                  <p>{loggedCount} logged</p>
                   <p>{upcomingCount} upcoming</p>
                 </div>
                 {largestCommitment ? (
@@ -463,7 +463,7 @@ export default function RecurringSettingsPage() {
                 items={[
                   { value: "all", label: "All" },
                   { value: "upcoming", label: "Upcoming" },
-                  { value: "generated", label: "Logged" },
+                  { value: "logged", label: "Logged" },
                   { value: "changes", label: "Changes" },
                 ]}
                 value={mobileFilter}
@@ -570,7 +570,7 @@ export default function RecurringSettingsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Logged this month</span>
-                  <span className="font-medium">{generatedCount}</span>
+                  <span className="font-medium">{loggedCount}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Upcoming this month</span>
@@ -732,8 +732,8 @@ function matchesRecurringFilter(entry: RecurringSeriesEntry, filter: RecurringFi
       return true
     case "upcoming":
       return entry.occurrenceStatus === "upcoming"
-    case "generated":
-      return entry.occurrenceStatus === "generated"
+    case "logged":
+      return entry.occurrenceStatus === "logged"
     case "changes":
       return entry.seriesState === "has_scheduled_change"
   }
@@ -747,7 +747,7 @@ function getFilteredEmptyState(filter: RecurringFilter): { title: string; descri
         title: "Nothing else upcoming this month",
         description: "All active commitments for this month have already been logged or completed.",
       }
-    case "generated":
+    case "logged":
       return {
         title: "Nothing logged yet",
         description: "No commitments for this month have been logged yet.",

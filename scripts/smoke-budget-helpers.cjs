@@ -24,6 +24,8 @@ const dateFilters = require("../lib/date-filters.ts")
 const formatters = require("../lib/formatters.ts")
 const insights = require("../lib/insights.ts")
 const monthCloseout = require("../lib/month-closeout.ts")
+const recurringStatus = require("../app/settings/recurring/_lib/recurring-status.ts")
+const recurringSeries = require("../app/settings/recurring/_lib/recurring-series.ts")
 
 const hourlyMonthly = income.calculateHourlyMonthlyIncome("20.00", "10.00")
 assertApprox(hourlyMonthly, 866.6666666667, 0.000001, "hourly income uses 52/12 monthly average")
@@ -144,12 +146,55 @@ assertEqual(dateFilters.formatMonthLabel("2026-05"), "May 2026", "month label fo
 assertEqual(dateFilters.formatMonthLabel("2026-99"), null, "month label rejects invalid months")
 assertEqual(dateFilters.formatMonthValue("2026-05", { month: "short" }), "May", "month value formatter renders month keys")
 assertEqual(dateFilters.toIsoDate(new Date(2026, 0, 5)), "2026-01-05", "toIsoDate uses local calendar date")
+assertEqual(dateFilters.getLocalDateKey(new Date(2026, 6, 26, 23, 59)), "2026-07-26", "local date key uses the local calendar day")
 assertEqual(dateFilters.parseIsoDate("2026-02-29"), null, "parseIsoDate rejects invalid calendar dates")
 assertEqual(dateFilters.parseIsoDate("2024-02-29").getFullYear(), 2024, "parseIsoDate accepts leap day")
 assertEqual(dateFilters.parseMonthKey("2026-05").getMonth(), 4, "parseMonthKey parses valid month keys")
 assertEqual(dateFilters.parseMonthKey("2026-15"), null, "parseMonthKey rejects invalid month keys")
 assertEqual(dateFilters.parseDateValue("2026-01-05").getDate(), 5, "parseDateValue preserves local calendar dates")
 assertEqual(dateFilters.formatDateValue("2026-01-05", { month: "short", day: "numeric", year: "numeric" }), "Jan 5, 2026", "date value formatter renders date-only values")
+
+const commitment = (projectedDate, generated) => ({
+  projected_date_for_month: projectedDate,
+  generated_for_month: generated,
+})
+const july23 = "2026-07-23"
+assertEqual(
+  recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-27", true), july23),
+  "upcoming",
+  "generated future commitment remains upcoming"
+)
+assertEqual(
+  recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-17", true), july23),
+  "logged",
+  "generated past commitment is logged"
+)
+assertEqual(
+  recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-27", true), "2026-07-27"),
+  "logged",
+  "generated commitment due today is logged"
+)
+assertEqual(
+  recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-27", false), july23),
+  "upcoming",
+  "future ungenerated commitment is upcoming"
+)
+assertEqual(
+  recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-21", false), july23),
+  "due",
+  "past ungenerated commitment is due"
+)
+
+const upcomingCommitments = [
+  { expense: "Spotify", projected_date_for_month: "2026-07-17", generated_for_month: true },
+  { expense: "Car Insurance", projected_date_for_month: "2026-07-21", generated_for_month: true },
+  { expense: "Rent", projected_date_for_month: "2026-07-27", generated_for_month: true },
+].filter((item) => recurringStatus.getCommitmentDisplayStatus(item, july23) === "upcoming")
+assertDeepEqual(
+  upcomingCommitments.map((item) => item.expense),
+  ["Rent"],
+  "upcoming commitments use billing date rather than generation state"
+)
 assertEqual(
   dateFilters.formatDateTimeValue("2026-01-05T14:30:00Z", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }),
   "Jan 5, 2026, 2:30 PM",
