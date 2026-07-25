@@ -104,7 +104,7 @@ export default function TransactionsPage() {
   const [customDateRange, setCustomDateRange] = useState<DateRangeFilter | null>(null)
   const [desktopFiltersCollapsed, setDesktopFiltersCollapsed] = useState(false)
   const [queryFiltersInitialized, setQueryFiltersInitialized] = useState(false)
-  const [hasAnyTransactions, setHasAnyTransactions] = useState(false)
+  const [hasAnyTransactions, setHasAnyTransactions] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [summary, setSummary] = useState<TransactionSummary>(emptyTransactionSummary)
@@ -215,19 +215,17 @@ export default function TransactionsPage() {
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [tagsResponse, quickPicksResponse, cardsResponse, contextsResponse, transactionsSummary] = await Promise.all([
+      const [tagsResponse, quickPicksResponse, cardsResponse, contextsResponse] = await Promise.all([
         apiClient.getTags(),
         apiClient.getTagQuickPicks(5),
         apiClient.getCards(),
         apiClient.getContexts(),
-        apiClient.getTransactions({ page: 1, page_size: 1, sort: "date_desc" }),
       ])
 
       setTags(tagsResponse.items)
       setQuickPickTags(quickPicksResponse.items)
       setCards(cardsResponse.items)
       setContexts(contextsResponse.items)
-      setHasAnyTransactions(transactionsSummary.total_items > 0)
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     }
@@ -248,6 +246,17 @@ export default function TransactionsPage() {
       setCurrentPage(response.page)
       setTotalItems(response.total_items)
       setSummary(response.summary)
+
+      const hasExplicitFilters = Object.entries(activeTransactionFilters).some(([key, value]) => {
+        if (key === "sort" || key === "page_size") {
+          return false
+        }
+        return value !== undefined && value !== "" && value !== "all"
+      })
+
+      if (!hasExplicitFilters) {
+        setHasAnyTransactions(response.total_items > 0)
+      }
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     } finally {
@@ -362,6 +371,7 @@ export default function TransactionsPage() {
     debouncedSearchQuery.trim() || preset !== "all" || customDateRange || selectedCategories.length ||
     selectedTags.length || selectedContexts.length || selectedCards.length || splitFilter !== "all" || queryMonthLabel
   )
+  const showFilteredEmptyState = hasActiveFilters && (hasAnyTransactions === true || hasAnyTransactions === null)
 
   const clearAllFilters = useCallback(() => {
     setPreset("all")
@@ -559,14 +569,14 @@ export default function TransactionsPage() {
               transactions={transactions}
               title={transactionTitle}
               activeContextIds={selectedContexts}
-              emptyTitle={hasAnyTransactions && hasActiveFilters ? "No matching transactions" : "No transactions yet"}
+              emptyTitle={showFilteredEmptyState ? "No matching transactions" : "No transactions yet"}
               emptyDescription={
-                hasAnyTransactions && hasActiveFilters
+                showFilteredEmptyState
                   ? "Try removing or adjusting some filters."
                   : "Add your first transaction to start tracking spending."
               }
-              emptyActionLabel={hasAnyTransactions && hasActiveFilters ? "Clear filters" : "Add Transaction"}
-              onEmptyAction={hasAnyTransactions && hasActiveFilters ? clearAllFilters : () => setShowAddTransaction(true)}
+              emptyActionLabel={showFilteredEmptyState ? "Clear filters" : "Add Transaction"}
+              onEmptyAction={showFilteredEmptyState ? clearAllFilters : () => setShowAddTransaction(true)}
               headerRight={
                 <div className="flex items-center gap-2">
                   <div className="inline-flex items-center rounded-lg border border-border/70 p-0.5 bg-background">
@@ -645,11 +655,11 @@ export default function TransactionsPage() {
 
       <FloatingAddButton
         onClick={() => setShowAddTransaction(true)}
-        showCoachmark={!isLoading && !hasAnyTransactions}
+        showCoachmark={!isLoading && hasAnyTransactions === false}
       />
       <BottomNav
         onAddClick={() => setShowAddTransaction(true)}
-        showAddCoachmark={!isLoading && !hasAnyTransactions}
+        showAddCoachmark={!isLoading && hasAnyTransactions === false}
       />
 
       <AddTransactionSheet

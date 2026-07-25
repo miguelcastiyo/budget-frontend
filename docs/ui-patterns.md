@@ -95,3 +95,19 @@ Keep frontend API code split by domain under `lib/api/` instead of adding every 
 - Keep `lib/api/client.ts` as the stable composition layer that assembles the exported `apiClient`.
 
 This keeps endpoint ownership clear and reduces churn when one feature area changes.
+
+## Data Ownership and Mutation Refresh
+
+- Backend-derived financial values are authoritative. Frontend code may format values and calculate temporary draft feedback, but should not recreate accounting, budget, Fund, Savings Plan, or closeout rules.
+- Each feature should have an identifiable canonical read path. Keep endpoint ownership in `lib/api/` and keep page/feature loaders responsible for composing the data they present.
+- A mutation should explicitly refresh the surfaces whose server state changed. Do not blanket-reload the application or introduce a global event bus for local changes.
+- Transactions mutations preserve the current collection context: filters, search, sort, loaded page depth, and selected month/date state should survive edits and deletes where the current UX supports it.
+- Mobile and desktop controls may render differently, but they must share state and semantics. URL parameters currently seed/deep-link selected transaction filters; the page-local filter model remains the active source of truth after initialization.
+- Optional enrichment/reference data must not block the core action when the core response is available.
+- Do not add shared server-state caching until repeated reads and affected-surface invalidation rules are demonstrated and documented.
+
+## Privacy-Sensitive Frontend Behavior
+
+- Do not add financial or user data to persistent browser storage without an explicit privacy/security design.
+- Do not log authentication material, complete API payloads, transaction descriptions/notes, income, Fund names/balances, or Savings Plan data.
+- Third-party telemetry on authenticated routes must be understood and intentionally approved before it is treated as privacy-safe.

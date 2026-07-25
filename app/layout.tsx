@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import { Analytics } from '@vercel/analytics/next'
 import { AuthGate } from '@/components/auth/auth-gate'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { GlobalErrorProvider } from '@/components/common/global-error-provider'
@@ -64,7 +63,6 @@ export default function RootLayout({
             </AuthProvider>
           </GoogleOauthProvider>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

@@ -14,6 +14,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs",
+    "test:interaction": "playwright test",
+    "test:interaction:headed": "playwright test --headed",
     "test": "npm run typecheck && npm run test:budget-helpers"
   },
   "dependencies": {
@@ -30,7 +32,6 @@
     "@radix-ui/react-switch": "1.2.6",
     "@radix-ui/react-tabs": "1.1.13",
     "@react-oauth/google": "^0.13.4",
-    "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
+    "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22",
     "@types/react": "19.2.14",
