@@ -83,8 +83,19 @@ export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { mon
 export function SavingsPlanFundContext({ fundId, month = getCurrentMonthKey() }: { fundId: string; month?: string }) {
   const { data, isLoading } = useSavingsPlan(month)
   const item = data?.funds.find((entry) => entry.fund.id === fundId)
-  if (isLoading || !item || (amount(item.planned_amount) === 0 && !item.pace.recommended_amount)) return null
-  return <section className="space-y-3 border-y border-border/70 py-5"><p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">This month</p>{amount(item.planned_amount) > 0 ? <MoneyProgress value={item.progress_amount} target={item.planned_amount} label={amount(item.remaining_planned) > 0 ? `${formatSavingsCurrency(item.remaining_planned)} remaining` : "Plan complete"} /> : <p className="font-medium">No amount planned</p>}<PaceHint item={item} /><Link className="inline-block text-sm font-medium underline underline-offset-4" href={`/funds/savings-plan?month=${month}`}>View Savings Plan →</Link></section>
+  if (isLoading || !item) return null
+  const monthName = formatMonthValue(month, { month: "long" }) ?? month
+  const contributed = amount(item.progress_amount)
+  const planned = amount(item.planned_amount)
+  const planStatus = planned === 0
+    ? `No ${monthName} amount planned`
+    : amount(item.over_plan_amount) > 0
+      ? `${formatSavingsCurrency(item.over_plan_amount)} above plan`
+      : amount(item.remaining_planned) > 0
+        ? `${formatSavingsCurrency(item.remaining_planned)} remaining toward plan`
+        : "Plan met"
+
+  return <section className="space-y-3 border-y border-border/70 py-5"><p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">This month</p>{contributed > 0 ? <p className="text-xl font-semibold tracking-tight">{formatSavingsCurrency(item.progress_amount)} contributed</p> : <p className="text-sm text-muted-foreground">No {monthName} contributions</p>}{planned > 0 ? <p className="text-sm text-muted-foreground">{formatSavingsCurrency(item.planned_amount)} planned for {monthName}</p> : <p className="text-sm text-muted-foreground">{planStatus}</p>}{planned > 0 ? <p className="text-sm font-medium text-foreground">{planStatus}</p> : null}<PaceHint item={item} /><Link className="inline-block text-sm font-medium underline underline-offset-4" href={`/funds/savings-plan?month=${month}`}>View Savings Plan →</Link></section>
 }
 
 export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {

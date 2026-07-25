@@ -252,7 +252,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <FundsShortcutCard savingsPlan={overview?.savings_plan ?? null} />
+          <FundsShortcutCard month={currentMonth} savingsPlan={overview?.savings_plan ?? null} />
 
           <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
             <div className="flex items-center justify-between">
@@ -357,7 +357,16 @@ export default function DashboardPage() {
   )
 }
 
-function FundsShortcutCard({ savingsPlan }: { savingsPlan: MonthOverviewResponse["savings_plan"] | null }) {
+function FundsShortcutCard({ month, savingsPlan }: { month: string; savingsPlan: MonthOverviewResponse["savings_plan"] | null }) {
+  const monthName = formatMonthValue(month, { month: "long" }) ?? month
+  const actualDirected = savingsPlan ? Number.parseFloat(savingsPlan.transaction_directed_to_funds) || 0 : 0
+  const plannedToFunds = savingsPlan ? Number.parseFloat(savingsPlan.planned_to_funds) || 0 : 0
+  const planContext = savingsPlan?.has_plan
+    ? `${formatSavingsCurrency(actualDirected)} directed to Funds · ${formatSavingsCurrency(plannedToFunds)} planned`
+    : actualDirected > 0
+      ? `${formatSavingsCurrency(actualDirected)} directed to Funds · No ${monthName} plan`
+      : `No ${monthName} plan`
+
   return (
     <Card className="border-0 p-4 shadow-sm">
       <div className="space-y-3">
@@ -372,7 +381,7 @@ function FundsShortcutCard({ savingsPlan }: { savingsPlan: MonthOverviewResponse
         </div>
         <div className="min-w-0">
           <p className="whitespace-normal text-sm text-muted-foreground">{savingsPlan?.has_budget ? `${formatSavingsCurrency(savingsPlan.saved_amount)} saved · ${formatSavingsCurrency(savingsPlan.budget_amount ?? "0")} budgeted` : "Decide where your monthly Savings should go."}</p>
-          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{formatSavingsCurrency(savingsPlan.planned_to_funds)} of {formatSavingsCurrency(savingsPlan.budget_amount ?? "0")} assigned to Funds{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
+          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{planContext}{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
         </div>
       </div>
     </Card>
