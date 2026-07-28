@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { apiClient } from "@/lib/api/client"
 import { formatSavingsCurrency } from "@/lib/formatters"
 import { formatMonthLabel, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { useReplaceSavingsPlan, useSavingsPlan } from "@/lib/savings-plan"
 import type { SavingsPlanFundItem } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 
 function amount(value: string | null | undefined) {
   return Number.parseFloat(value ?? "0") || 0
@@ -64,6 +64,8 @@ function FundPlanRow({ item, editing, value, onChange, onRemove }: { item: Savin
 }
 
 export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { month?: string }) {
+  const financialAuthority = useFinancialAuthority()
+  if (financialAuthority.isLoading || financialAuthority.mode === "encrypted") return null
   const { data, isLoading } = useSavingsPlan(month)
   if (isLoading) return <div className="space-y-3 border-y border-border/70 py-5"><div className="h-3 w-24 animate-pulse rounded bg-muted" /><div className="h-7 w-44 animate-pulse rounded bg-muted" /></div>
   if (!data) return null
@@ -81,6 +83,8 @@ export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { mon
 }
 
 export function SavingsPlanFundContext({ fundId, month = getCurrentMonthKey() }: { fundId: string; month?: string }) {
+  const financialAuthority = useFinancialAuthority()
+  if (financialAuthority.isLoading || financialAuthority.mode === "encrypted") return null
   const { data, isLoading } = useSavingsPlan(month)
   const item = data?.funds.find((entry) => entry.fund.id === fundId)
   if (isLoading || !item) return null
@@ -102,6 +106,7 @@ export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {
   const [month, setMonth] = useState(initialMonth || getCurrentMonthKey())
   const { data, isLoading, error, refetch } = useSavingsPlan(month)
   const { replace, isSaving, error: saveError } = useReplaceSavingsPlan(month)
+  const financialAuthority = useFinancialAuthority()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [showAdd, setShowAdd] = useState(false)
@@ -120,7 +125,7 @@ export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {
     if (next) { setEditing(false); setShowAdd(false); await refetch() }
   }
   const openAdd = async () => {
-    const result = await apiClient.getFunds({ status: "active" })
+    const result = await financialAuthority.getFunds({ status: "active" })
     setActiveFunds(result.items.map((fund) => ({ fund: { id: fund.id, name: fund.name, status: fund.status, goal_amount: fund.goal_amount, target_month: fund.target_month, current_balance: fund.current_balance }, planned_amount: "0.00", transaction_contributed: "0.00", closeout_contributed: "0.00", progress_amount: "0.00", remaining_planned: "0.00", over_plan_amount: "0.00", pace: { status: "unavailable", planning_basis_balance: null, goal_shortfall: null, months_remaining: null, recommended_amount: null } })))
     setShowAdd(true)
   }

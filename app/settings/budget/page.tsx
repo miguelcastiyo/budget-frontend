@@ -16,11 +16,17 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import type {
   BudgetSettings,
   BudgetSettingsResolvedResponse,
+  BudgetSettingsVersionsResponse,
   BudgetSettingsVersionItem,
 } from "@/lib/api/types"
 import { formatMonthLabel, getCurrentMonthKey, isFutureMonth, parseMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { formatMoneyCents } from "@/lib/domain/financial/money"
+import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
+import type { RehydratedFinancialState } from "@/lib/privacy/encrypted-authority/rehydrate"
 import {
   totalAmount,
   totalPercent,
@@ -46,7 +52,54 @@ import {
   serializeBudgetFormState,
 } from "@/lib/budget-form"
 
+function budgetSettingsFromState(item: RehydratedFinancialState["budgets"][number]): BudgetSettings {
+  return {
+    monthly_income: formatMoneyCents(item.monthlyIncomeCents),
+    income_source_type: item.incomeSourceType,
+    primary_monthly_income: item.primaryMonthlyIncomeCents == null ? null : formatMoneyCents(item.primaryMonthlyIncomeCents),
+    primary_hourly_rate: item.primaryHourlyRateCents == null ? null : formatMoneyCents(item.primaryHourlyRateCents),
+    primary_weekly_hours: item.primaryWeeklyHoursHundredths == null ? null : (item.primaryWeeklyHoursHundredths / 100).toFixed(2),
+    side_income_type: item.sideIncomeType,
+    side_income_label: null,
+    side_monthly_income: item.sideMonthlyIncomeCents == null ? null : formatMoneyCents(item.sideMonthlyIncomeCents),
+    side_hourly_rate: item.sideHourlyRateCents == null ? null : formatMoneyCents(item.sideHourlyRateCents),
+    side_weekly_hours: item.sideWeeklyHoursHundredths == null ? null : (item.sideWeeklyHoursHundredths / 100).toFixed(2),
+    allocation_mode: item.allocationMode,
+    needs_percent: item.needsPercentHundredths == null ? undefined : (item.needsPercentHundredths / 100).toFixed(2),
+    wants_percent: item.wantsPercentHundredths == null ? undefined : (item.wantsPercentHundredths / 100).toFixed(2),
+    savings_percent: item.savingsPercentHundredths == null ? undefined : (item.savingsPercentHundredths / 100).toFixed(2),
+    needs_amount: item.needsAmountCents == null ? undefined : formatMoneyCents(item.needsAmountCents),
+    wants_amount: item.wantsAmountCents == null ? undefined : formatMoneyCents(item.wantsAmountCents),
+    savings_amount: item.savingsAmountCents == null ? undefined : formatMoneyCents(item.savingsAmountCents),
+  }
+}
+
+function getEncryptedBudgetResolution(state: RehydratedFinancialState | undefined, month: string): BudgetSettingsResolvedResponse {
+  if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+  const resolved = resolvedBudget(state.budgets, month)
+  return { requested_month: month, resolved_effective_month: resolved.resolvedEffectiveMonth, is_exact_match: resolved.isExactMatch, settings: budgetSettingsFromState(resolved.settings) }
+}
+
+function getEncryptedBudgetVersions(state: RehydratedFinancialState | undefined): BudgetSettingsVersionsResponse {
+  if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+  const items = state.budgets.filter((item) => item.effectiveMonth).sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth)).map((item, index, all) => {
+    const settings = budgetSettingsFromState(item)
+    const amounts = resolvedAmounts(item)
+    return { effective_month: `${item.effectiveMonth}-01`, applies_from_month: item.effectiveMonth, applies_until_month: all[index + 1]?.effectiveMonth ? `${all[index + 1].effectiveMonth}-01` : null, ...settings, needs_percent: settings.needs_percent ?? null, wants_percent: settings.wants_percent ?? null, savings_percent: settings.savings_percent ?? null, needs_amount: settings.needs_amount ?? null, wants_amount: settings.wants_amount ?? null, savings_amount: settings.savings_amount ?? null, resolved_amounts: amounts, created_at: "", updated_at: "" }
+  })
+  return { items }
+}
+
+async function updateEncryptedBudget(authority: ReturnType<typeof useFinancialAuthority>["authority"], month: string, payload: Record<string, unknown>): Promise<BudgetSettings> {
+  if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+  const existing = authority.store.values().find((record) => record.family === "budget_version" && String(record.data.effective_month ?? "").startsWith(month))
+  if (existing) await authority.update(existing.envelope.record_id, { ...existing.data, ...payload })
+  else await authority.createSource("budget_version", "budget_version_v1", createEncryptedRecordId(), payload)
+  return payload as unknown as BudgetSettings
+}
+
 export default function BudgetSettingsPage() {
+  const financialAuthority = useFinancialAuthority()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -113,10 +166,9 @@ export default function BudgetSettingsPage() {
       setIncomeForm(defaultIncomeFormState)
       setAllocationForm(defaultBudgetAllocationFormState)
       setLoadedPayloadKey(null)
-      const [budgetResult, versionsResult] = await Promise.allSettled([
-        apiClient.getBudgetSettings(selectedMonth),
-        apiClient.getBudgetSettingsVersions(),
-      ])
+      const [budgetResult, versionsResult] = financialAuthority.mode === "encrypted"
+        ? await Promise.allSettled([getEncryptedBudgetResolution(financialAuthority.authority?.getState(), selectedMonth), getEncryptedBudgetVersions(financialAuthority.authority?.getState())])
+        : await Promise.allSettled([apiClient.getBudgetSettings(selectedMonth), apiClient.getBudgetSettingsVersions()])
 
       if (cancelled) {
         return
@@ -156,7 +208,7 @@ export default function BudgetSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [initialMonth])
+  }, [financialAuthority, initialMonth])
 
   useEffect(() => {
     if (!shouldAutoOpenEditor || isBudgetLoading || budgetResolution === null || budgetError !== null) {
@@ -229,10 +281,13 @@ export default function BudgetSettingsPage() {
     setSuccess(null)
 
     try {
-      const response = await apiClient.updateBudgetSettings({
+      const payload = {
         effective_month: selectedMonth,
         ...budgetSettingsPayload(incomeForm, allocationForm),
-      })
+      }
+      const response = financialAuthority.mode === "encrypted"
+        ? await updateEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
+        : await apiClient.updateBudgetSettings(payload)
 
       hydrateForm(response)
       setBudgetResolution({
@@ -242,7 +297,7 @@ export default function BudgetSettingsPage() {
         settings: response,
       })
       try {
-        const versions = await apiClient.getBudgetSettingsVersions()
+        const versions = financialAuthority.mode === "encrypted" ? await getEncryptedBudgetVersions(financialAuthority.authority?.getState()) : await apiClient.getBudgetSettingsVersions()
         setBudgetVersions(versions.items)
         setVersionsError(null)
       } catch (versionsErr) {

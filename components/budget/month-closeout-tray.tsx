@@ -44,6 +44,8 @@ import type {
   MonthCloseoutResultType,
   MonthCloseoutSaved,
 } from "@/lib/api/types"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { commitEncryptedCloseout, reopenEncryptedCloseout } from "@/lib/privacy/encrypted-authority/closeout-mutation"
 
 export type MonthCloseoutTrayMode = "close" | "view" | "edit" | "review"
 
@@ -185,6 +187,7 @@ export function MonthCloseoutTray({
   onModeChange,
   onSaved,
 }: MonthCloseoutTrayProps) {
+  const authority = useFinancialAuthority()
   const [notes, setNotes] = useState("")
   const [allocations, setAllocations] = useState<EditableAllocationRow[]>([])
   const [decision, setDecision] = useState<CloseoutDecision>(null)
@@ -253,7 +256,7 @@ export function MonthCloseoutTray({
     let isActive = true
     setIsFundsLoading(true)
 
-    void apiClient.getFunds({ status: "active", include_entries_summary: true })
+    void authority.getFunds({ status: "active" })
       .then((response) => {
         if (isActive) {
           setFunds(response.items)
@@ -273,7 +276,7 @@ export function MonthCloseoutTray({
     return () => {
       isActive = false
     }
-  }, [open, showDecisionSection])
+  }, [authority, open, showDecisionSection])
 
   const footerState = useMemo(() => {
     if (mode === "edit") {
@@ -352,10 +355,11 @@ export function MonthCloseoutTray({
         allocations: buildPayloadAllocations(allocations),
       }
 
-      const response =
-        mode === "edit"
-          ? await apiClient.updateMonthCloseout(month, payload)
-          : await apiClient.closeMonth(month, payload)
+      const response = authority.mode === "encrypted"
+        ? await commitEncryptedCloseout(authority.authority!, month, payload)
+        : mode === "edit"
+          ? await authority.updateMonthCloseout(month, payload)
+          : await authority.closeMonth(month, payload)
 
       onSaved(response)
       onOpenChange(false)
@@ -379,7 +383,9 @@ export function MonthCloseoutTray({
     setError(null)
 
     try {
-      const response = await apiClient.reopenMonth(month)
+      const response = authority.mode === "encrypted"
+        ? await reopenEncryptedCloseout(authority.authority!, month)
+        : await authority.reopenMonth(month)
       onSaved(response)
       setShowReopenConfirm(false)
       onOpenChange(false)

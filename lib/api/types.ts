@@ -25,6 +25,23 @@ export interface UserPreferences {
   }
 }
 
+export interface VaultMetadata {
+  vault_id: string
+  crypto_profile_version: 1
+  passphrase: {
+    kdf: "PBKDF2"
+    kdf_hash: "SHA-256"
+    iterations: number
+    salt: string
+    wrap_algorithm: "AES-KW"
+    wrapped_vault_key: string
+  }
+  recovery: {
+    wrap_algorithm: "AES-KW"
+    wrapped_vault_key: string
+  }
+}
+
 // Profile
 export interface Profile {
   id: string

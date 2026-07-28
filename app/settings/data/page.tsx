@@ -29,6 +29,10 @@ import {
   TagSetup,
 } from "./_components/data-settings-sections"
 import { useDataRuns } from "./_hooks/use-data-runs"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { exportTransactions as exportEncryptedTransactions } from "@/lib/domain/financial/csv"
+import { planCsvImport, type CsvRow } from "@/lib/domain/financial/csv"
+import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
 import {
   bestCategorySource,
   createEmptyImportState,
@@ -50,11 +54,26 @@ import {
   type ImportStep,
 } from "./_lib/import-export"
 
+function parseCsvText(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const rows: string[][] = []
+  let row: string[] = [], cell = "", quoted = false
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') { cell += '"'; index += 1 } else quoted = !quoted
+    } else if (character === "," && !quoted) { row.push(cell); cell = "" } else if ((character === "\n" || character === "\r") && !quoted) { if (character === "\r" && text[index + 1] === "\n") index += 1; row.push(cell); if (row.some((value) => value.trim())) rows.push(row); row = []; cell = "" } else cell += character
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row) }
+  const headers = rows.shift()?.map((value) => value.trim()) ?? []
+  return { headers, rows: rows.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]))) }
+}
+
 export default function DataSettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { dataRuns, isLoadingRuns, runsError, loadDataRuns } = useDataRuns(50)
+  const authority = useFinancialAuthority()
   const [rollbackTarget, setRollbackTarget] = useState<DataRunItem | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const [rollingBackImportId, setRollingBackImportId] = useState<string | null>(null)
@@ -146,6 +165,19 @@ export default function DataSettingsPage() {
 
     setIsPreviewing(true)
     try {
+      if (authority.mode === "encrypted") {
+        const parsed = parseCsvText(await file.text())
+        const lower = new Map(parsed.headers.map((header) => [header.toLowerCase(), header]))
+        const suggestedMapping: CsvImportMapping = {}
+        for (const field of ["date", "expense", "amount", "category", "tag", "card", "is_split", "notes"] as const) {
+          const header = lower.get(field) ?? lower.get(field.replace("is_split", "is split"))
+          if (header) suggestedMapping[field] = header
+        }
+        const preview: CsvImportPreviewResponse = { mode: "preview", headers: parsed.headers, sample_rows: parsed.rows.slice(0, 5), column_profiles: parsed.headers.map((header) => ({ header, blank_count: parsed.rows.filter((item) => !item[header]?.trim()).length, unique_values_truncated: false, unique_values: [...new Set(parsed.rows.map((item) => item[header] ?? ""))].filter(Boolean).slice(0, 100).map((value) => ({ value, count: parsed.rows.filter((item) => item[header] === value).length })) })), date_profiles: [], suggested_mapping: suggestedMapping, total_rows: parsed.rows.length, limits: { max_bytes: 10_000_000, max_rows: 100_000, max_returned_errors: 100 } }
+        const tagsResponse = (authority.authority?.getState().tags ?? []).map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey }))
+        setImportPreview(preview); setExistingTags(tagsResponse); setImportMapping(suggestedMapping); setDateYear(String(currentImportYear())); setCategoryMode(suggestedMapping.category ? "exact_column" : "default"); setCategorySourceHeader(suggestedMapping.category ?? ""); setCategoryValueMap({}); setTagValueMap({}); setImportStep("map")
+        return
+      }
       const [preview, tagsResponse] = await Promise.all([
         apiClient.previewImportTransactions(file),
         apiClient.getTags(),
@@ -293,6 +325,12 @@ export default function DataSettingsPage() {
     setCommitResult(null)
 
     try {
+      if (authority.mode === "encrypted") {
+        const plan = await buildEncryptedPlan()
+        setValidationResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV validated locally", mode: "dry_run", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: 0, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: [] })
+        setImportStep("review")
+        return
+      }
       const result = await apiClient.importTransactions(importFile, "dry_run", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setValidationResult(result)
       setImportStep("review")
@@ -316,6 +354,16 @@ export default function DataSettingsPage() {
     setImportError(null)
 
     try {
+      if (authority.mode === "encrypted") {
+        const plan = await buildEncryptedPlan()
+        const creates = plan.accepted.map((record) => ({ id: record.id, family: "transaction", data: { ...record, amount_cents: record.amountCents, is_split: record.isSplit, tag_id: record.tagId, context_id: record.contextId, card_id: record.cardId, recurring_expense_id: null, import_fingerprint: record.importFingerprint, is_deleted: false } }))
+        const batchId = plan.accepted[0]?.id.split(":").slice(0, -1).join(":") ?? `csv_${createEncryptedRecordId()}`
+        creates.push({ id: batchId, family: "import_run", data: { id: batchId, source_filename: importFile.name, status: plan.errors.length ? "partial" : "completed", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, error_summary: plan.errors.length ? "CSV validation errors" : null } } as never)
+        await authority.authority!.commitSourceDiff({ creates, updates: [], tombstones: [] }, `csv_${createEncryptedRecordId()}`.replace(/[^A-Za-z0-9_-]/g, "_"))
+        setCommitResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV imported into encrypted authority", mode: "commit", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: [] })
+        setImportStep("done")
+        return
+      }
       const result = await apiClient.importTransactions(importFile, "commit", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setCommitResult(result)
       setImportStep("done")
@@ -357,6 +405,18 @@ export default function DataSettingsPage() {
     setIsExporting(true)
 
     try {
+      if (authority.mode === "encrypted") {
+        const csv = exportEncryptedTransactions(authority.authority?.getState().transactions ?? [], { createdAt: "", updatedAt: "", tagName: (id) => authority.authority?.getState().tags.find((tag) => tag.id === id)?.name ?? null })
+        const blob = new Blob([csv], { type: "text/csv" })
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = url
+        anchor.download = "transactions.csv"
+        anchor.click()
+        URL.revokeObjectURL(url)
+        setIsExporting(false)
+        return
+      }
       const blob = await apiClient.exportTransactions(filters)
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement("a")
@@ -391,7 +451,14 @@ export default function DataSettingsPage() {
     setRollbackError(null)
 
     try {
-      await apiClient.rollbackImport(importRunId)
+      if (authority.mode === "encrypted") {
+        if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const imported = authority.authority.store.values().filter((record) => record.family === "transaction" && record.sourceId.startsWith(`${importRunId}:`))
+        const run = authority.authority.store.values().find((record) => record.family === "import_run" && record.sourceId === importRunId)
+        await authority.authority.commitSourceDiff({ creates: [], updates: run ? [{ id: run.envelope.record_id, family: "import_run", data: { ...run.data, status: "rolled_back" } }] : [], tombstones: imported.map((record) => ({ id: record.envelope.record_id, family: "transaction", data: record.data })) })
+      } else {
+        await apiClient.rollbackImport(importRunId)
+      }
       setRollbackTarget(null)
       await loadDataRuns()
     } catch (err) {
@@ -454,8 +521,14 @@ export default function DataSettingsPage() {
     mode: "value_map",
     value_map: tagValueMap,
   }), [tagValueMap])
+  const buildEncryptedPlan = async () => {
+    if (!importFile || !authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+    const parsed = parseCsvText(await importFile.text())
+    const rows: CsvRow[] = parsed.rows.map((item, index) => ({ row: index + 2, date: item[effectiveImportMapping.date ?? ""] ?? "", expense: item[effectiveImportMapping.expense ?? ""] ?? "", amount: item[effectiveImportMapping.amount ?? ""] ?? "", externalCategory: item[effectiveImportMapping.category ?? categorySourceHeader] ?? defaultCategory, tag: item[effectiveImportMapping.tag ?? ""] ?? "", card: item[effectiveImportMapping.card ?? ""] ?? "", notes: item[effectiveImportMapping.notes ?? ""] ?? "", isSplit: (item[effectiveImportMapping.is_split ?? ""] ?? "").toLowerCase() === "true" }))
+    return planCsvImport(rows, authority.authority.getState().transactions, { year: Number(dateYear) || currentImportYear(), userId: "authority-user", batchId: `csv_${createEncryptedRecordId()}` })
+  }
   const amountProfile = profileForHeader(importPreview, importMapping.amount ?? "")
-  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && tagSetupComplete && !hasDuplicateMapping)
+  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (authority.mode === "encrypted" || tagSetupComplete) && !hasDuplicateMapping)
   const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
   const currentImportStepIndex = useMemo(() => importStepIndex(importStep), [importStep])
 

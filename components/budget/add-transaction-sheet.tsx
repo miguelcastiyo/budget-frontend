@@ -54,6 +54,8 @@ import {
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { taxonomyFromState } from "@/lib/domain/financial/view-models"
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -72,6 +74,7 @@ export function AddTransactionSheet({
   mode = "create",
   transaction = null,
 }: AddTransactionSheetProps) {
+  const financialAuthority = useFinancialAuthority()
   const [date, setDate] = useState<Date>(new Date())
   const [expense, setExpense] = useState("")
   const [amount, setAmount] = useState("")
@@ -150,6 +153,15 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
+      if (financialAuthority.mode === "encrypted") {
+        const state = financialAuthority.authority?.getState()
+        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const references = taxonomyFromState(state)
+        setTags(references.tags)
+        setQuickPickTags(references.tags.slice(0, 5))
+        setCards(sortCards(references.cards))
+        return
+      }
       const [tagsResponse, cardsResponse, quickPickTagsResponse] = await Promise.all([
         apiClient.getTags(),
         apiClient.getCards(),
@@ -168,7 +180,7 @@ export function AddTransactionSheet({
     } finally {
       setIsLoadingTaxonomy(false)
     }
-  }, [])
+  }, [financialAuthority])
 
   const loadContexts = useCallback(async () => {
     setIsLoadingContexts(true)
@@ -249,6 +261,11 @@ export function AddTransactionSheet({
   }, [isEditMode, open, showNewCard, showNewTag])
 
   useEffect(() => {
+    if (financialAuthority.mode === "encrypted") {
+      suggestionRequestRef.current += 1
+      setSuggestions([])
+      return
+    }
     if (!open || isEditMode) {
       suggestionRequestRef.current += 1
       setSuggestions([])
@@ -290,7 +307,7 @@ export function AddTransactionSheet({
     }, 300)
 
     return () => window.clearTimeout(timeoutId)
-  }, [expense, isEditMode, open])
+  }, [expense, financialAuthority.mode, isEditMode, open])
 
   const resetForm = () => {
     const now = new Date()
@@ -484,13 +501,13 @@ export function AddTransactionSheet({
           card_id: cardId || undefined,
           context_id: contextId || null,
         }
-        const updated = await apiClient.updateTransaction(transaction.id, payload)
+        const updated = await financialAuthority.updateTransaction(transaction, payload)
 
         if (makeRecurring && !transactionAlreadyRecurring) {
           const startsMonth = format(date, "yyyy-MM")
           const normalizedBillingDay = Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31)
 
-          await apiClient.createRecurringExpense({
+          await financialAuthority.createRecurringExpense({
             expense: expense.trim(),
             amount: normalizedAmount,
             category,
@@ -525,14 +542,14 @@ export function AddTransactionSheet({
           payload.notes = normalizedNotes
         }
 
-        const created = await apiClient.createTransaction(payload)
+        const created = await financialAuthority.createTransaction(payload)
 
         if (makeRecurring) {
           const startsMonth = format(date, "yyyy-MM")
           const normalizedBillingDay = Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31)
 
           try {
-            await apiClient.createRecurringExpense({
+            await financialAuthority.createRecurringExpense({
               expense: expense.trim(),
               amount: normalizedAmount,
               category,
@@ -546,7 +563,7 @@ export function AddTransactionSheet({
             })
           } catch (recurringError) {
             try {
-              await apiClient.deleteTransaction(created.id)
+              await financialAuthority.deleteTransaction(created)
             } catch {
               // Best-effort rollback; primary error below.
             }

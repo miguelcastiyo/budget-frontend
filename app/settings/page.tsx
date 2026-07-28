@@ -22,6 +22,7 @@ import {
   Pencil,
   Database,
   Layers,
+  LockKeyhole,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
@@ -334,6 +335,12 @@ export default function SettingsPage() {
             {(isOwner || canManageApiKeys) && (
               <div className="lg:order-3">
                 <SettingsSection title="Account & Access">
+                  <SettingsItem
+                    icon={<LockKeyhole className="w-5 h-5 text-muted-foreground" />}
+                    label="Privacy & Vault"
+                    description="Unlock, recover, and manage device access"
+                    href="/settings/vault"
+                  />
                   {isOwner && (
                     <SettingsItem
                       icon={<UserPlus className="w-5 h-5 text-muted-foreground" />}

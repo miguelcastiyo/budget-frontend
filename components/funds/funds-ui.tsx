@@ -70,6 +70,9 @@ import { formatCurrency } from "@/lib/formatters"
 import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { parseMoneyCents } from "@/lib/domain/financial/money"
 
 type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
@@ -405,6 +408,7 @@ function renderFundShell(children: React.ReactNode) {
 }
 
 export function FundsOverviewPage() {
+  const financialAuthority = useFinancialAuthority()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [filter, setFilter] = useState<FundsFilter>("active")
@@ -419,6 +423,9 @@ export function FundsOverviewPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const loadData = useCallback(async () => {
+    if (financialAuthority.isLoading || (financialAuthority.mode === "encrypted" && !financialAuthority.authority)) {
+      return
+    }
     setIsLoading(true)
     setError(null)
     setSummaryError(null)
@@ -427,12 +434,12 @@ export function FundsOverviewPage() {
       const metricsPromise =
         filter === "active"
           ? null
-          : apiClient.getFunds({ status: "active", include_entries_summary: true })
+          : financialAuthority.getFunds({ status: "active" })
 
       const [fundsResult, activeMetricsResult, summaryResult] = await Promise.allSettled([
-        apiClient.getFunds({ status: filter, include_entries_summary: true }),
+        financialAuthority.getFunds({ status: filter }),
         metricsPromise ?? Promise.resolve(null),
-        apiClient.getFundCloseoutSummary(new Date().getFullYear()),
+        financialAuthority.mode === "encrypted" ? Promise.resolve(null) : apiClient.getFundCloseoutSummary(new Date().getFullYear()),
       ])
 
       if (fundsResult.status === "rejected") {
@@ -465,7 +472,7 @@ export function FundsOverviewPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [filter])
+  }, [filter, financialAuthority])
 
   useEffect(() => {
     void loadData()
@@ -587,7 +594,8 @@ export function FundsOverviewPage() {
                             fund,
                             fund.status === "active" ? "archive" : "restore",
                             loadData,
-                            setError
+                            setError,
+                            financialAuthority
                           )
                         }
                       />
@@ -862,6 +870,7 @@ function FundListCard({
 }
 
 export function FundDetailPage() {
+  const financialAuthority = useFinancialAuthority()
   const router = useRouter()
   const params = useParams<{ fundId: string }>()
   const fundId = typeof params?.fundId === "string" ? params.fundId : ""
@@ -880,11 +889,18 @@ export function FundDetailPage() {
     if (!fundId) {
       return
     }
+    if (financialAuthority.isLoading || (financialAuthority.mode === "encrypted" && !financialAuthority.authority)) {
+      return
+    }
 
     setIsLoading(true)
     setError(null)
 
     try {
+      if (financialAuthority.mode === "encrypted") {
+        const [fundResponse, entriesResponse] = await Promise.all([financialAuthority.getFund(fundId), financialAuthority.getFundEntries(fundId)])
+        setFund(fundResponse); setEntries(entriesResponse.items); return
+      }
       const [fundResponse, entriesResponse] = await Promise.all([
         apiClient.getFund(fundId),
         apiClient.getFundEntries(fundId, {
@@ -905,7 +921,7 @@ export function FundDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [fundId])
+  }, [financialAuthority, fundId])
 
   useEffect(() => {
     void loadData()
@@ -985,7 +1001,7 @@ export function FundDetailPage() {
                       Edit fund
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => void handleArchiveRestore(fund, fund.status === "active" ? "archive" : "restore", loadData, setError)}
+                      onClick={() => void handleArchiveRestore(fund, fund.status === "active" ? "archive" : "restore", loadData, setError, financialAuthority)}
                     >
                       {fund.status === "active" ? (
                         <>
@@ -1193,7 +1209,7 @@ export function FundDetailPage() {
             description="This only works for manual, starting-balance, and correction entries."
             confirmLabel="Delete entry"
             confirmVariant="destructive"
-            onConfirm={() => void handleDeleteEntry(fund.id, deleteTarget, loadData, setDeleteTarget, setError)}
+            onConfirm={() => void handleDeleteEntry(fund.id, deleteTarget, loadData, setDeleteTarget, setError, financialAuthority.deleteFundEntry)}
           >
             <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
               Linked transaction and closeout entries need to be changed from their original workflow.
@@ -1232,6 +1248,7 @@ function FundDialog({
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const financialAuthority = useFinancialAuthority()
   const [values, setValues] = useState<FundFormState>(getDefaultFundFormState())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1271,7 +1288,24 @@ function FundDialog({
     setError(null)
 
     try {
-      if (mode === "create") {
+      if (financialAuthority.mode === "encrypted") {
+        const encryptedAuthority = financialAuthority.authority
+        if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        if (mode === "create") {
+          const id = createEncryptedRecordId()
+          const startingBalance = values.starting_balance ? parseMoneyCents(values.starting_balance) : 0
+          const creates = [{ id, family: "fund", data: { id, name: values.name.trim(), fund_type: "goal", goal_amount_cents: goalAmount ? parseMoneyCents(goalAmount) : null, status: "active", sort_order: 0, notes: values.notes.trim() || null } }]
+          if (startingBalance > 0) {
+            const entryId = createEncryptedRecordId()
+            creates.push({ id: entryId, family: "fund_ledger_entry", data: { id: entryId, fund_id: id, entry_date: `${getCurrentMonthKey()}-01`, entry_type: "contribution", direction: "in", amount_cents: startingBalance, source_type: "starting_balance", is_voided: false, is_deleted: false } } as never)
+          }
+          await encryptedAuthority.commitSourceDiff({ creates, updates: [], tombstones: [] })
+        } else if (fund) {
+          const current = encryptedAuthority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fund.id)
+          if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+          await encryptedAuthority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data: { ...current.data, name: values.name.trim(), goal_amount_cents: goalAmount ? parseMoneyCents(goalAmount) : null, notes: values.notes.trim() || null } }], tombstones: [] })
+        }
+      } else if (mode === "create") {
         await apiClient.createFund(payload as CreateFundRequest)
       } else if (fund) {
         await apiClient.updateFund(fund.id, payload as UpdateFundRequest)
@@ -1530,6 +1564,7 @@ function FundEntryDialog({
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const financialAuthority = useFinancialAuthority()
   const [values, setValues] = useState<EntryFormState>(getEntryFormState())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1548,6 +1583,12 @@ function FundEntryDialog({
 
   useEffect(() => {
     if (!open || mode !== "create" || intent === "use") {
+      return
+    }
+    if (financialAuthority.mode === "encrypted") {
+      setTags([])
+      setCards([])
+      setTransactions([])
       return
     }
 
@@ -1587,7 +1628,7 @@ function FundEntryDialog({
     return () => {
       isActive = false
     }
-  }, [open, mode, intent])
+  }, [financialAuthority, open, mode, intent])
 
   const isLinkMode = values.budget_tracking === "link_existing_transaction"
   const isCreateTransactionMode = values.budget_tracking === "create_transaction"
@@ -1620,7 +1661,7 @@ function FundEntryDialog({
 
     try {
       if (mode === "create") {
-        await apiClient.createFundEntry(fund.id, buildEntryPayload(values, intent))
+        await financialAuthority.createFundEntry(fund.id, buildEntryPayload(values, intent))
       } else if (entry) {
         const payload: UpdateFundEntryRequest = {
           entry_date: values.entry_date,
@@ -1629,14 +1670,14 @@ function FundEntryDialog({
           amount: values.amount,
           note: values.note.trim() || null,
         }
-        await apiClient.updateFundEntry(fund.id, entry.id, payload)
+        await financialAuthority.updateFundEntry(fund.id, entry, payload)
       }
       onSaved()
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
       } else {
-        setError("Unable to save fund entry")
+        setError(err instanceof Error ? err.message : "Unable to save fund entry")
       }
     } finally {
       setIsSubmitting(false)
@@ -1842,11 +1883,18 @@ async function handleArchiveRestore(
   fund: FundListItem | FundDetail,
   action: "archive" | "restore",
   onDone: () => void | Promise<void>,
-  setError: (value: string | null) => void
+  setError: (value: string | null) => void,
+  financialAuthority?: ReturnType<typeof useFinancialAuthority>
 ) {
   try {
     setError(null)
-    if (action === "archive") {
+    if (financialAuthority?.mode === "encrypted") {
+      const encryptedAuthority = financialAuthority.authority
+      if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      const current = encryptedAuthority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fund.id)
+      if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+      await encryptedAuthority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data: { ...current.data, status: action === "archive" ? "archived" : "active" } }], tombstones: [] })
+    } else if (action === "archive") {
       await apiClient.archiveFund(fund.id)
     } else {
       await apiClient.restoreFund(fund.id)
@@ -1866,7 +1914,8 @@ async function handleDeleteEntry(
   entry: FundEntry | null,
   onDone: () => void | Promise<void>,
   clearTarget: (entry: FundEntry | null) => void,
-  setError: (value: string | null) => void
+  setError: (value: string | null) => void,
+  deleteEntry: (fundId: string, entry: FundEntry) => Promise<void> = (id, item) => apiClient.deleteFundEntry(id, item.id)
 ) {
   if (!entry) {
     return
@@ -1874,7 +1923,7 @@ async function handleDeleteEntry(
 
   try {
     setError(null)
-    await apiClient.deleteFundEntry(fundId, entry.id)
+    await deleteEntry(fundId, entry)
     clearTarget(null)
     await onDone()
   } catch (err) {

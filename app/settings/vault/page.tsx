@@ -1,0 +1,50 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft, ChevronRight, Info, KeyRound, LockKeyhole, Monitor, ShieldCheck } from "lucide-react"
+import { BottomNav } from "@/components/layout/bottom-nav"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
+import { PrivacySetupFlow } from "@/components/privacy/privacy-setup-flow"
+import { VaultRecoveryPanel, type VaultFlow } from "@/components/privacy/vault-recovery-panel"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { apiClient } from "@/lib/api/client"
+
+function SettingsRow({ icon, label, description, meta, onClick, href }: { icon: React.ReactNode; label: string; description: string; meta?: string; onClick?: () => void; href?: string }) {
+  const content = <div className="flex min-h-[76px] items-center gap-3 px-4 py-3.5 text-left sm:gap-4"><div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary/70">{icon}</div><div className="min-w-0 flex-1"><p className="font-medium leading-tight">{label}</p><p className="mt-0.5 text-sm leading-snug text-muted-foreground">{description}</p></div>{meta && <span className="shrink-0 text-sm text-muted-foreground">{meta}</span>}<ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" /></div>
+  if (href) return <Link href={href} className="block transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{content}</Link>
+  return <button type="button" onClick={onClick} className="block w-full transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">{content}</button>
+}
+
+export default function VaultSettingsPage() {
+  const authority = useFinancialAuthority()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [flow, setFlow] = useState<VaultFlow | null>(null)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const [deviceCount, setDeviceCount] = useState<number | null>(null)
+  const returnTo = searchParams.get("returnTo")
+  const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.startsWith("/settings/vault") ? returnTo : null
+  const finishFlow = () => { setFlow(null); if (safeReturnTo && authority.authority) router.push(safeReturnTo) }
+
+  useEffect(() => { void apiClient.getDevices().then((result) => setDeviceCount(result.items.filter((item) => !item.revoked_at).length)).catch(() => setDeviceCount(null)) }, [])
+
+  if (authority.isLoading) return <div className="min-h-screen bg-background pb-mobile-nav" />
+  if (authority.mode !== "encrypted") return <div className="min-h-screen bg-background pb-mobile-nav"><header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header"><div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4"><Link href="/settings"><Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to Settings"><ArrowLeft className="size-5" /></Button></Link><LockKeyhole className="size-5 text-muted-foreground" aria-hidden="true" /><h1 className="flex-1 text-xl font-bold">Privacy &amp; Vault</h1></div></header><main className="mx-auto max-w-lg space-y-4 px-5 pt-5"><PrivacySetupFlow /></main><BottomNav /></div>
+
+  return <div className="min-h-screen bg-background pb-mobile-nav">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header"><div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4"><Link href="/settings"><Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to Settings"><ArrowLeft className="size-5" /></Button></Link><LockKeyhole className="size-5 text-muted-foreground" aria-hidden="true" /><h1 className="flex-1 text-xl font-bold">Privacy &amp; Vault</h1></div></header>
+    <main className="mx-auto max-w-lg space-y-6 px-5 pt-5">
+      <p className="text-sm text-muted-foreground">Your financial data is protected by your Vault.</p>
+      <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Vault</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<LockKeyhole className="size-5 text-muted-foreground" />} label="Vault" description={authority.authority ? "Your encrypted data is available on this device." : "Unlock to view your encrypted financial data."} meta={authority.authority ? "Unlocked" : "Locked"} onClick={() => setFlow("unlock")} /><SettingsRow icon={<KeyRound className="size-5 text-muted-foreground" />} label="Vault passphrase" description="Change how you unlock your Vault" onClick={() => setFlow("change-passphrase")} /><SettingsRow icon={<ShieldCheck className="size-5 text-muted-foreground" />} label="Recovery Code" description="Recovery protection active" onClick={() => setFlow("replace-recovery")} /></Card></section>
+      <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Access</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<Monitor className="size-5 text-muted-foreground" />} label="Devices" description="Manage where your Vault is accessed" meta={deviceCount === null ? undefined : `${deviceCount} active`} href="/settings/vault/devices" /></Card></section>
+      <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Learn more</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<Info className="size-5 text-muted-foreground" />} label="How your privacy works" description="A short explanation of encrypted storage and recovery" onClick={() => setAboutOpen(true)} /></Card></section>
+    </main>
+    <ResponsiveDialog open={flow !== null} onOpenChange={(open) => !open && setFlow(null)} title={flow === "unlock" ? "Unlock your Vault" : flow === "recovery" ? "Recover your Vault" : flow === "change-passphrase" ? "Change Vault passphrase" : "Replace Recovery Code"} description={flow === "unlock" ? "Use your Vault passphrase to continue." : undefined} mobileSize="compact" bodyClassName="px-4 py-5 sm:px-6"><VaultRecoveryPanel flow={flow ?? "unlock"} onComplete={finishFlow} /><>{flow === "unlock" && <button type="button" className="mt-4 text-sm text-muted-foreground underline" onClick={() => setFlow("recovery")}>Forgot passphrase? Use Recovery Code</button>}</></ResponsiveDialog>
+    <ResponsiveDialog open={aboutOpen} onOpenChange={setAboutOpen} title="How your privacy works" mobileSize="compact"><div className="space-y-5 text-sm"><div><h2 className="font-semibold">Encrypted on your device</h2><p className="mt-1 text-muted-foreground">Your financial information is encrypted before it is stored.</p></div><div><h2 className="font-semibold">Your Vault stays yours</h2><p className="mt-1 text-muted-foreground">Your Vault passphrase and Recovery Code are not stored in a form we can use to unlock your data.</p></div><div><h2 className="font-semibold">Recovery is yours</h2><p className="mt-1 text-muted-foreground">If you forget your passphrase, your Recovery Code can restore access. If you lose both, we can&apos;t recover the encrypted data.</p></div></div></ResponsiveDialog>
+    <BottomNav />
+  </div>
+}

@@ -1,0 +1,8 @@
+import { formatMoneyCents } from "./money"
+import { ledgerBalance, type Fund, type FundLedgerEntry } from "./funds"
+
+export interface SavingsAllocation { fundId: string; month: string; plannedAmountCents: number }
+export interface SavingsPlan { id: string; month: string; savingsBudgetCents: number; allocations: SavingsAllocation[]; status: "active" | "completed" }
+export function validateAllocations(plan: SavingsPlan): void { const total = plan.allocations.reduce((sum, item) => sum + item.plannedAmountCents, 0); if (total > plan.savingsBudgetCents) throw new Error("OVERALLOCATED") }
+export function orderedAllocations(plan: SavingsPlan): SavingsAllocation[] { return [...plan.allocations].sort((a, b) => a.fundId.localeCompare(b.fundId) || a.month.localeCompare(b.month)) }
+export function planSummary(plan: SavingsPlan, funds: Fund[], entries: FundLedgerEntry[]) { validateAllocations(plan); const planned = plan.allocations.reduce((sum, item) => sum + item.plannedAmountCents, 0); const fundStates = orderedAllocations(plan).map((allocation) => { const fund = funds.find((item) => item.id === allocation.fundId); const balance = ledgerBalance(entries, allocation.fundId); const goal = fund?.goalAmountCents ?? null; return { fundId: allocation.fundId, planned: formatMoneyCents(allocation.plannedAmountCents), balance: formatMoneyCents(balance), goal: goal === null ? null : formatMoneyCents(goal), goalMet: goal !== null && balance >= goal } }); return { planned: formatMoneyCents(planned), unassigned: formatMoneyCents(plan.savingsBudgetCents - planned), overallocated: false, funds: fundStates, status: plan.status } }

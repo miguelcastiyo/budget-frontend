@@ -24,12 +24,14 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
 
 export default function DashboardPage() {
   const router = useRouter()
   const { setupStatus, refreshProfile } = useAuth()
+  const authority = useFinancialAuthority()
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [overview, setOverview] = useState<MonthOverviewResponse | null>(null)
@@ -53,14 +55,17 @@ export default function DashboardPage() {
   }, [])
 
   const loadDashboardData = useCallback(async () => {
+    if (authority.isLoading) {
+      return
+    }
     setIsLoading(true)
     setIsCloseoutLoading(true)
     setError(null)
 
     try {
       const [overviewResult, closeoutResult] = await Promise.allSettled([
-        apiClient.getMonthOverview(currentMonth),
-        apiClient.getMonthCloseout(currentMonth),
+        authority.getMonthOverview(currentMonth),
+        authority.mode === "encrypted" ? Promise.resolve(null) : apiClient.getMonthCloseout(currentMonth),
       ])
 
       if (overviewResult.status === "rejected") {
@@ -69,7 +74,7 @@ export default function DashboardPage() {
 
       setOverview(overviewResult.value)
 
-      if (closeoutResult.status === "fulfilled") {
+      if (closeoutResult.status === "fulfilled" && closeoutResult.value) {
         setCloseout(closeoutResult.value)
       } else {
         setCloseout(null)
@@ -85,7 +90,7 @@ export default function DashboardPage() {
       setIsLoading(false)
       setIsCloseoutLoading(false)
     }
-  }, [currentMonth])
+  }, [authority, currentMonth])
 
   useEffect(() => {
     void loadDashboardData()

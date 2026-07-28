@@ -35,7 +35,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         return
       }
 
-      router.replace("/")
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo")
+      const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/"
+      router.replace(safeReturnTo)
     }
   }, [isAuthenticated, isLoading, needsOnboarding, onOnboardingPage, pathname, publicPath, router])
 

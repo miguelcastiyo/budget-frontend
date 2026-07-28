@@ -35,6 +35,7 @@ import { parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 
 type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "all_time" | "custom"
 
@@ -289,6 +290,7 @@ function formatCompactDateRange(firstDate: string, lastDate: string): string {
 }
 
 export default function InsightsPage() {
+  const authority = useFinancialAuthority()
   const initialRange = useMemo(() => getPresetRange("this_month"), [])
   const [selectedPreset, setSelectedPreset] = useState<InsightPreset>("this_month")
   const [customFrom, setCustomFrom] = useState(initialRange.date_from)
@@ -303,11 +305,14 @@ export default function InsightsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const loadInsights = useCallback(async (range: InsightRange) => {
+    if (authority.isLoading) {
+      return
+    }
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await apiClient.getInsightsMetrics(range.date_from, range.date_to)
+      const response = await authority.getInsightsMetrics(range.date_from, range.date_to)
       setData(response)
     } catch (err) {
       if (err instanceof ApiError) {
@@ -318,7 +323,7 @@ export default function InsightsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [authority])
 
   useEffect(() => {
     void loadInsights(appliedRange)
@@ -327,17 +332,15 @@ export default function InsightsPage() {
   const resolveAllTimeRange = useCallback(async (): Promise<InsightRange> => {
     const today = toIsoDate(new Date())
 
-    const oldestTransactionPage = await apiClient.getTransactions({
-      page: 1,
-      page_size: 1,
-      sort: "date_asc",
-    })
+    const oldestTransactionPage = authority.mode === "encrypted"
+      ? { items: authority.authority?.getState().transactions.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(0, 1).map((item) => ({ date: item.date })) ?? [] }
+      : await apiClient.getTransactions({ page: 1, page_size: 1, sort: "date_asc" })
 
     return {
       date_from: oldestTransactionPage.items[0]?.date ?? today,
       date_to: today,
     }
-  }, [])
+  }, [authority])
 
   const applyPreset = async (preset: Exclude<InsightPreset, "custom">) => {
     try {

@@ -1,4 +1,5 @@
 import type { ErrorEnvelope } from "./types"
+import { assertLegacyMutationAllowed } from "../privacy/encrypted-authority/routing"
 
 const API_BASE = "/api/v1"
 const CSRF_STORAGE_KEY = "budget.csrf_token"
@@ -115,6 +116,7 @@ export class ApiClientCore {
     this.ensureCsrfTokenLoaded()
 
     const method = options.method || "GET"
+    assertLegacyMutationAllowed(endpoint, method)
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       ...this.authorizedHeaders(method, options.headers),
@@ -161,6 +163,7 @@ export class ApiClientCore {
 
   async requestFormData<T>(endpoint: string, formData: FormData, options: RequestInit = {}): Promise<T> {
     this.ensureCsrfTokenLoaded()
+    assertLegacyMutationAllowed(endpoint, options.method || "POST")
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,

@@ -30,6 +30,7 @@ import {
   RecurringItemRow,
 } from "./_components/recurring-sections"
 import { useRecurringData } from "./_hooks/use-recurring-data"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import {
   emptyForm,
   formFromItem,
@@ -76,6 +77,7 @@ export default function RecurringSettingsPage() {
 
   const [isMutating, setIsMutating] = useState(false)
   const { data, tags, cards, isLoading, error, setTags, setCards, setError, loadData } = useRecurringData(month)
+  const authority = useFinancialAuthority()
   const editingItem = data?.items.find((item) => item.id === editingId) ?? null
   const seriesEntries = useMemo(
     () => buildRecurringSeriesEntries(data?.items ?? [], month),
@@ -122,7 +124,10 @@ export default function RecurringSettingsPage() {
       items: detailEntry?.seriesItems ?? [detailItem],
     })
 
-    void apiClient.getRecurringExpenseSeries(detailItem.id)
+    const seriesRequest = authority.mode === "encrypted"
+      ? Promise.resolve({ series_id: detailEntry?.seriesId ?? detailItem.series_id, items: detailEntry?.seriesItems ?? [detailItem] } as RecurringExpenseSeriesResponse)
+      : apiClient.getRecurringExpenseSeries(detailItem.id)
+    void seriesRequest
       .then((response) => {
         if (cancelled) {
           return
@@ -148,7 +153,7 @@ export default function RecurringSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [detailEntry, detailItem, setError])
+  }, [authority.mode, detailEntry, detailItem, setError])
 
   const tagOptions = useMemo(() => tags, [tags])
   const activeItemsCount = useMemo(
@@ -217,7 +222,7 @@ export default function RecurringSettingsPage() {
     setError(null)
 
     try {
-      await apiClient.createRecurringExpense({
+      await authority.createRecurringExpense({
         expense: newForm.expense.trim(),
         amount: formatRecurringAmount(newForm.amount),
         category: newForm.category,
@@ -274,7 +279,7 @@ export default function RecurringSettingsPage() {
     setError(null)
 
     try {
-      await apiClient.updateRecurringExpense(editingId, {
+      await authority.updateRecurringExpense(editingId, {
         expense: editingForm.expense.trim(),
         amount: formatRecurringAmount(editingForm.amount),
         category: editingForm.category,
@@ -309,7 +314,7 @@ export default function RecurringSettingsPage() {
     setError(null)
 
     try {
-      await apiClient.deleteRecurringExpense(deleteId)
+      await authority.deleteRecurringExpense(deleteId)
       setDeleteId(null)
       setDetailId(null)
       if (editingId === deleteId) {
@@ -382,7 +387,7 @@ export default function RecurringSettingsPage() {
         payload.billing_day = scheduleChangeBillingType === "last_day" ? null : Number(scheduleChangeBillingDay)
       }
 
-      await apiClient.scheduleRecurringExpenseChange(detailItem.id, payload)
+      await authority.scheduleRecurringExpenseChange(detailItem.id, payload)
       setDetailTrayMode("details")
       await loadData()
     } catch (err) {

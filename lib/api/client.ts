@@ -10,6 +10,10 @@ import { createProfileApi } from "./profile"
 import { createRecurringApi } from "./recurring"
 import { createTaxonomyApi } from "./taxonomy"
 import { createTransactionsApi } from "./transactions"
+import { createVaultApi } from "./vault"
+import { createEncryptedRecordsApi } from "./encrypted-records"
+import { createPrivacyMigrationApi } from "./privacy-migration"
+import { createDevicesApi } from "./devices"
 
 const core = new ApiClientCore()
 
@@ -25,6 +29,10 @@ type ApiClient = ApiClientCore
   & ReturnType<typeof createMonthCloseoutsApi>
   & ReturnType<typeof createSavingsPlanApi>
   & ReturnType<typeof createApiKeysApi>
+  & ReturnType<typeof createVaultApi>
+  & ReturnType<typeof createEncryptedRecordsApi>
+  & ReturnType<typeof createPrivacyMigrationApi>
+  & ReturnType<typeof createDevicesApi>
 
 export const apiClient: ApiClient = Object.assign(
   core,
@@ -38,7 +46,11 @@ export const apiClient: ApiClient = Object.assign(
   createImportExportApi(core),
   createMonthCloseoutsApi(core),
   createSavingsPlanApi(core),
-  createApiKeysApi(core)
+  createApiKeysApi(core),
+  createVaultApi(core),
+  createEncryptedRecordsApi(core),
+  createPrivacyMigrationApi(core)
+  ,createDevicesApi(core)
 )
 
 export { ApiError, GLOBAL_API_ERROR_EVENT }

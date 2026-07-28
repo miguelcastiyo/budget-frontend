@@ -25,6 +25,8 @@ import { mergeTransactionPages, replaceTransaction } from "@/lib/transaction-col
 import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
 import type {
   Card,
   Category,
@@ -77,6 +79,7 @@ function parseCategoryQuery(value: string): Category | null {
 }
 
 export default function TransactionsPage() {
+  const financialAuthority = useFinancialAuthority()
   const desktopFiltersStorageKey = "transactions-desktop-filters-collapsed"
   const router = useRouter()
   const pathname = usePathname()
@@ -214,7 +217,20 @@ export default function TransactionsPage() {
   }, [customDateRange, debouncedSearchQuery, preset, selectedCards, selectedCategories, selectedContexts, selectedTags, sortOrder, splitFilter])
 
   const loadReferenceData = useCallback(async () => {
+    if (financialAuthority.isLoading) {
+      return
+    }
     try {
+      if (financialAuthority.mode === "encrypted") {
+        const state = financialAuthority.authority?.getState()
+        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const references = taxonomyFromState(state)
+        setTags(references.tags)
+        setQuickPickTags(references.tags.slice(0, 5))
+        setCards(references.cards)
+        setContexts(references.contexts)
+        return
+      }
       const [tagsResponse, quickPicksResponse, cardsResponse, contextsResponse] = await Promise.all([
         apiClient.getTags(),
         apiClient.getTagQuickPicks(5),
@@ -229,13 +245,22 @@ export default function TransactionsPage() {
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     }
-  }, [])
+  }, [financialAuthority])
 
   const loadTransactionsData = useCallback(async () => {
+    if (financialAuthority.isLoading) {
+      return
+    }
     setIsLoading(true)
     setError(null)
 
     try {
+      if (financialAuthority.mode === "encrypted") {
+        const state = financialAuthority.authority?.getState()
+        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, category: activeTransactionFilters.categories?.split(",")[0] as "needs" | "wants" | "savings" | undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" })
+        setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
+      }
       const response = await apiClient.getTransactions({
         ...activeTransactionFilters,
         page: 1,
@@ -262,7 +287,7 @@ export default function TransactionsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [activeTransactionFilters])
+  }, [activeTransactionFilters, financialAuthority])
 
   const loadMoreTransactions = useCallback(async () => {
     if (isLoading || isLoadingMore || transactions.length >= totalItems) {
@@ -273,6 +298,12 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
+      if (financialAuthority.mode === "encrypted") {
+        const state = financialAuthority.authority?.getState()
+        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const response = transactionsPageFromState(state, { page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" })
+        setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); return
+      }
       const response = await apiClient.getTransactions({
         ...activeTransactionFilters,
         page: currentPage + 1,
@@ -288,7 +319,7 @@ export default function TransactionsPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [activeTransactionFilters, currentPage, isLoading, isLoadingMore, totalItems, transactions.length])
+  }, [activeTransactionFilters, currentPage, financialAuthority, isLoading, isLoadingMore, totalItems, transactions.length])
 
   useEffect(() => {
     void loadReferenceData()
@@ -310,6 +341,10 @@ export default function TransactionsPage() {
   // search, loaded pagination depth, and the user's current scroll context.
   const revalidateLoadedTransactions = useCallback(async (loadedPageCount: number) => {
     try {
+      if (financialAuthority.mode === "encrypted") {
+        await loadTransactionsData()
+        return
+      }
       const responses = await Promise.all(
         Array.from({ length: loadedPageCount }, (_, index) => apiClient.getTransactions({
           ...activeTransactionFilters,
@@ -329,7 +364,7 @@ export default function TransactionsPage() {
     } catch (err) {
       setError(transactionError(err, "Unable to refresh transactions"))
     }
-  }, [activeTransactionFilters])
+  }, [activeTransactionFilters, financialAuthority, loadTransactionsData])
 
   const dismissError = useCallback(() => {
     setError(null)
@@ -408,7 +443,9 @@ export default function TransactionsPage() {
 
     try {
       setError(null)
-      await apiClient.deleteTransaction(transactionId)
+      const current = transactions.find((item) => item.id === transactionId)
+      if (!current) throw new Error("TRANSACTION_NOT_FOUND")
+      await financialAuthority.deleteTransaction(current)
       setTransactions((current) => current.filter((transaction) => transaction.id !== transactionId))
       setSelectedTransaction((current) => (current?.id === transactionId ? null : current))
       void revalidateLoadedTransactions(currentPage)
@@ -417,7 +454,7 @@ export default function TransactionsPage() {
     } finally {
       setDeletingTransactionId(null)
     }
-  }, [currentPage, revalidateLoadedTransactions])
+  }, [currentPage, financialAuthority, revalidateLoadedTransactions, transactions])
 
   const handleTransactionUpdated = (updatedTransaction: Transaction) => {
     setTransactions((current) => replaceTransaction(current, updatedTransaction))

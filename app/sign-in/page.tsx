@@ -212,7 +212,9 @@ function SignInPageContent() {
     setAuthenticatedUser(result.user)
     const nextSetupStatus = await apiClient.getSetupStatus()
     setSetupStatus(nextSetupStatus)
-    router.push(nextSetupStatus.budget_profile_complete ? "/" : "/onboarding")
+    const returnTo = searchParams.get("returnTo")
+    const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : null
+    router.push(safeReturnTo ?? (nextSetupStatus.budget_profile_complete ? "/" : "/onboarding"))
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
