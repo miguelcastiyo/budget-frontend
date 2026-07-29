@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, ChevronRight, Info, KeyRound, LockKeyhole, Monitor, ShieldCheck } from "lucide-react"
+import { ArrowLeft, ChevronRight, Info, KeyRound, LockKeyhole, Monitor, ShieldCheck, Zap } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -12,6 +12,7 @@ import { PrivacySetupFlow } from "@/components/privacy/privacy-setup-flow"
 import { VaultRecoveryPanel, type VaultFlow } from "@/components/privacy/vault-recovery-panel"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { apiClient } from "@/lib/api/client"
+import { isQuickUnlockCancellation, quickUnlockErrorMessage } from "@/lib/privacy/quick-unlock-ui"
 
 function SettingsRow({ icon, label, description, meta, onClick, href }: { icon: React.ReactNode; label: string; description: string; meta?: string; onClick?: () => void; href?: string }) {
   const content = <div className="flex min-h-[76px] items-center gap-3 px-4 py-3.5 text-left sm:gap-4"><div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary/70">{icon}</div><div className="min-w-0 flex-1"><p className="font-medium leading-tight">{label}</p><p className="mt-0.5 text-sm leading-snug text-muted-foreground">{description}</p></div>{meta && <span className="shrink-0 text-sm text-muted-foreground">{meta}</span>}<ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" /></div>
@@ -25,10 +26,15 @@ export default function VaultSettingsPage() {
   const searchParams = useSearchParams()
   const [flow, setFlow] = useState<VaultFlow | null>(null)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [quickUnlockOpen, setQuickUnlockOpen] = useState(false)
+  const [quickUnlockBusy, setQuickUnlockBusy] = useState(false)
+  const [quickUnlockMessage, setQuickUnlockMessage] = useState("")
   const [deviceCount, setDeviceCount] = useState<number | null>(null)
   const returnTo = searchParams.get("returnTo")
   const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.startsWith("/settings/vault") ? returnTo : null
   const finishFlow = () => { setFlow(null); if (safeReturnTo && authority.authority) router.push(safeReturnTo) }
+  const enableQuickUnlock = async () => { setQuickUnlockBusy(true); setQuickUnlockMessage(""); try { await authority.enrollQuickUnlock(); setQuickUnlockOpen(false) } catch (error) { if (!isQuickUnlockCancellation(error)) setQuickUnlockMessage(quickUnlockErrorMessage(error)) } finally { setQuickUnlockBusy(false) } }
+  const disableQuickUnlock = async () => { if (!window.confirm("Disable Quick Unlock?\n\nYou'll need your Vault passphrase the next time this device needs to unlock your Vault.\n\nYour Vault and Recovery Code will not change.")) return; setQuickUnlockBusy(true); setQuickUnlockMessage(""); try { await authority.revokeQuickUnlock(); setQuickUnlockOpen(false) } catch (error) { setQuickUnlockMessage(quickUnlockErrorMessage(error)) } finally { setQuickUnlockBusy(false) } }
 
   useEffect(() => { void apiClient.getDevices().then((result) => setDeviceCount(result.items.filter((item) => !item.revoked_at).length)).catch(() => setDeviceCount(null)) }, [])
 
@@ -40,11 +46,13 @@ export default function VaultSettingsPage() {
     <main className="mx-auto max-w-lg space-y-6 px-5 pt-5">
       <p className="text-sm text-muted-foreground">Your financial data is protected by your Vault.</p>
       <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Vault</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<LockKeyhole className="size-5 text-muted-foreground" />} label="Vault" description={authority.authority ? "Your encrypted data is available on this device." : "Unlock to view your encrypted financial data."} meta={authority.authority ? "Unlocked" : "Locked"} onClick={() => setFlow("unlock")} /><SettingsRow icon={<KeyRound className="size-5 text-muted-foreground" />} label="Vault passphrase" description="Change how you unlock your Vault" onClick={() => setFlow("change-passphrase")} /><SettingsRow icon={<ShieldCheck className="size-5 text-muted-foreground" />} label="Recovery Code" description="Recovery protection active" onClick={() => setFlow("replace-recovery")} /></Card></section>
+      <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Quick Unlock</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<Zap className="size-5 text-muted-foreground" />} label="Quick Unlock" description={authority.quickUnlockCapability === "unsupported" ? "Not available on this device" : "Use this device to unlock your Vault faster."} meta={authority.quickUnlockStatus === "enrolled" ? "Enabled on this device" : authority.quickUnlockCapability === "unsupported" ? undefined : "Not enabled"} onClick={authority.quickUnlockCapability === "unsupported" ? undefined : () => { setQuickUnlockMessage(""); setQuickUnlockOpen(true) }} /></Card></section>
       <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Access</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<Monitor className="size-5 text-muted-foreground" />} label="Devices" description="Manage where your Vault is accessed" meta={deviceCount === null ? undefined : `${deviceCount} active`} href="/settings/vault/devices" /></Card></section>
       <section className="space-y-2"><h2 className="px-1 text-sm font-semibold">Learn more</h2><Card className="divide-y divide-border/70 overflow-hidden rounded-lg border-border/70 py-0 shadow-none"><SettingsRow icon={<Info className="size-5 text-muted-foreground" />} label="How your privacy works" description="A short explanation of encrypted storage and recovery" onClick={() => setAboutOpen(true)} /></Card></section>
     </main>
     <ResponsiveDialog open={flow !== null} onOpenChange={(open) => !open && setFlow(null)} title={flow === "unlock" ? "Unlock your Vault" : flow === "recovery" ? "Recover your Vault" : flow === "change-passphrase" ? "Change Vault passphrase" : "Replace Recovery Code"} description={flow === "unlock" ? "Use your Vault passphrase to continue." : undefined} mobileSize="compact" preventInitialFocus bodyClassName="px-4 py-5 sm:px-6"><VaultRecoveryPanel flow={flow ?? "unlock"} onComplete={finishFlow} /><>{flow === "unlock" && <button type="button" className="mt-4 text-sm text-muted-foreground underline" onClick={() => setFlow("recovery")}>Forgot passphrase? Use Recovery Code</button>}</></ResponsiveDialog>
     <ResponsiveDialog open={aboutOpen} onOpenChange={setAboutOpen} title="How your privacy works" mobileSize="compact"><div className="space-y-5 text-sm"><div><h2 className="font-semibold">Encrypted on your device</h2><p className="mt-1 text-muted-foreground">Your financial information is encrypted before it is stored.</p></div><div><h2 className="font-semibold">Your Vault stays yours</h2><p className="mt-1 text-muted-foreground">Your Vault passphrase and Recovery Code are not stored in a form we can use to unlock your data.</p></div><div><h2 className="font-semibold">Recovery is yours</h2><p className="mt-1 text-muted-foreground">If you forget your passphrase, your Recovery Code can restore access. If you lose both, we can&apos;t recover the encrypted data.</p></div></div></ResponsiveDialog>
+    <ResponsiveDialog open={quickUnlockOpen} onOpenChange={setQuickUnlockOpen} title="Quick Unlock" mobileSize="compact" bodyClassName="px-4 py-5 sm:px-6"><div className="space-y-5 text-sm"><div><h2 className="font-semibold">{authority.quickUnlockStatus === "enrolled" ? "Enabled on this device" : "Unlock your Vault faster"}</h2><p className="mt-1 text-muted-foreground">Quick Unlock uses this device&apos;s built-in security. Your Vault passphrase and Recovery Code will continue to work.</p></div>{quickUnlockMessage && <p role="status" className="text-destructive">{quickUnlockMessage}</p>}{authority.quickUnlockStatus === "enrolled" ? <Button type="button" variant="destructive" className="min-h-11 w-full" disabled={quickUnlockBusy} onClick={() => void disableQuickUnlock()}>{quickUnlockBusy ? "Disabling…" : "Disable Quick Unlock"}</Button> : <Button type="button" className="min-h-11 w-full" disabled={quickUnlockBusy} onClick={() => void enableQuickUnlock()}>{quickUnlockBusy ? "Setting up…" : "Enable Quick Unlock"}</Button>}<button type="button" className="min-h-11 w-full text-muted-foreground underline underline-offset-4" onClick={() => setQuickUnlockOpen(false)}>Not now</button></div></ResponsiveDialog>
     <BottomNav />
   </div>
 }

@@ -37,5 +37,11 @@ export class VaultManager {
     catch (error) { this.lock(); this.state = "error"; throw error }
   }
 
+  async installRuntimeKey(runtimeKey: CryptoKey) {
+    this.state = "unlocking"
+    try { this.key = runtimeKey; this.state = "unlocked"; return runtimeKey }
+    catch (error) { this.lock(); this.state = "error"; throw error }
+  }
+
   lock() { this.key = null; this.state = "locked" }
 }

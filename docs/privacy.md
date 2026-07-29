@@ -89,6 +89,20 @@ The browser also holds the usable Vault key in memory. A browser extension,
 compromised device, or malicious future JavaScript deployment could capture
 secrets or plaintext while the account is unlocked.
 
+## Quick Unlock
+
+Quick Unlock is an optional convenience method for the existing Vault. When
+enabled, the current authenticated device can explicitly request device
+verification to recover the existing Vault key locally. It does not create an
+account session, replace the Vault passphrase or Recovery Code, change the
+financial encryption format, or persist the decrypted Vault key.
+
+Runtime destruction or refresh still leaves the Vault locked. An approved
+unlock method is then required: Quick Unlock when enrolled and available, the
+Vault passphrase, or the existing recovery flow. Quick Unlock status is scoped
+to the current Budget device authorization and can be revoked from Privacy &
+Vault settings.
+
 The frontend must not log authentication material, complete API payloads,
 transaction descriptions or notes, income, Fund names or balances, Savings
 Plan data, session identifiers, Vault keys, Recovery Codes, or decrypted
@@ -122,3 +136,9 @@ erasure.
 
 Locking or revoking a device prevents future authenticated sync. It does not
 claim to erase plaintext or secrets that the device already learned.
+
+Signing out ends the current session but does not remove the Budget device or
+disable Quick Unlock. Removing a device is stronger: it revokes all sessions
+and Quick Unlock authorization associated with that device. Budget cannot erase
+a Vault key already resident in an offline browser or delete a platform
+credential from Apple, iCloud Keychain, or another credential manager.

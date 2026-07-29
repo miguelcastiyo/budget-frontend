@@ -43,3 +43,18 @@ test("browser Web Crypto supports the Phase 2 synthetic Vault round trip and neg
   expect(result.tamperRejected).toBe(true)
   expect(result.exportRejected).toBe(true)
 })
+
+test("Quick Unlock derives a non-exportable PRF wrapper key and proves local Vault-key recovery", async ({ page }) => {
+  await page.goto("/")
+  const result = await page.evaluate(async () => {
+    const vault = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"])
+    const prf = crypto.getRandomValues(new Uint8Array(32)).buffer
+    const derived = await crypto.subtle.importKey("raw", prf, { name: "AES-KW", length: 256 }, false, ["wrapKey", "unwrapKey"])
+    const wrapped = await crypto.subtle.wrapKey("raw", vault, derived, "AES-KW")
+    await crypto.subtle.unwrapKey("raw", wrapped, derived, "AES-KW", { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"])
+    let exportRejected = false
+    try { await crypto.subtle.exportKey("raw", derived) } catch { exportRejected = true }
+    return { exportRejected }
+  })
+  expect(result.exportRejected).toBe(true)
+})

@@ -15,6 +15,7 @@ import { fundVMFromState } from "@/lib/domain/financial/view-models"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { transactionFundDiff, transactionFundState, type SourceRecord } from "@/lib/domain/financial/transaction-fund-diff"
 import { encryptedCloseout, encryptedInsights, encryptedMonthOverview, encryptedRecurring, encryptedSavingsPlan } from "@/lib/privacy/encrypted-authority/derived"
+import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
 
 interface FinancialAuthorityContextValue {
   mode: FinancialAuthorityMode
@@ -26,6 +27,11 @@ interface FinancialAuthorityContextValue {
   changePassphrase: (newPassphrase: string) => Promise<void>
   rotateRecoverySecret: () => Promise<string>
   lock: () => void
+  quickUnlockCapability: "supported" | "unsupported"
+  quickUnlockStatus: "unknown" | "not_enrolled" | "enrolled"
+  unlockWithQuickUnlock: () => Promise<void>
+  enrollQuickUnlock: () => Promise<void>
+  revokeQuickUnlock: () => Promise<void>
   createTransaction: (input: CreateTransactionRequest) => Promise<Transaction>
   updateTransaction: (current: Transaction, input: UpdateTransactionRequest) => Promise<Transaction>
   deleteTransaction: (current: Transaction) => Promise<void>
@@ -57,15 +63,17 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const [mode, setMode] = useState<FinancialAuthorityMode>("legacy")
   const [isLoading, setIsLoading] = useState(true)
   const [authority, setAuthority] = useState<EncryptedFinancialAuthority | null>(null)
+  const [quickUnlockStatus, setQuickUnlockStatus] = useState<"unknown" | "not_enrolled" | "enrolled">("unknown")
+  const capability = useMemo(() => quickUnlockCapability(), [])
   const vaultManager = useMemo(() => new VaultManager(), [])
 
   const refresh = async () => {
-    if (!isAuthenticated) { setMode("legacy"); setAuthority(null); vaultManager.lock(); setFinancialAuthorityMode("legacy"); return }
+    if (!isAuthenticated) { setMode("legacy"); setAuthority(null); setQuickUnlockStatus("unknown"); vaultManager.lock(); setFinancialAuthorityMode("legacy"); return }
     setIsLoading(true)
     try {
       const status = await apiClient.getPrivacyStatus()
       const next: FinancialAuthorityMode = status.financial_privacy_state === "encrypted" ? "encrypted" : status.financial_privacy_state === "vault_setup_required" ? "setup" : status.financial_privacy_state === "migration_in_progress" ? "migration" : "legacy"
-      setMode(next); if (next !== "encrypted") { setAuthority(null); vaultManager.lock() }; setFinancialAuthorityMode(next)
+      setMode(next); if (next !== "encrypted") { setAuthority(null); setQuickUnlockStatus("unknown"); vaultManager.lock() } else { try { const quick = await apiClient.getQuickUnlockStatus(); setQuickUnlockStatus(quick.status) } catch { setQuickUnlockStatus("unknown") } }; setFinancialAuthorityMode(next)
     } finally { setIsLoading(false) }
   }
 
@@ -80,6 +88,29 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     setAuthority(nextAuthority)
   }
   const lock = () => { vaultManager.lock(); setAuthority(null) }
+  const installAuthority = async (runtimeKey: CryptoKey) => {
+    await vaultManager.installRuntimeKey(runtimeKey)
+    const metadata = await apiClient.getVault()
+    const nextAuthority = new EncryptedFinancialAuthority(apiClient, runtimeKey, metadata.vault_id)
+    try { await nextAuthority.bootstrap() } catch (error) { vaultManager.lock(); throw error }
+    setAuthority(nextAuthority)
+  }
+  const unlockWithQuickUnlock = async () => {
+    if (mode !== "encrypted" || !capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
+    await installAuthority(await unlockWithQuickUnlockClient(apiClient))
+  }
+  const enrollQuickUnlock = async () => {
+    const runtimeKey = vaultManager.getRuntimeKey()
+    if (!authority || !runtimeKey) throw new Error("VAULT_LOCKED")
+    if (!capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
+    await enrollQuickUnlockClient(apiClient, runtimeKey)
+    setQuickUnlockStatus("enrolled")
+  }
+  const revokeQuickUnlock = async () => {
+    const status = await apiClient.getQuickUnlockStatus()
+    if (status.status === "enrolled" && status.quick_unlock_id) await apiClient.revokeQuickUnlock(status.quick_unlock_id)
+    setQuickUnlockStatus("not_enrolled")
+  }
   const changePassphrase = async (newPassphrase: string) => {
     const runtimeKey = vaultManager.getRuntimeKey()
     if (!authority || !runtimeKey) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
@@ -145,7 +176,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   useEffect(() => { void refresh(); return () => { vaultManager.lock(); setFinancialAuthorityMode("legacy") } }, [isAuthenticated, vaultManager])
   const encryptedRecurringRecord = (id: string) => authority?.store.get(id) ?? authority?.store.values().find((record) => record.family === "recurring_series" && (record.sourceId === id || String(record.data.id ?? "") === id))
   const value = useMemo(() => ({ mode, isLoading, refresh, authority, unlock, lock, createTransaction: async (input: CreateTransactionRequest) => mode === "encrypted" ? createEncryptedTransaction(input) : apiClient.createTransaction(input), updateTransaction: async (current: Transaction, input: UpdateTransactionRequest) => mode === "encrypted" ? updateEncryptedTransaction(current, input) : apiClient.updateTransaction(current.id, input), deleteTransaction: async (current: Transaction) => { if (mode === "encrypted") return deleteEncryptedTransaction(current); await apiClient.deleteTransaction(current.id) }, createFundEntry: async (fundId: string, input: CreateFundEntryRequest) => mode === "encrypted" ? createEncryptedFundEntry(fundId, input) : apiClient.createFundEntry(fundId, input), getFunds: async (filters?: { status?: "active" | "archived" | "all" }) => mode === "encrypted" ? getEncryptedFunds(filters) : apiClient.getFunds(filters), getFund: async (fundId: string) => mode === "encrypted" ? getEncryptedFund(fundId) : apiClient.getFund(fundId), getFundEntries: async (fundId: string) => mode === "encrypted" ? getEncryptedFundEntries(fundId) : apiClient.getFundEntries(fundId, { page: 1, page_size: 100 }), updateFundEntry: async (fundId: string, entry: FundEntry, input: UpdateFundEntryRequest) => mode === "encrypted" ? updateEncryptedFundEntry(fundId, entry, input) : apiClient.updateFundEntry(fundId, entry.id, input), deleteFundEntry: async (fundId: string, entry: FundEntry) => mode === "encrypted" ? deleteEncryptedFundEntry(fundId, entry) : apiClient.deleteFundEntry(fundId, entry.id), getMonthOverview: async (month: string) => { if (mode === "encrypted") { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); return encryptedMonthOverview(authority.getState(), month) } return apiClient.getMonthOverview(month) }, getMonthCloseout: async (month: string) => { if (mode === "encrypted") { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); return encryptedCloseout(authority.getState(), month) } return apiClient.getMonthCloseout(month) }, closeMonth: async (month: string, payload: Record<string, unknown>) => { if (mode !== "encrypted") return apiClient.closeMonth(month, payload as never); if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const id = createEncryptedRecordId(); await authority.createSource("month_closeout", "month_closeout_v1", id, { id, month, status: "closed", ...payload }); return encryptedCloseout(authority.getState(), month) }, updateMonthCloseout: async (month: string, payload: Record<string, unknown>) => { if (mode !== "encrypted") return apiClient.updateMonthCloseout(month, payload as never); return value.closeMonth(month, payload) }, reopenMonth: async (month: string) => { if (mode !== "encrypted") return apiClient.reopenMonth(month); const saved = authority?.getState().closeouts.find((item) => String(item.month ?? "") === month); if (!saved) return encryptedCloseout(authority!.getState(), month); const record = authority!.store.values().find((item) => item.family === "month_closeout" && String(item.data.month ?? "") === month); if (record) await authority!.update(record.envelope.record_id, { ...record.data, is_reopened: true }); return encryptedCloseout(authority!.getState(), month) }, getInsightsMetrics: async (from: string, to: string) => { if (mode === "encrypted") { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); return encryptedInsights(authority.getState(), from, to) } return apiClient.getInsightsMetrics(from, to) }, getRecurringExpenses: async (month: string) => { if (mode === "encrypted") { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); return encryptedRecurring(authority.getState(), month) } return apiClient.getRecurringExpenses(month) }, getSavingsPlan: async (month: string) => { if (mode === "encrypted") { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); return encryptedSavingsPlan(authority.getState(), month) } return apiClient.getSavingsPlan(month) }, createRecurringExpense: async (input: Record<string, unknown>) => { if (mode !== "encrypted") return apiClient.createRecurringExpense(input as never).then(() => undefined); if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const id = createEncryptedRecordId(); await authority.createSource("recurring_series", "recurring_series_v1", id, { id, series_id: id, ...input, amount_cents: parseMoneyCents(String(input.amount ?? "0")), is_deleted: false }) }, updateRecurringExpense: async (id: string, input: Record<string, unknown>) => { if (mode !== "encrypted") return apiClient.updateRecurringExpense(id, input as never).then(() => undefined); const current = encryptedRecurringRecord(id); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); await authority!.update(current.envelope.record_id, { ...current.data, ...input, amount_cents: input.amount == null ? current.data.amount_cents : parseMoneyCents(String(input.amount)) }) }, deleteRecurringExpense: async (id: string) => { if (mode !== "encrypted") return apiClient.deleteRecurringExpense(id); const current = encryptedRecurringRecord(id); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); await authority!.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: current.envelope.record_id, family: "recurring_series", data: current.data }] }) }, scheduleRecurringExpenseChange: async (id: string, input: Record<string, unknown>) => { if (mode !== "encrypted") return apiClient.scheduleRecurringExpenseChange(id, input as never).then(() => undefined); const current = encryptedRecurringRecord(id); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); const effective = String(input.effective_month); const nextId = createEncryptedRecordId(); const prior = { ...current.data, ends_month: effective }; const next = { ...current.data, ...input, id: nextId, series_id: current.data.series_id ?? current.data.id, starts_month: effective, ends_month: null, amount_cents: input.amount == null ? current.data.amount_cents : parseMoneyCents(String(input.amount)) }; await authority!.commitSourceDiff({ creates: [{ id: nextId, family: "recurring_series", data: next }], updates: [{ id: current.envelope.record_id, family: "recurring_series", data: prior }], tombstones: [] }) }, replaceSavingsPlan: async (month: string, request: { allocations: Array<{ fund_id: string; amount: string }> }) => { if (mode !== "encrypted") return apiClient.replaceSavingsPlan(month, request); if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const planId = createEncryptedRecordId(); await authority.createSource("savings_plan", "savings_plan_v1", planId, { id: planId, month, status: "active", savings_budget_cents: 0 }); for (const allocation of request.allocations) { const allocationId = createEncryptedRecordId(); await authority.createSource("savings_plan_allocation", "savings_plan_allocation_v1", allocationId, { id: allocationId, plan_id: planId, month, fund_id: allocation.fund_id, planned_amount_cents: parseMoneyCents(allocation.amount) }) } return encryptedSavingsPlan(authority.getState(), month) } }), [mode, isLoading, authority])
-  const phase7Value = { ...value, unlockWithRecovery, changePassphrase, rotateRecoverySecret }
+  const phase7Value = { ...value, unlockWithRecovery, changePassphrase, rotateRecoverySecret, quickUnlockCapability: capability.supported ? "supported" as const : "unsupported" as const, quickUnlockStatus, unlockWithQuickUnlock, enrollQuickUnlock, revokeQuickUnlock }
   return <FinancialAuthorityContext.Provider value={phase7Value}>{children}</FinancialAuthorityContext.Provider>
 }
 
