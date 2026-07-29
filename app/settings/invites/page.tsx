@@ -109,6 +109,7 @@ export default function InvitesSettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
   const [revokeInviteId, setRevokeInviteId] = useState<string | null>(null)
+  const [deleteAccountInviteId, setDeleteAccountInviteId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const isOwner = profile?.role === "owner"
@@ -247,6 +248,9 @@ export default function InvitesSettingsPage() {
   const invitePendingRevoke = revokeInviteId
     ? invites.find((invite) => invite.invite_id === revokeInviteId) ?? null
     : null
+  const invitePendingAccountDelete = deleteAccountInviteId
+    ? invites.find((invite) => invite.invite_id === deleteAccountInviteId) ?? null
+    : null
 
   const handleRevokeInvite = async () => {
     if (!revokeInviteId) {
@@ -269,6 +273,33 @@ export default function InvitesSettingsPage() {
         setError(err.error.message)
       } else {
         setError("Unable to revoke invite")
+      }
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const handleDeleteInvitedAccount = async () => {
+    if (!deleteAccountInviteId) {
+      return
+    }
+
+    setIsMutating(true)
+    setError(null)
+
+    try {
+      await apiClient.deleteInvitedAccount(deleteAccountInviteId)
+      setInvites((previous) => previous.map((invite) => (
+        invite.invite_id === deleteAccountInviteId
+          ? { ...invite, accepted_user_active: false }
+          : invite
+      )))
+      setDeleteAccountInviteId(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.error.message)
+      } else {
+        setError("Unable to delete invited account")
       }
     } finally {
       setIsMutating(false)
@@ -372,7 +403,7 @@ export default function InvitesSettingsPage() {
                         </p>
                       )}
                     </div>
-                    {invite.status === "pending" && (
+                    {invite.status === "pending" ? (
                       <Button
                         type="button"
                         size="icon"
@@ -384,7 +415,19 @@ export default function InvitesSettingsPage() {
                       >
                         <Trash2 className="size-4" />
                       </Button>
-                    )}
+                    ) : invite.status === "accepted" && invite.accepted_user_active !== false && invite.accepted_user_role !== "owner" ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="rounded-full text-destructive hover:text-destructive"
+                        onClick={() => setDeleteAccountInviteId(invite.invite_id)}
+                        disabled={isMutating}
+                        aria-label={`Delete account for ${invite.invitee_name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
               ))
@@ -604,6 +647,31 @@ export default function InvitesSettingsPage() {
               Revoke access for <span className="font-medium text-foreground">{invitePendingRevoke.invitee_name}</span>.
             </p>
             <p>{invitePendingRevoke.email}</p>
+          </div>
+        ) : null}
+      </ResponsiveConfirmDialog>
+
+      <ResponsiveConfirmDialog
+        open={deleteAccountInviteId !== null}
+        onOpenChange={(open) => {
+          if (!isMutating) {
+            setDeleteAccountInviteId(open ? deleteAccountInviteId : null)
+          }
+        }}
+        title="Delete invited account"
+        description="This disables the invited user’s account and signs them out of all devices. Their financial and audit records are retained."
+        confirmLabel={isMutating ? "Deleting..." : "Delete account"}
+        confirmVariant="destructive"
+        confirmDisabled={!invitePendingAccountDelete || isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleDeleteInvitedAccount()}
+      >
+        {invitePendingAccountDelete ? (
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Delete access for <span className="font-medium text-foreground">{invitePendingAccountDelete.invitee_name}</span>?
+            </p>
+            <p>{invitePendingAccountDelete.email}</p>
           </div>
         ) : null}
       </ResponsiveConfirmDialog>

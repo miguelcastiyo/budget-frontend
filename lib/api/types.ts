@@ -1139,6 +1139,10 @@ export interface InviteResponse {
   expires_at: string
   created_at: string
   accepted_at: string | null
+  accepted_user_id: string | null
+  accepted_user_name: string | null
+  accepted_user_role: UserRole | null
+  accepted_user_active: boolean | null
 }
 
 export interface InvitesResponse {
