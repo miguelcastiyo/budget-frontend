@@ -24,7 +24,12 @@ export function extractPrfResult(credential: Credential): ArrayBuffer | null {
   if (result?.prf?.enabled !== true) return null
   const first = result.prf.results?.first
   if (!first) return null
-  return first instanceof ArrayBuffer ? first : null
+  if (first instanceof ArrayBuffer) return first
+  if (typeof first === "object" && typeof (first as { byteLength?: unknown }).byteLength === "number") {
+    const view = first as unknown as ArrayBufferView
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice().buffer as ArrayBuffer
+  }
+  return null
 }
 
 export function serializeRegistrationCredential(credential: PublicKeyCredential): Record<string, unknown> {

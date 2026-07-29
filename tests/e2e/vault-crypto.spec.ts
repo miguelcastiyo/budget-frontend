@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { validateNewPassphrase } from "../../lib/privacy/vault-crypto"
-import { assertionOptionsForBrowser, registrationOptionsForBrowser } from "../../lib/privacy/quick-unlock"
+import { assertionOptionsForBrowser, extractPrfResult, registrationOptionsForBrowser } from "../../lib/privacy/quick-unlock"
 
 test("new Vault passphrases reject trivial weak patterns while allowing strong choices", () => {
   expect(validateNewPassphrase("123456123456")).toContain("unique")
@@ -14,6 +14,11 @@ test("Quick Unlock converts PRF extension inputs to browser byte arrays", () => 
   const assertion = assertionOptionsForBrowser({ challenge: first, allowCredentials: [], extensions: { prf: { evalByCredential: { credential: { first } } } } })
   expect((registration.extensions as any)?.prf?.eval?.first).toBeInstanceOf(Uint8Array)
   expect((assertion.extensions as any)?.prf?.evalByCredential?.credential?.first).toBeInstanceOf(Uint8Array)
+})
+
+test("Quick Unlock accepts Safari-compatible PRF byte views", () => {
+  const credential = { getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: new Uint8Array(32) } } }) } as unknown as Credential
+  expect(extractPrfResult(credential)?.byteLength).toBe(32)
 })
 
 test("browser Web Crypto supports the Phase 2 synthetic Vault round trip and negative paths", async ({ page }) => {
