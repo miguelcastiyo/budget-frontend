@@ -1,10 +1,19 @@
 import { expect, test } from "@playwright/test"
 import { validateNewPassphrase } from "../../lib/privacy/vault-crypto"
+import { assertionOptionsForBrowser, registrationOptionsForBrowser } from "../../lib/privacy/quick-unlock"
 
 test("new Vault passphrases reject trivial weak patterns while allowing strong choices", () => {
   expect(validateNewPassphrase("123456123456")).toContain("unique")
   expect(validateNewPassphrase("passwordpassword")).toContain("unique")
   expect(validateNewPassphrase("A secure phrase 2026")).toBeNull()
+})
+
+test("Quick Unlock converts PRF extension inputs to browser byte arrays", () => {
+  const first = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  const registration = registrationOptionsForBrowser({ challenge: first, user: { id: first }, extensions: { prf: { eval: { first } } } })
+  const assertion = assertionOptionsForBrowser({ challenge: first, allowCredentials: [], extensions: { prf: { evalByCredential: { credential: { first } } } } })
+  expect((registration.extensions as any)?.prf?.eval?.first).toBeInstanceOf(Uint8Array)
+  expect((assertion.extensions as any)?.prf?.evalByCredential?.credential?.first).toBeInstanceOf(Uint8Array)
 })
 
 test("browser Web Crypto supports the Phase 2 synthetic Vault round trip and negative paths", async ({ page }) => {

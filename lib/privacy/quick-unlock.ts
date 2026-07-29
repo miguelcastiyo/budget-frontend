@@ -38,11 +38,18 @@ export function serializeAssertionCredential(credential: PublicKeyCredential): R
 }
 
 export function registrationOptionsForBrowser(options: Record<string, any>): PublicKeyCredentialCreationOptions {
-  return { ...options, challenge: base64UrlToBytes(options.challenge), user: { ...options.user, id: base64UrlToBytes(options.user.id) }, excludeCredentials: (options.excludeCredentials ?? []).map((item: any) => ({ ...item, id: base64UrlToBytes(item.id) })) } as unknown as PublicKeyCredentialCreationOptions
+  return { ...options, challenge: base64UrlToBytes(options.challenge), user: { ...options.user, id: base64UrlToBytes(options.user.id) }, excludeCredentials: (options.excludeCredentials ?? []).map((item: any) => ({ ...item, id: base64UrlToBytes(item.id) })), extensions: browserPrfExtensions(options.extensions) } as unknown as PublicKeyCredentialCreationOptions
 }
 
 export function assertionOptionsForBrowser(options: Record<string, any>): PublicKeyCredentialRequestOptions {
-  return { ...options, challenge: base64UrlToBytes(options.challenge), allowCredentials: (options.allowCredentials ?? []).map((item: any) => ({ ...item, id: base64UrlToBytes(item.id) })) }
+  return { ...options, challenge: base64UrlToBytes(options.challenge), allowCredentials: (options.allowCredentials ?? []).map((item: any) => ({ ...item, id: base64UrlToBytes(item.id) })), extensions: browserPrfExtensions(options.extensions) }
+}
+
+function browserPrfExtensions(extensions: Record<string, any> | undefined): Record<string, any> | undefined {
+  if (!extensions?.prf) return extensions
+  const convertInputs = (inputs: Record<string, any> | undefined) => inputs ? { ...inputs, ...(inputs.first ? { first: base64UrlToBytes(inputs.first) } : {}), ...(inputs.second ? { second: base64UrlToBytes(inputs.second) } : {}) } : inputs
+  const prf = extensions.prf
+  return { ...extensions, prf: { ...prf, ...(prf.eval ? { eval: convertInputs(prf.eval) } : {}), ...(prf.evalByCredential ? { evalByCredential: Object.fromEntries(Object.entries(prf.evalByCredential).map(([id, inputs]) => [id, convertInputs(inputs as Record<string, any>)])) } : {}) } }
 }
 
 export function quickUnlockRegistrationCredentialOptions(options: Record<string, any>): CredentialCreationOptions {
