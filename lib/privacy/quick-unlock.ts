@@ -70,9 +70,9 @@ export async function deriveQuickUnlockKey(prfOutput: ArrayBuffer): Promise<Cryp
   return crypto.subtle.importKey("raw", prfOutput, wrapAlgorithm, false, ["wrapKey", "unwrapKey"])
 }
 
-export async function wrapVaultKeyForQuickUnlock(runtimeVaultKey: CryptoKey, prfOutput: ArrayBuffer): Promise<string> {
+export async function wrapVaultKeyForQuickUnlock(wrappingVaultKey: CryptoKey, prfOutput: ArrayBuffer): Promise<string> {
   const key = await deriveQuickUnlockKey(prfOutput)
-  const wrapped = await crypto.subtle.wrapKey("raw", runtimeVaultKey, key, "AES-KW")
+  const wrapped = await crypto.subtle.wrapKey("raw", wrappingVaultKey, key, "AES-KW")
   return bytesToBase64Url(new Uint8Array(wrapped))
 }
 
@@ -85,8 +85,8 @@ export async function unwrapVaultKeyWithQuickUnlock(wrapped: string, prfOutput: 
   }
 }
 
-export async function assertLocalQuickUnlockWrapProof(runtimeVaultKey: CryptoKey, prfOutput: ArrayBuffer): Promise<void> {
-  const wrapped = await wrapVaultKeyForQuickUnlock(runtimeVaultKey, prfOutput)
+export async function assertLocalQuickUnlockWrapProof(wrappingVaultKey: CryptoKey, prfOutput: ArrayBuffer): Promise<void> {
+  const wrapped = await wrapVaultKeyForQuickUnlock(wrappingVaultKey, prfOutput)
   await unwrapVaultKeyWithQuickUnlock(wrapped, prfOutput)
 }
 
@@ -97,7 +97,7 @@ type QuickUnlockApi = {
   completeQuickUnlockAssertion: (payload: Record<string, unknown>) => Promise<Record<string, any>>
 }
 
-export async function enrollQuickUnlock(api: QuickUnlockApi, runtimeVaultKey: CryptoKey): Promise<Record<string, any>> {
+export async function enrollQuickUnlock(api: QuickUnlockApi, wrappingVaultKey: CryptoKey): Promise<Record<string, any>> {
   const prfInput = createPrfInput()
   const options = await api.getQuickUnlockRegistrationOptions(bytesToBase64Url(prfInput))
   const credential = await navigator.credentials.create(quickUnlockRegistrationCredentialOptions(options))
@@ -109,8 +109,8 @@ export async function enrollQuickUnlock(api: QuickUnlockApi, runtimeVaultKey: Cr
     throw error
   }
   const payload: Record<string, unknown> = { challenge_id: options.challenge_id, prf_input: bytesToBase64Url(prfInput), credential: serializeRegistrationCredential(credential) }
-  await assertLocalQuickUnlockWrapProof(runtimeVaultKey, prfOutput)
-  payload.wrapped_vault_key = await wrapVaultKeyForQuickUnlock(runtimeVaultKey, prfOutput)
+  await assertLocalQuickUnlockWrapProof(wrappingVaultKey, prfOutput)
+  payload.wrapped_vault_key = await wrapVaultKeyForQuickUnlock(wrappingVaultKey, prfOutput)
   return api.completeQuickUnlockRegistration(payload)
 }
 

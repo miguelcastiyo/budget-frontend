@@ -103,7 +103,9 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     const runtimeKey = vaultManager.getRuntimeKey()
     if (!authority || !runtimeKey) throw new Error("VAULT_LOCKED")
     if (!capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
-    await enrollQuickUnlockClient(apiClient, runtimeKey)
+    const wrappingKey = vaultManager.getQuickUnlockWrapKey()
+    if (!wrappingKey) throw new Error("QUICK_UNLOCK_REQUIRES_PASSPHRASE_UNLOCK")
+    await enrollQuickUnlockClient(apiClient, wrappingKey)
     setQuickUnlockStatus("enrolled")
   }
   const revokeQuickUnlock = async () => {
@@ -114,7 +116,9 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const changePassphrase = async (newPassphrase: string) => {
     const runtimeKey = vaultManager.getRuntimeKey()
     if (!authority || !runtimeKey) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-    await apiClient.replacePassphraseWrapper(await createPassphraseWrapper(runtimeKey, newPassphrase))
+    const wrappingKey = vaultManager.getQuickUnlockWrapKey()
+    if (!wrappingKey) throw new Error("VAULT_PASSPHRASE_UNLOCK_REQUIRED")
+    await apiClient.replacePassphraseWrapper(await createPassphraseWrapper(wrappingKey, newPassphrase))
   }
   const unlockWithRecovery = async (recoverySecret: string, newPassphrase: string) => {
     const status = await apiClient.getPrivacyStatus()
@@ -122,7 +126,9 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     const metadata = await apiClient.getVault()
     const payload: VaultInitializationPayload = { crypto_profile_version: metadata.crypto_profile_version, passphrase_wrap: metadata.passphrase, recovery_wrap: metadata.recovery }
     const runtimeKey = await vaultManager.unlockWithRecoverySecret(recoverySecret.trim(), payload)
-    await apiClient.replacePassphraseWrapper(await createPassphraseWrapper(runtimeKey, newPassphrase))
+    const wrappingKey = vaultManager.getQuickUnlockWrapKey()
+    if (!wrappingKey) throw new Error("VAULT_PASSPHRASE_UNLOCK_REQUIRED")
+    await apiClient.replacePassphraseWrapper(await createPassphraseWrapper(wrappingKey, newPassphrase))
     const nextAuthority = new EncryptedFinancialAuthority(apiClient, runtimeKey, metadata.vault_id)
     try { await nextAuthority.bootstrap() } catch (error) { vaultManager.lock(); throw error }
     setAuthority(nextAuthority)
@@ -130,8 +136,10 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const rotateRecoverySecret = async () => {
     const runtimeKey = vaultManager.getRuntimeKey()
     if (!authority || !runtimeKey) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+    const wrappingKey = vaultManager.getQuickUnlockWrapKey()
+    if (!wrappingKey) throw new Error("VAULT_PASSPHRASE_UNLOCK_REQUIRED")
     const secret = generateRecoverySecret()
-    await apiClient.replaceRecoveryWrapper(await createRecoveryWrapper(runtimeKey, secret))
+    await apiClient.replaceRecoveryWrapper(await createRecoveryWrapper(wrappingKey, secret))
     return secret
   }
   const uiTransaction = (record: { sourceId: string; data: Record<string, unknown> }): Transaction => {

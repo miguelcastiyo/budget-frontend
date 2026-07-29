@@ -21,6 +21,17 @@ export interface CreatedVault {
   payload: VaultInitializationPayload
   recoverySecret: string
   runtimeKey: CryptoKey
+  /**
+   * A memory-only extractable copy used for an explicit wrapper operation
+   * (for example Quick Unlock enrollment). The operational runtime key stays
+   * non-extractable and this copy is never persisted.
+   */
+  quickUnlockWrapKey: CryptoKey
+}
+
+export interface VaultUnlockKeys {
+  runtimeKey: CryptoKey
+  quickUnlockWrapKey: CryptoKey
 }
 
 const vaultKeyAlgorithm = { name: "AES-GCM", length: 256 } as const
@@ -75,14 +86,14 @@ async function derivePassphraseKeyWithIterations(passphrase: string, salt: Uint8
   return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" }, material, wrapAlgorithm, false, ["wrapKey", "unwrapKey"])
 }
 
-async function unwrapVaultKey(wrapped: Uint8Array, wrappingKey: CryptoKey): Promise<CryptoKey> {
+async function unwrapVaultKey(wrapped: Uint8Array, wrappingKey: CryptoKey, extractable: boolean): Promise<CryptoKey> {
   return cryptoApi().subtle.unwrapKey(
     "raw",
     wrapped,
     wrappingKey,
     "AES-KW",
     vaultKeyAlgorithm,
-    false,
+    extractable,
     ["encrypt", "decrypt"]
   )
 }
@@ -99,7 +110,7 @@ export async function createVault(passphrase: string): Promise<CreatedVault> {
     crypto.subtle.wrapKey("raw", vaultKey, passphraseKey, "AES-KW"),
     crypto.subtle.wrapKey("raw", vaultKey, recoveryKey, "AES-KW"),
   ])
-  const runtimeKey = await unwrapVaultKey(new Uint8Array(passphraseWrapped), passphraseKey)
+  const runtimeKey = await unwrapVaultKey(new Uint8Array(passphraseWrapped), passphraseKey, false)
   return {
     payload: {
       crypto_profile_version: 1,
@@ -115,28 +126,47 @@ export async function createVault(passphrase: string): Promise<CreatedVault> {
     },
     recoverySecret: bytesToBase64Url(recoveryBytes),
     runtimeKey,
+    quickUnlockWrapKey: vaultKey,
   }
 }
 
-export async function unlockWithPassphrase(passphrase: string, metadata: VaultInitializationPayload): Promise<CryptoKey> {
+export async function unlockWithPassphraseKeys(passphrase: string, metadata: VaultInitializationPayload): Promise<VaultUnlockKeys> {
   requireUnlockPassphrase(passphrase)
   try {
     const key = await derivePassphraseKey(passphrase, base64UrlToBytes(metadata.passphrase_wrap.salt))
-    return await unwrapVaultKey(base64UrlToBytes(metadata.passphrase_wrap.wrapped_vault_key), key)
+    const wrapped = base64UrlToBytes(metadata.passphrase_wrap.wrapped_vault_key)
+    const [runtimeKey, quickUnlockWrapKey] = await Promise.all([
+      unwrapVaultKey(wrapped, key, false),
+      unwrapVaultKey(wrapped, key, true),
+    ])
+    return { runtimeKey, quickUnlockWrapKey }
   } catch {
     throw new Error("VAULT_UNLOCK_FAILED")
   }
 }
 
-export async function unlockWithRecoverySecret(recoverySecret: string, metadata: VaultInitializationPayload): Promise<CryptoKey> {
+export async function unlockWithPassphrase(passphrase: string, metadata: VaultInitializationPayload): Promise<CryptoKey> {
+  return (await unlockWithPassphraseKeys(passphrase, metadata)).runtimeKey
+}
+
+export async function unlockWithRecoverySecretKeys(recoverySecret: string, metadata: VaultInitializationPayload): Promise<VaultUnlockKeys> {
   try {
     const recoveryBytes = base64UrlToBytes(recoverySecret)
     if (recoveryBytes.length !== VAULT_CRYPTO_PROFILE.recoverySecretBytes) throw new Error("invalid recovery secret")
     const key = await cryptoApi().subtle.importKey("raw", recoveryBytes, wrapAlgorithm, false, ["wrapKey", "unwrapKey"])
-    return await unwrapVaultKey(base64UrlToBytes(metadata.recovery_wrap.wrapped_vault_key), key)
+    const wrapped = base64UrlToBytes(metadata.recovery_wrap.wrapped_vault_key)
+    const [runtimeKey, quickUnlockWrapKey] = await Promise.all([
+      unwrapVaultKey(wrapped, key, false),
+      unwrapVaultKey(wrapped, key, true),
+    ])
+    return { runtimeKey, quickUnlockWrapKey }
   } catch {
     throw new Error("VAULT_RECOVERY_FAILED")
   }
+}
+
+export async function unlockWithRecoverySecret(recoverySecret: string, metadata: VaultInitializationPayload): Promise<CryptoKey> {
+  return (await unlockWithRecoverySecretKeys(recoverySecret, metadata)).runtimeKey
 }
 
 export async function createPassphraseWrapper(runtimeKey: CryptoKey, passphrase: string): Promise<VaultInitializationPayload["passphrase_wrap"]> {

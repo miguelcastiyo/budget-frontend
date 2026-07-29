@@ -77,3 +77,19 @@ test("Quick Unlock derives a non-exportable PRF wrapper key and proves local Vau
   })
   expect(result.exportRejected).toBe(true)
 })
+
+test("Quick Unlock wraps a temporary extractable copy while keeping the runtime Vault key non-extractable", async ({ page }) => {
+  await page.goto("/")
+  const result = await page.evaluate(async () => {
+    const source = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"])
+    const wrapping = await crypto.subtle.generateKey({ name: "AES-KW", length: 256 }, false, ["wrapKey", "unwrapKey"])
+    const wrapped = await crypto.subtle.wrapKey("raw", source, wrapping, "AES-KW")
+    const runtime = await crypto.subtle.unwrapKey("raw", wrapped, wrapping, "AES-KW", { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"])
+    const runtimeWrapRejected = await crypto.subtle.wrapKey("raw", runtime, wrapping, "AES-KW").then(() => false).catch(() => true)
+    const temporaryWrapSucceeded = await crypto.subtle.wrapKey("raw", source, wrapping, "AES-KW").then(() => true).catch(() => false)
+    return { runtimeExtractable: runtime.extractable, runtimeWrapRejected, temporaryWrapSucceeded }
+  })
+  expect(result.runtimeExtractable).toBe(false)
+  expect(result.runtimeWrapRejected).toBe(true)
+  expect(result.temporaryWrapSucceeded).toBe(true)
+})
