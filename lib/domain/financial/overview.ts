@@ -7,8 +7,8 @@ import type { RecurringOccurrence } from "./recurring"
 
 export function monthOverview(input: { transactions: TransactionRecord[]; budgets: BudgetSettingsRecord[]; occurrences: RecurringOccurrence[]; month: string; currentDate: string; recentLimit?: number }) {
   const range = monthDateRange(input.month)
-  const monthTransactions = filterTransactions(input.transactions, { from: range.from, to: range.to, sort: "date_asc" })
-  const summary = transactionSummary(input.transactions, { from: range.from, to: range.to })
+  const monthTransactions = filterTransactions(input.transactions, { from: range.from, to: range.to, sort: "date_asc" }).filter((item) => item.source !== "recurring" || item.date <= input.currentDate)
+  const summary = transactionSummary(monthTransactions, {})
   const categoryTotals = ["needs", "wants", "savings"].map((category) => ({ category, total: formatMoneyCents(monthTransactions.filter((item) => item.category === category).reduce((sum, item) => sum + item.amountCents, 0)) }))
   const tagTotals = [...new Set(monthTransactions.map((item) => item.tagId).filter(Boolean))]
     .map((tagId) => ({ tagId, totalCents: monthTransactions.filter((item) => item.tagId === tagId).reduce((sum, item) => sum + item.amountCents, 0) }))
@@ -17,7 +17,7 @@ export function monthOverview(input: { transactions: TransactionRecord[]; budget
   let budget: ReturnType<typeof resolvedBudget> | null = null
   try { budget = resolvedBudget(input.budgets, input.month) } catch { budget = null }
   const allocations = budget ? resolvedAmounts(budget.settings) : { needs: "0.00", wants: "0.00", savings: "0.00" }
-  const recurring = input.occurrences.filter((item) => item.occurrenceMonth === `${input.month}-01`)
+  const recurring = input.occurrences.filter((item) => item.occurrenceMonth === `${input.month}-01` && item.dueDate <= input.currentDate)
   const recurringTotal = monthTransactions.filter((item) => item.source === "recurring").reduce((sum, item) => sum + item.amountCents, 0)
   const recent = [...monthTransactions].sort((a, b) => b.date.localeCompare(a.date) || b.createdSequence - a.createdSequence || a.id.localeCompare(b.id)).slice(0, input.recentLimit ?? 5)
   const totalCents = monthTransactions.reduce((sum, item) => sum + item.amountCents, 0)

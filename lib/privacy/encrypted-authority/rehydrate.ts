@@ -115,5 +115,12 @@ export function rehydrateFinancialState(records: Iterable<DecryptedFinancialReco
       throw new Error(`ENCRYPTED_RECORD_REHYDRATION_FAILED:${record.family}:${record.sourceId}`, { cause: error })
     }
   }
+  const recurringAmounts = new Map(state.recurringRules.map((raw) => [String(raw.id ?? ""), raw.amount_cents == null ? moneyCents(raw.amount, false) : moneyCents(raw.amount_cents, true)]))
+  for (const item of state.transactions) {
+    if (item.amountCents <= 0 && item.source === "recurring" && item.recurringExpenseId) {
+      const amountCents = recurringAmounts.get(item.recurringExpenseId) ?? 0
+      if (amountCents > 0) item.amountCents = amountCents
+    }
+  }
   return state
 }

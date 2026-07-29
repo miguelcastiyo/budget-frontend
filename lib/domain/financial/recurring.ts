@@ -42,14 +42,16 @@ function previousMonth(month: string): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`
 }
 
-export function planMaterialization(rules: RecurringRule[], month: string, existing: RecurringOccurrence[], transactions: TransactionRecord[], currentMonth: string): RecurringOccurrence[] {
+export function planMaterialization(rules: RecurringRule[], month: string, existing: RecurringOccurrence[], transactions: TransactionRecord[], currentMonth: string, currentDate?: string): RecurringOccurrence[] {
   const normalized = monthKey(month)
   if (normalized > monthKey(currentMonth)) return []
   const planned: RecurringOccurrence[] = []
   for (const rule of resolveRules(rules, normalized)) {
-    if (existing.some((occurrence) => occurrence.recurringExpenseId === rule.id && occurrence.occurrenceMonth === `${normalized}-01`)) continue
+    const due = dueDate(rule, normalized)
+    if (currentDate && normalized === monthKey(currentMonth) && due > currentDate) continue
+    if (existing.some((occurrence) => occurrence.recurringExpenseId === rule.id && monthKey(occurrence.occurrenceMonth) === normalized)) continue
     const seed = rule.seedTransactionId ? transactions.find((transaction) => transaction.id === rule.seedTransactionId && transaction.date.slice(0, 7) === normalized) : undefined
-    planned.push({ id: `${rule.id}:${normalized}`, recurringExpenseId: rule.id, occurrenceMonth: `${normalized}-01`, dueDate: dueDate(rule, normalized), transactionId: seed?.id ?? `${rule.id}:${normalized}:transaction` })
+    planned.push({ id: `${rule.id}:${normalized}`, recurringExpenseId: rule.id, occurrenceMonth: `${normalized}-01`, dueDate: due, transactionId: seed?.id ?? `${rule.id}:${normalized}:transaction` })
   }
   return planned
 }

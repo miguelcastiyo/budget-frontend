@@ -1,4 +1,5 @@
-import { getCurrentMonthKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
+import { parseMoneyCents } from "@/lib/domain/financial/money"
 import { generatedTransaction, planMaterialization, type RecurringRule, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
 import type { TransactionRecord } from "@/lib/domain/financial/types"
 import type { EncryptedFinancialAuthority } from "./authority"
@@ -10,7 +11,7 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
     id: String(raw.id ?? ""),
     seriesId: String(raw.series_id ?? raw.id ?? ""),
     expense: String(raw.expense ?? ""),
-    amountCents: Number(raw.amount_cents ?? 0),
+    amountCents: raw.amount_cents == null ? parseMoneyCents(String(raw.amount ?? "0")) : Number(raw.amount_cents),
     category: String(raw.category ?? "needs") as RecurringRule["category"],
     billingType: String(raw.billing_type ?? "day_of_month") as RecurringRule["billingType"],
     billingDay: raw.billing_day == null ? null : Number(raw.billing_day),
@@ -23,7 +24,7 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
   const existing: RecurringOccurrence[] = state.recurringOccurrences.map((raw) => ({
     id: String(raw.id ?? ""),
     recurringExpenseId: String(raw.recurring_expense_id ?? ""),
-    occurrenceMonth: String(raw.occurrence_month ?? ""),
+    occurrenceMonth: String(raw.occurrence_month ?? "").slice(0, 7) + "-01",
     dueDate: String(raw.due_date ?? ""),
     transactionId: String(raw.transaction_id ?? ""),
   }))
@@ -33,7 +34,7 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
     source: raw.source, recurringExpenseId: raw.recurringExpenseId, importFingerprint: raw.importFingerprint,
     tagId: raw.tagId, contextId: raw.contextId, cardId: raw.cardId, isDeleted: raw.isDeleted, createdSequence: 0,
   }))
-  const planned = planMaterialization(rules, month, existing, transactions, getCurrentMonthKey())
+  const planned = planMaterialization(rules, month, existing, transactions, getCurrentMonthKey(), getLocalDateKey())
   if (planned.length === 0) return
   const creates = planned.flatMap((occurrence) => {
     const rule = rules.find((item) => item.id === occurrence.recurringExpenseId)
