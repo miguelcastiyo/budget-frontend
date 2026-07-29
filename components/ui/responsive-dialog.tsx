@@ -31,6 +31,7 @@ interface ResponsiveDialogProps {
   desktopClassName?: string
   bodyMaxWidthClassName?: string
   mobileSize?: "full" | "compact"
+  preventInitialFocus?: boolean
 }
 
 export function ResponsiveDialog({
@@ -50,6 +51,7 @@ export function ResponsiveDialog({
   desktopClassName = "sm:w-[min(calc(100dvw-2rem),38rem)] sm:max-w-[38rem]",
   bodyMaxWidthClassName,
   mobileSize = "full",
+  preventInitialFocus = false,
 }: ResponsiveDialogProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const swipeDismiss = useSwipeDismiss({
@@ -62,6 +64,9 @@ export function ResponsiveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         {...swipeDismiss}
+        onOpenAutoFocus={(event) => {
+          if (preventInitialFocus) event.preventDefault()
+        }}
         showCloseButton={false}
         className={cn(
           "flex w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:rounded-2xl sm:border",
@@ -111,7 +116,7 @@ export function ResponsiveDialog({
         <div
           ref={scrollRef}
           className={cn(
-            "min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5",
+            "min-h-0 overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:px-6 sm:py-5",
             mobileSize === "full" ? "flex-1" : "flex-initial",
             bodyClassName
           )}

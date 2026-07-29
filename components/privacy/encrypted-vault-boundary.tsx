@@ -24,7 +24,7 @@ export function EncryptedVaultBoundary({ children }: { children: React.ReactNode
   }
 
   return <div className="min-h-screen bg-background pb-mobile-nav">
-    <main className="mx-auto max-w-lg px-5 pb-8 pt-6">
+    <main className="mx-auto max-w-lg px-5 pb-8 pt-[calc(1.5rem+env(safe-area-inset-top,0px))]">
       <Card className="w-full space-y-4 p-6 text-center shadow-sm" data-testid="encrypted-vault-locked-boundary">
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground"><LockKeyhole className="size-6" aria-hidden="true" /></div>
         <div><h1 className="text-lg font-semibold">Vault setup required</h1><p className="mt-2 text-sm text-muted-foreground">Protect your financial data with a Vault passphrase before you start budgeting.</p></div>
