@@ -22,7 +22,9 @@ export function createPrfInput(): Uint8Array {
 export function extractPrfResult(credential: Credential): ArrayBuffer | null {
   const result = (credential as PublicKeyCredential).getClientExtensionResults?.() as { prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } } } | undefined
   if (result?.prf?.enabled !== true) return null
-  return result.prf.results?.first ?? null
+  const first = result.prf.results?.first
+  if (!first) return null
+  return first instanceof ArrayBuffer ? first : null
 }
 
 export function serializeRegistrationCredential(credential: PublicKeyCredential): Record<string, unknown> {
@@ -89,11 +91,14 @@ export async function enrollQuickUnlock(api: QuickUnlockApi, runtimeVaultKey: Cr
   const credential = await navigator.credentials.create(quickUnlockRegistrationCredentialOptions(options))
   if (!(credential instanceof PublicKeyCredential)) throw new Error("QUICK_UNLOCK_REGISTRATION_FAILED")
   const prfOutput = extractPrfResult(credential)
-  const payload: Record<string, unknown> = { challenge_id: options.challenge_id, prf_input: bytesToBase64Url(prfInput), credential: serializeRegistrationCredential(credential) }
-  if (prfOutput) {
-    await assertLocalQuickUnlockWrapProof(runtimeVaultKey, prfOutput)
-    payload.wrapped_vault_key = await wrapVaultKeyForQuickUnlock(runtimeVaultKey, prfOutput)
+  if (!prfOutput) {
+    const error = new Error("QUICK_UNLOCK_PRF_UNAVAILABLE")
+    error.name = "QUICK_UNLOCK_PRF_UNAVAILABLE"
+    throw error
   }
+  const payload: Record<string, unknown> = { challenge_id: options.challenge_id, prf_input: bytesToBase64Url(prfInput), credential: serializeRegistrationCredential(credential) }
+  await assertLocalQuickUnlockWrapProof(runtimeVaultKey, prfOutput)
+  payload.wrapped_vault_key = await wrapVaultKeyForQuickUnlock(runtimeVaultKey, prfOutput)
   return api.completeQuickUnlockRegistration(payload)
 }
 
