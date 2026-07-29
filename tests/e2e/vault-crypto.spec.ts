@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { validateNewPassphrase } from "../../lib/privacy/vault-crypto"
 import { assertionOptionsForBrowser, extractPrfResult, registrationOptionsForBrowser } from "../../lib/privacy/quick-unlock"
+import { quickUnlockErrorMessage } from "../../lib/privacy/quick-unlock-ui"
 
 test("new Vault passphrases reject trivial weak patterns while allowing strong choices", () => {
   expect(validateNewPassphrase("123456123456")).toContain("unique")
@@ -19,6 +20,10 @@ test("Quick Unlock converts PRF extension inputs to browser byte arrays", () => 
 test("Quick Unlock accepts Safari-compatible PRF byte views", () => {
   const credential = { getClientExtensionResults: () => ({ prf: { enabled: true, results: { first: new Uint8Array(32) } } }) } as unknown as Credential
   expect(extractPrfResult(credential)?.byteLength).toBe(32)
+})
+
+test("Quick Unlock maps Safari DOMException names to actionable messages", () => {
+  expect(quickUnlockErrorMessage(new DOMException("The operation is not supported", "NotSupportedError"))).toContain("could not create")
 })
 
 test("browser Web Crypto supports the Phase 2 synthetic Vault round trip and negative paths", async ({ page }) => {
