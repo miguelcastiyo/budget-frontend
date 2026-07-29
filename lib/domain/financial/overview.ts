@@ -10,7 +10,10 @@ export function monthOverview(input: { transactions: TransactionRecord[]; budget
   const monthTransactions = filterTransactions(input.transactions, { from: range.from, to: range.to, sort: "date_asc" })
   const summary = transactionSummary(input.transactions, { from: range.from, to: range.to })
   const categoryTotals = ["needs", "wants", "savings"].map((category) => ({ category, total: formatMoneyCents(monthTransactions.filter((item) => item.category === category).reduce((sum, item) => sum + item.amountCents, 0)) }))
-  const tagTotals = [...new Set(monthTransactions.map((item) => item.tagId).filter(Boolean))].map((tagId) => ({ tagId, total: formatMoneyCents(monthTransactions.filter((item) => item.tagId === tagId).reduce((sum, item) => sum + item.amountCents, 0)) }))
+  const tagTotals = [...new Set(monthTransactions.map((item) => item.tagId).filter(Boolean))]
+    .map((tagId) => ({ tagId, totalCents: monthTransactions.filter((item) => item.tagId === tagId).reduce((sum, item) => sum + item.amountCents, 0) }))
+    .sort((a, b) => b.totalCents - a.totalCents || String(a.tagId).localeCompare(String(b.tagId)))
+    .map(({ tagId, totalCents }) => ({ tagId, total: formatMoneyCents(totalCents) }))
   let budget: ReturnType<typeof resolvedBudget> | null = null
   try { budget = resolvedBudget(input.budgets, input.month) } catch { budget = null }
   const allocations = budget ? resolvedAmounts(budget.settings) : { needs: "0.00", wants: "0.00", savings: "0.00" }
