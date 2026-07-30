@@ -258,7 +258,7 @@ export default function TransactionsPage() {
       if (financialAuthority.mode === "encrypted") {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, category: activeTransactionFilters.categories?.split(",")[0] as "needs" | "wants" | "savings" | undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey())
+        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey())
         setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
       }
       const response = await apiClient.getTransactions({
@@ -301,7 +301,7 @@ export default function TransactionsPage() {
       if (financialAuthority.mode === "encrypted") {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const response = transactionsPageFromState(state, { page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey())
+        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey())
         setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); return
       }
       const response = await apiClient.getTransactions({

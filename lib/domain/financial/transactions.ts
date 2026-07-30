@@ -35,12 +35,21 @@ export function deleteTransaction(current: TransactionRecord): TransactionRecord
 
 export function visibleTransactions(records: TransactionRecord[]): TransactionRecord[] { return records.filter((record) => !record.isDeleted) }
 
-export interface TransactionFilter { from?: string; to?: string; search?: string; category?: FinancialCategory; tagId?: string; contextId?: string; cardId?: string; page?: number; pageSize?: number; sort?: "date_asc" | "date_desc" }
+export interface TransactionFilter { from?: string; to?: string; search?: string; category?: FinancialCategory; categories?: FinancialCategory[]; tagId?: string; tagIds?: string[]; contextId?: string; contextIds?: string[]; cardId?: string; cardIds?: string[]; isSplit?: boolean; page?: number; pageSize?: number; sort?: "date_asc" | "date_desc" }
+
+function sameReference(left: string | null, right: string): boolean {
+  if (left == null) return false
+  if (left === right) return true
+  const leftTail = left.split(":").pop()
+  const rightTail = right.split(":").pop()
+  return leftTail === rightTail || (Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right))
+}
 
 export function filterTransactions(records: TransactionRecord[], filter: TransactionFilter): TransactionRecord[] {
   const search = filter.search?.trim().toLowerCase()
   const direction = filter.sort === "date_asc" ? 1 : -1
-  return visibleTransactions(records).filter((record) => (!filter.from || record.date >= filter.from) && (!filter.to || record.date <= filter.to) && (!search || record.expense.toLowerCase().includes(search) || record.notes?.toLowerCase().includes(search)) && (!filter.category || record.category === filter.category) && (!filter.tagId || record.tagId === filter.tagId) && (!filter.contextId || record.contextId === filter.contextId) && (!filter.cardId || record.cardId === filter.cardId)).sort((a, b) => direction * a.date.localeCompare(b.date) || direction * (a.createdSequence - b.createdSequence) || a.id.localeCompare(b.id))
+  const categories = filter.categories ?? (filter.category ? [filter.category] : undefined)
+  return visibleTransactions(records).filter((record) => (!filter.from || record.date >= filter.from) && (!filter.to || record.date <= filter.to) && (!search || record.expense.toLowerCase().includes(search) || record.notes?.toLowerCase().includes(search)) && (!categories || categories.includes(record.category)) && (!filter.tagId || sameReference(record.tagId, filter.tagId)) && (!filter.tagIds || filter.tagIds.length === 0 || filter.tagIds.some((id) => sameReference(record.tagId, id))) && (!filter.contextId || sameReference(record.contextId, filter.contextId)) && (!filter.contextIds || filter.contextIds.length === 0 || filter.contextIds.some((id) => sameReference(record.contextId, id))) && (!filter.cardId || sameReference(record.cardId, filter.cardId)) && (!filter.cardIds || filter.cardIds.length === 0 || filter.cardIds.some((id) => sameReference(record.cardId, id))) && (filter.isSplit === undefined || record.isSplit === filter.isSplit)).sort((a, b) => direction * a.date.localeCompare(b.date) || direction * (a.createdSequence - b.createdSequence) || a.id.localeCompare(b.id))
 }
 
 export function paginateTransactions(records: TransactionRecord[], filter: TransactionFilter): { items: TransactionRecord[]; page: number; pageSize: number; totalItems: number } {
