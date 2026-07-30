@@ -1,4 +1,4 @@
-import type { Card, Context, Fund as LegacyFund, MonthCloseoutResponse, RecurringExpense, SavingsPlanResponse, Tag, Transaction, TransactionsPage } from "../../api/types"
+import type { Card, Context, Fund as LegacyFund, MonthCloseoutResponse, RecurringExpense, SavingsPlanResponse, Tag, Transaction, TransactionsPage, TransactionSuggestion, TransactionSuggestionsResponse } from "../../api/types"
 import { formatMoneyCents } from "./money"
 import { filterTransactions, paginateTransactions, transactionSummary, type TransactionFilter } from "./transactions"
 import { ledgerBalance, orderedFunds, type Fund, type FundLedgerEntry } from "./funds"
@@ -20,9 +20,42 @@ const emptyTag = (id: string | null): Tag => ({ id: id ?? "", name: "", icon_key
 const emptyCard = (id: string | null): Card | null => id ? { id, name: "", is_favorite: false } : null
 const referenceTail = (value: string) => value.trim().split(":").pop() ?? value.trim()
 const sameReferenceId = (left: string, right: string) => left.trim() === right.trim() || referenceTail(left) === referenceTail(right) || left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase() || (Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right))
-function tagFromState(state: RehydratedFinancialState, id: string | null): Tag { const item = id == null ? null : state.tags.find((candidate) => sameReferenceId(candidate.id, id) || candidate.name.trim().toLocaleLowerCase() === id.trim().toLocaleLowerCase()); return item ? { id: id ?? item.id, name: item.name, icon_key: item.iconKey } : emptyTag(id) }
+export function tagFromState(state: RehydratedFinancialState, id: string | null): Tag { const item = id == null ? null : state.tags.find((candidate) => sameReferenceId(candidate.id, id) || candidate.name.trim().toLocaleLowerCase() === id.trim().toLocaleLowerCase()); return item ? { id: id ?? item.id, name: item.name, icon_key: item.iconKey } : emptyTag(id) }
 function contextFromState(state: RehydratedFinancialState, id: string | null): Context | null { const item = id == null ? null : state.contexts.find((candidate) => sameReferenceId(candidate.id, id) || candidate.name.trim().toLocaleLowerCase() === id.trim().toLocaleLowerCase()); return item ? { id: id ?? item.id, name: item.name, icon_key: item.iconKey } : id ? { id, name: "", icon_key: null } : null }
-function cardFromState(state: RehydratedFinancialState, id: string | null): Card | null { const item = id == null ? null : state.cards.find((candidate) => sameReferenceId(candidate.id, id) || candidate.name.trim().toLocaleLowerCase() === id.trim().toLocaleLowerCase()); return item ? { id: id ?? item.id, name: item.name, is_favorite: item.isFavorite } : emptyCard(id) }
+export function cardFromState(state: RehydratedFinancialState, id: string | null): Card | null { const item = id == null ? null : state.cards.find((candidate) => sameReferenceId(candidate.id, id) || candidate.name.trim().toLocaleLowerCase() === id.trim().toLocaleLowerCase()); return item ? { id: id ?? item.id, name: item.name, is_favorite: item.isFavorite } : emptyCard(id) }
+
+export function transactionSuggestionsFromState(state: RehydratedFinancialState, query: string, limit = 5): TransactionSuggestionsResponse {
+  const normalizedQuery = query.trim().toLocaleLowerCase("en-US").replace(/\s+/g, " ")
+  if (!normalizedQuery) return { items: [] }
+  const groups = new Map<string, { expense: string; rank: number; rows: TransactionRecord[] }>()
+  for (const record of state.transactions.filter((item) => !item.isDeleted && item.tagId !== null)) {
+    const normalizedExpense = record.expense.trim().toLocaleLowerCase("en-US").replace(/\s+/g, " ")
+    if (!normalizedExpense.includes(normalizedQuery)) continue
+    const rank = normalizedExpense === normalizedQuery ? 0 : normalizedExpense.startsWith(normalizedQuery) ? 1 : 2
+    const group = groups.get(normalizedExpense)
+    if (group) { group.rows.push(record); group.rank = Math.min(group.rank, rank) }
+    else groups.set(normalizedExpense, { expense: record.expense, rank, rows: [record] })
+  }
+  const suggestions: Array<TransactionSuggestion & { lastId: string; matchRank: number }> = []
+  for (const group of groups.values()) {
+    const rows = [...group.rows].sort((a, b) => b.date.localeCompare(a.date) || b.createdSequence - a.createdSequence || b.id.localeCompare(a.id)).slice(0, 5)
+    const setups = new Map<string, { count: number; lastUsedAt: string; lastId: string; row: TransactionRecord }>()
+    for (const row of rows) {
+      const key = [row.category, row.tagId, row.cardId ?? "null", row.isSplit ? "1" : "0"].join("|")
+      const setup = setups.get(key)
+      if (!setup) setups.set(key, { count: 1, lastUsedAt: row.date, lastId: row.id, row })
+      else { setup.count++; if (row.date > setup.lastUsedAt || (row.date === setup.lastUsedAt && row.id > setup.lastId)) { setup.lastUsedAt = row.date; setup.lastId = row.id; setup.row = row } }
+    }
+    const setup = [...setups.values()].sort((a, b) => b.count - a.count || b.lastUsedAt.localeCompare(a.lastUsedAt) || b.lastId.localeCompare(a.lastId))[0]
+    if (!setup) continue
+    const tag = tagFromState(state, setup.row.tagId)
+    if (!tag.id || !tag.name) continue
+    const confidence = group.rank === 0 && setup.count >= 2 ? "high" : group.rank <= 1 || group.rank === 0 ? "medium" : "low"
+    suggestions.push({ expense: group.expense, category: setup.row.category, tag, card: cardFromState(state, setup.row.cardId), is_split: setup.row.isSplit, confidence, last_used_at: setup.lastUsedAt, usage_count: setup.count, lastId: setup.lastId, matchRank: group.rank })
+  }
+  suggestions.sort((a, b) => a.matchRank - b.matchRank || b.usage_count - a.usage_count || b.last_used_at.localeCompare(a.last_used_at) || b.lastId.localeCompare(a.lastId))
+  return { items: suggestions.slice(0, Math.max(1, Math.min(10, limit))).map(({ lastId: _lastId, matchRank: _matchRank, ...item }) => item) }
+}
 
 export function transactionVM(transaction: Transaction): TransactionListItemVM { return { id: transaction.id, date: transaction.date, expense: transaction.expense, amount: transaction.amount, category: transaction.category, isSplit: transaction.is_split, notes: transaction.notes, source: transaction.source, recurringExpenseId: transaction.recurring_expense_id, tag: transaction.tag, context: transaction.context, card: transaction.card } }
 export function transactionsVMFromLegacy(page: { items: Transaction[]; page: number; page_size: number; total_items: number; summary: { total_spent: string; count: number; avg_transaction: string; split_count: number } }): TransactionsVM { return { items: page.items.map(transactionVM), page: page.page, pageSize: page.page_size, totalItems: page.total_items, summary: { totalSpent: page.summary.total_spent, count: page.summary.count, average: page.summary.avg_transaction, splitCount: page.summary.split_count } } }
@@ -31,6 +64,7 @@ function internalTransactionVM(state: RehydratedFinancialState, record: Transact
 export function transactionsVMFromState(state: RehydratedFinancialState, filter: TransactionFilter = {}): TransactionsVM { const page = paginateTransactions(state.transactions, filter); const summary = transactionSummary(state.transactions, filter); return { items: page.items.map((record) => internalTransactionVM(state, record)), page: page.page, pageSize: page.pageSize, totalItems: page.totalItems, summary: { totalSpent: summary.totalSpent, count: summary.count, average: summary.avgTransaction, splitCount: summary.splitCount } } }
 export function transactionsPageFromState(state: RehydratedFinancialState, filter: TransactionFilter = {}, currentDate?: string): TransactionsPage { const visibleState = currentDate ? { ...state, transactions: state.transactions.filter((record) => record.source !== "recurring" || record.date <= currentDate) } : state; const page = paginateTransactions(visibleState.transactions, filter); const summary = transactionSummary(visibleState.transactions, filter); return { items: page.items.map((record) => ({ id: record.id, date: record.date, expense: record.expense, amount: formatMoneyCents(record.amountCents), category: record.category, is_split: record.isSplit, notes: record.notes, source: record.source === "import" ? "import" : "manual", recurring_expense_id: record.recurringExpenseId, tag: tagFromState(state, record.tagId), context: contextFromState(state, record.contextId), card: cardFromState(state, record.cardId), created_at: "", updated_at: "" })), page: page.page, page_size: page.pageSize, total_items: page.totalItems, summary: { total_spent: summary.totalSpent, count: summary.count, avg_transaction: summary.avgTransaction, split_count: summary.splitCount } } }
 export function taxonomyFromState(state: RehydratedFinancialState) { return { tags: state.tags.map((item) => ({ id: referenceTail(item.id), name: item.name, icon_key: item.iconKey })), contexts: state.contexts.map((item) => ({ id: referenceTail(item.id), name: item.name, icon_key: item.iconKey })), cards: state.cards.map((item) => ({ id: referenceTail(item.id), name: item.name, is_favorite: item.isFavorite })) } }
+export function tagQuickPicksFromState(state: RehydratedFinancialState, limit = 5): Tag[] { const usage = new Map<string, { count: number; lastUsedAt: string }>(); for (const transaction of state.transactions) { if (transaction.isDeleted || transaction.tagId == null) continue; const current = usage.get(transaction.tagId) ?? { count: 0, lastUsedAt: "" }; current.count++; if (transaction.date > current.lastUsedAt) current.lastUsedAt = transaction.date; usage.set(transaction.tagId, current) }; const tags = state.tags.filter((item) => !item.isDeleted).map((item) => ({ tag: { id: referenceTail(item.id), name: item.name, icon_key: item.iconKey }, usage: usage.get(item.id) ?? usage.get(referenceTail(item.id)) ?? { count: 0, lastUsedAt: "" } })); tags.sort((a, b) => b.usage.count - a.usage.count || b.usage.lastUsedAt.localeCompare(a.usage.lastUsedAt) || a.tag.name.localeCompare(b.tag.name, "en-US")); return tags.slice(0, Math.max(0, limit)).map((item) => item.tag) }
 
 export function fundVMFromLegacy(fund: LegacyFund): FundVM { return { id: fund.id, name: fund.name, fundType: fund.fund_type, goalAmount: fund.goal_amount, status: fund.status, sortOrder: fund.sort_order, balance: fund.current_balance, remaining: fund.remaining_amount, isGoalMet: fund.is_goal_met } }
 export function fundVMFromState(fund: Fund, entries: FundLedgerEntry[]): FundVM { const balance = ledgerBalance(entries, fund.id); return { id: fund.id, name: fund.name, fundType: fund.fundType, goalAmount: fund.goalAmountCents === null ? null : formatMoneyCents(fund.goalAmountCents), status: fund.status, sortOrder: fund.sortOrder, balance: formatMoneyCents(balance), remaining: fund.goalAmountCents === null ? null : formatMoneyCents(Math.max(0, fund.goalAmountCents - balance)), isGoalMet: fund.goalAmountCents !== null && balance >= fund.goalAmountCents } }

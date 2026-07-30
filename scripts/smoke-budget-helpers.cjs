@@ -27,6 +27,7 @@ const monthCloseout = require("../lib/month-closeout.ts")
 const transactionCollection = require("../lib/transaction-collection.ts")
 const recurringStatus = require("../app/settings/recurring/_lib/recurring-status.ts")
 const recurringSeries = require("../app/settings/recurring/_lib/recurring-series.ts")
+const financialViewModels = require("../lib/domain/financial/view-models.ts")
 
 const hourlyMonthly = income.calculateHourlyMonthlyIncome("20.00", "10.00")
 assertApprox(hourlyMonthly, 866.6666666667, 0.000001, "hourly income uses 52/12 monthly average")
@@ -119,6 +120,20 @@ assertDeepEqual(
   [transactionOne, transactionTwo, { id: "txn_3", expense: "Three" }],
   "transaction page merge preserves order and removes duplicate IDs"
 )
+
+const suggestionState = {
+  transactions: [
+    { id: "txn_1", date: "2026-07-01", expense: "Coffee Shop", amountCents: 500, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_food", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 1 },
+    { id: "txn_2", date: "2026-07-15", expense: "Coffee Shop", amountCents: 600, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_food", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 2 },
+    { id: "txn_3", date: "2026-07-20", expense: "Coffee Roaster", amountCents: 900, category: "wants", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_food", contextId: null, cardId: null, isDeleted: false, createdSequence: 3 },
+  ],
+  tags: [{ id: "tag_food", userId: "u", name: "Food", iconKey: "food", isFavorite: false, isDeleted: false, createdSequence: 1 }],
+  contexts: [], cards: [{ id: "card_1", userId: "u", name: "Everyday", iconKey: null, isFavorite: true, isDeleted: false, createdSequence: 1 }], budgets: [],
+}
+const suggestions = financialViewModels.transactionSuggestionsFromState(suggestionState, "coffee", 5).items
+assertEqual(suggestions[0].expense, "Coffee Shop", "encrypted suggestions prefer the higher-frequency exact setup")
+assertEqual(suggestions[0].usage_count, 2, "encrypted suggestions retain setup frequency")
+assertEqual(suggestions[1].expense, "Coffee Roaster", "encrypted suggestions include prefix matches")
 
 const allocationState = {
   ...allocation.defaultBudgetAllocationFormState,

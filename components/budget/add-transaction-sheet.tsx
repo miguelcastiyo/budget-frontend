@@ -55,7 +55,7 @@ import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { taxonomyFromState } from "@/lib/domain/financial/view-models"
+import { tagQuickPicksFromState, taxonomyFromState } from "@/lib/domain/financial/view-models"
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -158,7 +158,7 @@ export function AddTransactionSheet({
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const references = taxonomyFromState(state)
         setTags(references.tags)
-        setQuickPickTags(references.tags.slice(0, 5))
+        setQuickPickTags(tagQuickPicksFromState(state, 5))
         setCards(sortCards(references.cards))
         return
       }
@@ -186,14 +186,14 @@ export function AddTransactionSheet({
     setIsLoadingContexts(true)
     setContextLoadError(null)
     try {
-      const response = await apiClient.getContexts()
+      const response = await financialAuthority.getContexts()
       setContexts(response.items)
     } catch (err) {
       setContextLoadError(err instanceof ApiError ? err.error.message : "Unable to load contexts")
     } finally {
       setIsLoadingContexts(false)
     }
-  }, [])
+  }, [financialAuthority])
 
   useEffect(() => {
     if (contextPickerOpen) {
@@ -293,7 +293,7 @@ export function AddTransactionSheet({
     const requestId = suggestionRequestRef.current + 1
     suggestionRequestRef.current = requestId
     const timeoutId = window.setTimeout(() => {
-      apiClient.getTransactionSuggestions(query, 5)
+      financialAuthority.getTransactionSuggestions(query, 5)
         .then((response) => {
           if (suggestionRequestRef.current === requestId) {
             setSuggestions(response.items)
@@ -364,7 +364,7 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const created = await apiClient.createTag({
+      const created = await financialAuthority.createTag({
         name,
         icon_key: newTagIconKey || null,
       })
@@ -393,7 +393,7 @@ export function AddTransactionSheet({
     setError(null)
 
     try {
-      const created = await apiClient.createCard({ name })
+      const created = await financialAuthority.createCard({ name })
       setCards((prev) => sortCards([...prev, created]))
       setCardId(created.id)
       setNewCardName("")
@@ -415,7 +415,7 @@ export function AddTransactionSheet({
     setIsCreatingContext(true)
     setContextLoadError(null)
     try {
-      const created = await apiClient.createContext({ name: trimmedName, icon_key: iconKey || null })
+      const created = await financialAuthority.createContext({ name: trimmedName, icon_key: iconKey || null })
       setContexts((previous) => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)))
       setContextId(created.id)
     } catch (err) {
