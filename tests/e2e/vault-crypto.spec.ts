@@ -22,6 +22,11 @@ test("Quick Unlock accepts Safari-compatible PRF byte views", () => {
   expect(extractPrfResult(credential)?.byteLength).toBe(32)
 })
 
+test("Quick Unlock accepts authentication PRF results when Safari omits registration-only enabled", () => {
+  const credential = { getClientExtensionResults: () => ({ prf: { results: { first: new Uint8Array(32) } } }) } as unknown as Credential
+  expect(extractPrfResult(credential)?.byteLength).toBe(32)
+})
+
 test("Quick Unlock maps Safari DOMException names to actionable messages", () => {
   expect(quickUnlockErrorMessage(new DOMException("The operation is not supported", "NotSupportedError"))).toContain("could not create")
 })

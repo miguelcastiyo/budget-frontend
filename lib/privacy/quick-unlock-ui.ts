@@ -6,7 +6,7 @@ export function quickUnlockErrorMessage(error: unknown): string {
   if (isQuickUnlockCancellation(error)) return ""
   const code = typeof error === "object" && error !== null && "error" in error && typeof (error as { error?: { code?: unknown } }).error?.code === "string" ? String((error as { error: { code: string } }).error.code) : error instanceof Error ? (error.name && error.name !== "Error" ? error.name : error.message) : ""
   if (code === "QUICK_UNLOCK_UNSUPPORTED") return "Quick Unlock isn't available on this device."
-  if (code === "QUICK_UNLOCK_PRF_UNAVAILABLE" || code === "QUICK_UNLOCK_PRF_INVALID") return "This iPhone browser did not provide the security capability Quick Unlock needs. Try Safari or the installed Budget app, then use your Vault passphrase if it continues."
+  if (code === "QUICK_UNLOCK_PRF_UNAVAILABLE" || code === "QUICK_UNLOCK_PRF_INVALID") return "This browser did not return the security capability Quick Unlock needs. Try Safari or the installed Budget app, then use your Vault passphrase if it continues."
   if (code === "QUICK_UNLOCK_REQUIRES_PASSPHRASE_UNLOCK") return "Unlock your Vault with your passphrase once before enabling Quick Unlock on this device."
   if (code === "VAULT_PASSPHRASE_UNLOCK_REQUIRED") return "Unlock your Vault with your passphrase once before changing its recovery settings."
   if (code === "NotSupportedError" || code === "QUICK_UNLOCK_REGISTRATION_FAILED") return "This browser could not create a Quick Unlock credential. Use Safari or the installed Budget app, then try again."

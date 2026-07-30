@@ -25,7 +25,9 @@ export function createPrfInput(): Uint8Array {
 
 export function extractPrfResult(credential: Credential): ArrayBuffer | null {
   const result = (credential as PublicKeyCredential).getClientExtensionResults?.() as { prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } } } | undefined
-  if (result?.prf?.enabled !== true) return null
+  // WebAuthn only reports `enabled` during registration. Authentication
+  // responses may omit it and return `results` directly.
+  if (!result?.prf || result.prf.enabled === false) return null
   const first = result.prf.results?.first
   if (!first) return null
   if (first instanceof ArrayBuffer) return first
