@@ -66,6 +66,11 @@ interface AddTransactionSheetProps {
   transaction?: Transaction | null
 }
 
+function formatOrdinalDay(day: number): string {
+  const suffix = day % 100 >= 11 && day % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[day % 10] ?? "th"
+  return `${day}${suffix}`
+}
+
 export function AddTransactionSheet({
   open,
   onOpenChange,
@@ -1027,14 +1032,12 @@ export function AddTransactionSheet({
                       </div>
 
                       {canCreateRecurringRule && (
-                        <div className="space-y-3 rounded-xl border border-border/60 p-3">
+                        <div className="space-y-2.5 rounded-xl border border-border/60 p-3">
                           <div className="flex items-center justify-between gap-3">
-                            <div>
+                            <div className="min-w-0">
                               <Label className="text-sm font-medium">Make recurring</Label>
                               <p className="text-xs text-muted-foreground">
-                                {isEditMode
-                                  ? "Create a recurring rule using this transaction as the first occurrence."
-                                  : "Adds this expense automatically each month."}
+                                Automatically add this every month
                               </p>
                             </div>
                             <Switch
@@ -1049,36 +1052,20 @@ export function AddTransactionSheet({
                           </div>
 
                           {makeRecurring && (
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3">
-                              <div className="min-w-0 space-y-2">
-                                <Label className="text-xs text-muted-foreground">Billing rule</Label>
-                                <Select
-                                  value={recurringBillingType}
-                                  onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
-                                >
-                                  <SelectTrigger className="h-10 w-full min-w-0 rounded-xl border-border/60">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="day_of_month">Same day monthly</SelectItem>
-                                    <SelectItem value="last_day">Last day monthly</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="min-w-0 space-y-2">
-                                <Label className="text-xs text-muted-foreground">Billing day</Label>
-                                <Input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  enterKeyHint="done"
-                                  value={recurringBillingType === "last_day" ? "" : recurringBillingDay}
-                                  onChange={(e) => setRecurringBillingDay(e.target.value)}
-                                  disabled={recurringBillingType === "last_day"}
-                                  placeholder={recurringBillingType === "last_day" ? "Auto" : "1-31"}
-                                  className="h-10 w-full rounded-xl border-border/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                />
-                              </div>
+                            <div className="min-w-0">
+                              <Label className="text-xs text-muted-foreground">Repeats</Label>
+                              <Select
+                                value={recurringBillingType}
+                                onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
+                              >
+                                <SelectTrigger aria-label="Choose recurring schedule" className="mt-1.5 h-11 w-full min-w-0 rounded-xl border-border/60 text-left">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="max-w-[calc(100vw-2rem)]">
+                                  <SelectItem value="day_of_month">On the {formatOrdinalDay(Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31))} of each month</SelectItem>
+                                  <SelectItem value="last_day">On the last day of each month</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
                           )}
                         </div>
