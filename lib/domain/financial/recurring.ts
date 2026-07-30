@@ -1,4 +1,5 @@
 import { daysInMonth, monthDateRange, monthKey } from "./clock"
+import { parseMoneyCents } from "./money"
 import type { TransactionRecord } from "./types"
 
 export interface RecurringRule {
@@ -8,6 +9,36 @@ export interface RecurringRule {
 }
 
 export interface RecurringOccurrence { id: string; recurringExpenseId: string; occurrenceMonth: string; dueDate: string; transactionId: string }
+
+function rawString(value: unknown, fallback = ""): string {
+  return value === null || value === undefined ? fallback : String(value)
+}
+
+function rawBoolean(value: unknown, defaultValue: boolean): boolean {
+  if (value === undefined || value === null) return defaultValue
+  return value === true || value === 1 || value === "1" || value === "true"
+}
+
+/** Normalize both legacy snapshot rows and client-created encrypted rows. */
+export function recurringRuleFromRaw(raw: Record<string, unknown>, fallbackMonth: string): RecurringRule {
+  const starts = raw.starts_month ?? raw.startsMonth
+  const ends = raw.ends_month ?? raw.endsMonth
+  const amount = raw.amount_cents ?? raw.amountCents
+  return {
+    id: rawString(raw.id ?? raw.source_id ?? raw.sourceId),
+    seriesId: rawString(raw.series_id ?? raw.seriesId ?? raw.id ?? raw.source_id ?? raw.sourceId),
+    expense: rawString(raw.expense),
+    amountCents: amount === null || amount === undefined ? parseMoneyCents(rawString(raw.amount ?? "0")) : Number(amount),
+    category: rawString(raw.category, "needs") as RecurringRule["category"],
+    billingType: rawString(raw.billing_type ?? raw.billingType, "day_of_month") as RecurringRule["billingType"],
+    billingDay: raw.billing_day == null && raw.billingDay == null ? null : Number(raw.billing_day ?? raw.billingDay),
+    startsMonth: monthKey(rawString(starts, fallbackMonth)),
+    endsMonth: ends == null || ends === "" ? null : monthKey(rawString(ends)),
+    isActive: rawBoolean(raw.is_active ?? raw.isActive, true),
+    isDeleted: rawBoolean(raw.is_deleted ?? raw.isDeleted, false),
+    seedTransactionId: raw.seed_transaction_id == null && raw.seedTransactionId == null ? null : rawString(raw.seed_transaction_id ?? raw.seedTransactionId),
+  }
+}
 
 export function dueDate(rule: RecurringRule, month: string): string {
   const normalized = monthKey(month)

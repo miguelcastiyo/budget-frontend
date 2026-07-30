@@ -1,26 +1,12 @@
 import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
-import { parseMoneyCents } from "@/lib/domain/financial/money"
-import { generatedTransaction, planMaterialization, type RecurringRule, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
+import { generatedTransaction, planMaterialization, recurringRuleFromRaw, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
 import type { TransactionRecord } from "@/lib/domain/financial/types"
 import type { EncryptedFinancialAuthority } from "./authority"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
 
 export async function materializeEncryptedRecurring(authority: EncryptedFinancialAuthority, month: string) {
   const state = authority.getState()
-  const rules: RecurringRule[] = state.recurringRules.map((raw) => ({
-    id: String(raw.id ?? ""),
-    seriesId: String(raw.series_id ?? raw.id ?? ""),
-    expense: String(raw.expense ?? ""),
-    amountCents: raw.amount_cents == null ? parseMoneyCents(String(raw.amount ?? "0")) : Number(raw.amount_cents),
-    category: String(raw.category ?? "needs") as RecurringRule["category"],
-    billingType: String(raw.billing_type ?? "day_of_month") as RecurringRule["billingType"],
-    billingDay: raw.billing_day == null ? null : Number(raw.billing_day),
-    startsMonth: String(raw.starts_month ?? month),
-    endsMonth: raw.ends_month == null ? null : String(raw.ends_month),
-    isActive: raw.is_active !== false,
-    isDeleted: raw.is_deleted === true,
-    seedTransactionId: raw.seed_transaction_id == null ? null : String(raw.seed_transaction_id),
-  }))
+  const rules = state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month))
   const existing: RecurringOccurrence[] = state.recurringOccurrences.map((raw) => ({
     id: String(raw.id ?? ""),
     recurringExpenseId: String(raw.recurring_expense_id ?? ""),

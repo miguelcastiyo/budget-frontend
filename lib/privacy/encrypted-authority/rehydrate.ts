@@ -99,8 +99,8 @@ export function rehydrateFinancialState(records: Iterable<DecryptedFinancialReco
         case "taxonomy_card": state.cards.push(taxonomy(record)); break
         case "budget_settings":
         case "budget_version": state.budgets.push(budget(record)); break
-        case "recurring_series": state.recurringRules.push(record.data); break
-        case "recurring_occurrence": state.recurringOccurrences.push(record.data); break
+        case "recurring_series": state.recurringRules.push({ ...record.data, id: record.data.id ?? record.sourceId, source_id: record.sourceId }); break
+        case "recurring_occurrence": state.recurringOccurrences.push({ ...record.data, id: record.data.id ?? record.sourceId }); break
         case "fund": state.funds.push(record.data); break
         case "fund_ledger_entry": state.fundLedgerEntries.push(record.data); break
         case "savings_plan":
