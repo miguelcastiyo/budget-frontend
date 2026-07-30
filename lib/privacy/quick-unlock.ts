@@ -7,15 +7,11 @@ const vaultKeyAlgorithm = { name: "AES-GCM", length: 256 } as const
 export interface QuickUnlockCapability {
   supported: boolean
   secureContext: boolean
-  unavailableReason: "ios_standalone" | null
 }
 
 export function quickUnlockCapability(): QuickUnlockCapability {
   const secureContext = typeof window !== "undefined" && window.isSecureContext
-  const standalone = typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true)
-  const ios = typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
-  const unavailableReason = ios && standalone ? "ios_standalone" as const : null
-  return { supported: !unavailableReason && secureContext && typeof PublicKeyCredential !== "undefined" && typeof navigator.credentials?.create === "function" && typeof navigator.credentials?.get === "function", secureContext, unavailableReason }
+  return { supported: secureContext && typeof PublicKeyCredential !== "undefined" && typeof navigator.credentials?.create === "function" && typeof navigator.credentials?.get === "function", secureContext }
 }
 
 export function createPrfInput(): Uint8Array {
