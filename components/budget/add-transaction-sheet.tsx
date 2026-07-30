@@ -261,11 +261,6 @@ export function AddTransactionSheet({
   }, [isEditMode, open, showNewCard, showNewTag])
 
   useEffect(() => {
-    if (financialAuthority.mode === "encrypted") {
-      suggestionRequestRef.current += 1
-      setSuggestions([])
-      return
-    }
     if (!open || isEditMode) {
       suggestionRequestRef.current += 1
       setSuggestions([])
