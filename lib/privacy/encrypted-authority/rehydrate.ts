@@ -36,6 +36,16 @@ function relationshipId(value: unknown): string | null {
   return String(value)
 }
 
+function sameRecordReference(left: unknown, right: unknown): boolean {
+  if (left == null || right == null) return false
+  const first = String(left)
+  const second = String(right)
+  if (first === second) return true
+  const firstTail = first.split(":").pop()
+  const secondTail = second.split(":").pop()
+  return firstTail === secondTail || (Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second))
+}
+
 // Records staged by an earlier Phase 5 client may retain their source
 // collection name in the encrypted payload. The envelope identity is still
 // authoritative, but accepting these stable historical aliases lets an
@@ -113,6 +123,17 @@ export function rehydrateFinancialState(records: Iterable<DecryptedFinancialReco
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("ENCRYPTED_RECORD_FAMILY_UNSUPPORTED:")) throw error
       throw new Error(`ENCRYPTED_RECORD_REHYDRATION_FAILED:${record.family}:${record.sourceId}`, { cause: error })
+    }
+  }
+  // Legacy recurring relationships are stored in the occurrence collection;
+  // older transaction rows may not carry a source/recurring ID themselves.
+  // Reconcile both legacy numeric IDs and encrypted migration IDs before any
+  // derived aggregation (Insights, Overview) runs.
+  for (const transaction of state.transactions) {
+    const occurrence = state.recurringOccurrences.find((candidate) => sameRecordReference(candidate.transaction_id, transaction.id))
+    if (occurrence) {
+      transaction.source = "recurring"
+      transaction.recurringExpenseId = relationshipId(occurrence.recurring_expense_id)
     }
   }
   const recurringAmounts = new Map(state.recurringRules.map((raw) => [String(raw.id ?? ""), raw.amount_cents == null ? moneyCents(raw.amount, false) : moneyCents(raw.amount_cents, true)]))
