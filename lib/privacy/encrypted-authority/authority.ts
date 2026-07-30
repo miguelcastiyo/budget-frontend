@@ -85,13 +85,22 @@ export class EncryptedFinancialAuthority {
     for (const record of diff.updates) {
       const current = this.store.get(record.id); if (!current) throw new Error(`ENCRYPTED_RECORD_NOT_FOUND:${record.id}`)
       const expectedRevision = options.expectedRevisionOverrides?.[record.id] ?? current.envelope.record_revision
-      const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, { record_family: record.family, record_schema_version: current.schemaVersion, source_id: record.id, data: record.data }, expectedRevision + 1, record.id)
+      // `record.id` is the envelope record ID used for mutation routing. Keep
+      // the decrypted source ID stable so a migrated record does not acquire
+      // a second identity after its first edit.
+      const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, { record_family: record.family, record_schema_version: current.schemaVersion, source_id: current.sourceId, data: record.data }, expectedRevision + 1, record.id)
       updates.push({ envelope: encrypted.envelope, expected_revision: expectedRevision, idempotency_key: mutationIds() })
     }
     for (const record of diff.tombstones) { const current = this.store.get(record.id); if (!current) throw new Error(`ENCRYPTED_RECORD_NOT_FOUND:${record.id}`); tombstones.push({ record_id: record.id, expected_revision: options.expectedRevisionOverrides?.[record.id] ?? current.envelope.record_revision, idempotency_key: mutationIds() }) }
     const result = await this.api.request<{ records: EncryptedRecordEnvelope[]; idempotent: boolean }>("/me/encrypted-records/batch", { method: "POST", body: JSON.stringify({ idempotency_key: idempotencyKey, creates, updates, tombstones }) })
     const byId = new Map(result.records.map((envelope) => [envelope.record_id, envelope]))
-    for (const record of [...diff.creates, ...diff.updates]) { const envelope = byId.get(record.id); if (envelope) this.store.replace({ envelope, family: record.family, schemaVersion: this.store.get(record.id)?.schemaVersion ?? `${record.family}_v1`, sourceId: record.id, data: record.data }) }
+    for (const record of [...diff.creates, ...diff.updates]) {
+      const envelope = byId.get(record.id)
+      if (envelope) {
+        const prior = this.store.get(record.id)
+        this.store.replace({ envelope, family: record.family, schemaVersion: prior?.schemaVersion ?? `${record.family}_v1`, sourceId: prior?.sourceId ?? record.id, data: record.data })
+      }
+    }
     for (const record of diff.tombstones) this.store.remove(record.id)
     this.state = rehydrateFinancialState(this.store.values())
     return result
