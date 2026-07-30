@@ -19,6 +19,12 @@ function rawBoolean(value: unknown, defaultValue: boolean): boolean {
   return value === true || value === 1 || value === "1" || value === "true"
 }
 
+function rawMonth(value: unknown, fallback: string): string {
+  const text = rawString(value, fallback)
+  const month = text.match(/^\d{4}-\d{2}/)?.[0] ?? rawString(fallback).match(/^\d{4}-\d{2}/)?.[0]
+  return monthKey(month ?? fallback)
+}
+
 /** Normalize both legacy snapshot rows and client-created encrypted rows. */
 export function recurringRuleFromRaw(raw: Record<string, unknown>, fallbackMonth: string): RecurringRule {
   const starts = raw.starts_month ?? raw.startsMonth
@@ -32,8 +38,8 @@ export function recurringRuleFromRaw(raw: Record<string, unknown>, fallbackMonth
     category: rawString(raw.category, "needs") as RecurringRule["category"],
     billingType: rawString(raw.billing_type ?? raw.billingType, "day_of_month") as RecurringRule["billingType"],
     billingDay: raw.billing_day == null && raw.billingDay == null ? null : Number(raw.billing_day ?? raw.billingDay),
-    startsMonth: monthKey(rawString(starts, fallbackMonth)),
-    endsMonth: ends == null || ends === "" ? null : monthKey(rawString(ends)),
+    startsMonth: rawMonth(starts, fallbackMonth),
+    endsMonth: ends == null || ends === "" ? null : rawMonth(ends, fallbackMonth),
     isActive: rawBoolean(raw.is_active ?? raw.isActive, true),
     isDeleted: rawBoolean(raw.is_deleted ?? raw.isDeleted, false),
     seedTransactionId: raw.seed_transaction_id == null && raw.seedTransactionId == null ? null : rawString(raw.seed_transaction_id ?? raw.seedTransactionId),
