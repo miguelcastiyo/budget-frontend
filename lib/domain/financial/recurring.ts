@@ -10,6 +10,14 @@ export interface RecurringRule {
 
 export interface RecurringOccurrence { id: string; recurringExpenseId: string; occurrenceMonth: string; dueDate: string; transactionId: string }
 
+export function sameRecurringReference(left: unknown, right: unknown): boolean {
+  if (left == null || right == null) return false
+  const first = String(left)
+  const second = String(right)
+  if (first === second) return true
+  return first.split(":").pop() === second.split(":").pop()
+}
+
 function rawString(value: unknown, fallback = ""): string {
   return value === null || value === undefined ? fallback : String(value)
 }
@@ -86,7 +94,7 @@ export function planMaterialization(rules: RecurringRule[], month: string, exist
   for (const rule of resolveRules(rules, normalized)) {
     const due = dueDate(rule, normalized)
     if (currentDate && normalized === monthKey(currentMonth) && due > currentDate) continue
-    if (existing.some((occurrence) => occurrence.recurringExpenseId === rule.id && monthKey(occurrence.occurrenceMonth) === normalized)) continue
+    if (existing.some((occurrence) => sameRecurringReference(occurrence.recurringExpenseId, rule.id) && monthKey(occurrence.occurrenceMonth) === normalized)) continue
     const seed = rule.seedTransactionId ? transactions.find((transaction) => transaction.id === rule.seedTransactionId && transaction.date.slice(0, 7) === normalized) : undefined
     planned.push({ id: `${rule.id}:${normalized}`, recurringExpenseId: rule.id, occurrenceMonth: `${normalized}-01`, dueDate: due, transactionId: seed?.id ?? `${rule.id}:${normalized}:transaction` })
   }

@@ -27,6 +27,7 @@ import { formatMonthLabel, getLocalDateKey, getMonthDateRange, getPresetDateRang
 import type { DateRangeFilter } from "@/lib/date-filters"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
+import { materializeEncryptedRecurring } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 import type {
   Card,
   Category,
@@ -256,6 +257,17 @@ export default function TransactionsPage() {
 
     try {
       if (financialAuthority.mode === "encrypted") {
+        if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        // Transactions must be self-sufficient: opening Settings > Recurring
+        // first must not be required for a due recurring occurrence to appear.
+        // Materialization remains idempotent and only creates eligible
+        // occurrences for the current/selected month.
+        try {
+          await materializeEncryptedRecurring(financialAuthority.authority, activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
+        } catch {
+          // Existing decrypted transactions should remain visible even if a
+          // best-effort occurrence write is temporarily unavailable.
+        }
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey())

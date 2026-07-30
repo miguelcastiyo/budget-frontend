@@ -1,5 +1,5 @@
 import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
-import { generatedTransaction, planMaterialization, recurringRuleFromRaw, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
+import { generatedTransaction, planMaterialization, recurringRuleFromRaw, sameRecurringReference, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
 import type { TransactionRecord } from "@/lib/domain/financial/types"
 import type { EncryptedFinancialAuthority } from "./authority"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
@@ -23,7 +23,7 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
   const planned = planMaterialization(rules, month, existing, transactions, getCurrentMonthKey(), getLocalDateKey())
   if (planned.length === 0) return
   const creates = planned.flatMap((occurrence) => {
-    const rule = rules.find((item) => item.id === occurrence.recurringExpenseId)
+    const rule = rules.find((item) => sameRecurringReference(item.id, occurrence.recurringExpenseId))
     if (!rule) return []
     const transaction = generatedTransaction(rule, occurrence)
     const transactionId = createEncryptedRecordId()
