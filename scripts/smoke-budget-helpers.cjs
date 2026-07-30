@@ -28,6 +28,57 @@ const transactionCollection = require("../lib/transaction-collection.ts")
 const recurringStatus = require("../app/settings/recurring/_lib/recurring-status.ts")
 const recurringSeries = require("../app/settings/recurring/_lib/recurring-series.ts")
 const financialViewModels = require("../lib/domain/financial/view-models.ts")
+const recurringForm = require("../lib/domain/financial/recurring-form.ts")
+const recurringDomain = require("../lib/domain/financial/recurring.ts")
+
+assertDeepEqual(
+  recurringForm.initialRecurringSchedule(new Date(2026, 6, 27)),
+  { billingType: "day_of_month", billingDay: "27" },
+  "transaction date supplies the initial custom recurring day"
+)
+assertDeepEqual(
+  recurringForm.recurringSchedulePayload("day_of_month", "22"),
+  { billing_type: "day_of_month", billing_day: 22 },
+  "custom recurring day remains distinct from the transaction date"
+)
+assertDeepEqual(
+  recurringForm.recurringSchedulePayload("last_day", "22"),
+  { billing_type: "last_day", billing_day: null },
+  "last-day recurring payload clears billing_day"
+)
+assertEqual(
+  recurringForm.shouldInitializeRecurringOnEnable(true, false, false),
+  true,
+  "enabling a fresh recurrence derives only its initial schedule"
+)
+assertEqual(
+  recurringForm.shouldInitializeRecurringOnEnable(true, true, true),
+  false,
+  "manual recurrence selection is not overwritten on subsequent changes"
+)
+const savedRule = recurringDomain.recurringRuleFromRaw({
+  id: "rule_27",
+  expense: "Rent",
+  amount_cents: 120000,
+  category: "needs",
+  billing_type: "day_of_month",
+  billing_day: 27,
+  starts_month: "2026-01-01",
+  is_active: true,
+}, "2026-07")
+assertEqual(savedRule.billingDay, 27, "commitment hydration preserves its stored billing day")
+assertEqual(
+  recurringDomain.planMaterialization(
+    [savedRule],
+    "2026-07",
+    [{ id: "occurrence_1", recurringExpenseId: "rule_27", occurrenceMonth: "2026-07-01", dueDate: "2026-07-27", transactionId: "txn_1" }],
+    [{ id: "txn_1", date: "2026-07-27", expense: "Rent", amountCents: 120000, category: "needs", isSplit: false, notes: null, source: "recurring", recurringExpenseId: "rule_27", importFingerprint: null, tagId: null, contextId: null, cardId: null, isDeleted: false, createdSequence: 1 }],
+    "2026-07",
+    "2026-07-30"
+  ).length,
+  0,
+  "existing seed-linked occurrence is not duplicated"
+)
 
 const hourlyMonthly = income.calculateHourlyMonthlyIncome("20.00", "10.00")
 assertApprox(hourlyMonthly, 866.6666666667, 0.000001, "hourly income uses 52/12 monthly average")

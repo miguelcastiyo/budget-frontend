@@ -56,6 +56,7 @@ import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/
 import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { tagQuickPicksFromState, taxonomyFromState } from "@/lib/domain/financial/view-models"
+import { initialRecurringSchedule, recurringSchedulePayload, shouldInitializeRecurringOnEnable } from "@/lib/domain/financial/recurring-form"
 
 interface AddTransactionSheetProps {
   open: boolean
@@ -126,19 +127,16 @@ export function AddTransactionSheet({
   const suggestionRequestRef = useRef(0)
   const appliedSuggestionExpenseRef = useRef<string | null>(null)
   const didAutoFocusOnOpenRef = useRef(false)
+  const recurringScheduleTouchedRef = useRef(false)
 
   const parseTransactionDate = (dateStr: string): Date => {
     return parseDateValue(dateStr) ?? new Date()
   }
 
-  const isLastDayOfMonth = (value: Date): boolean => {
-    const lastDay = new Date(value.getFullYear(), value.getMonth() + 1, 0).getDate()
-    return value.getDate() === lastDay
-  }
-
   const applyRecurringDefaultsFromDate = (selectedDate: Date) => {
-    setRecurringBillingDay(String(selectedDate.getDate()))
-    setRecurringBillingType(isLastDayOfMonth(selectedDate) ? "last_day" : "day_of_month")
+    const schedule = initialRecurringSchedule(selectedDate)
+    setRecurringBillingDay(schedule.billingDay)
+    setRecurringBillingType(schedule.billingType)
   }
 
   const focusAmountInput = () => {
@@ -238,6 +236,7 @@ export function AddTransactionSheet({
       setMakeRecurring(false)
       setRecurringBillingType("day_of_month")
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
+      recurringScheduleTouchedRef.current = false
       setSuggestions([])
       setError(null)
       setNotesError(null)
@@ -329,6 +328,7 @@ export function AddTransactionSheet({
     setMakeRecurring(false)
     setSuggestions([])
     appliedSuggestionExpenseRef.current = null
+    recurringScheduleTouchedRef.current = false
     applyRecurringDefaultsFromDate(now)
     setError(null)
     setNotesError(null)
@@ -336,9 +336,6 @@ export function AddTransactionSheet({
 
   const updateTransactionDate = (nextDate: Date) => {
     setDate(nextDate)
-    if (makeRecurring) {
-      applyRecurringDefaultsFromDate(nextDate)
-    }
   }
 
   const applySuggestion = (suggestion: TransactionSuggestion) => {
@@ -505,7 +502,6 @@ export function AddTransactionSheet({
 
         if (makeRecurring && !transactionAlreadyRecurring) {
           const startsMonth = format(date, "yyyy-MM")
-          const normalizedBillingDay = Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31)
 
           await financialAuthority.createRecurringExpense({
             expense: expense.trim(),
@@ -513,8 +509,7 @@ export function AddTransactionSheet({
             category,
             tag_id: tagId,
             card_id: cardId || null,
-            billing_type: recurringBillingType,
-            billing_day: recurringBillingType === "day_of_month" ? normalizedBillingDay : null,
+            ...recurringSchedulePayload(recurringBillingType, recurringBillingDay),
             starts_month: startsMonth,
             is_active: true,
             seed_transaction_id: updated.id,
@@ -546,7 +541,6 @@ export function AddTransactionSheet({
 
         if (makeRecurring) {
           const startsMonth = format(date, "yyyy-MM")
-          const normalizedBillingDay = Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31)
 
           try {
             await financialAuthority.createRecurringExpense({
@@ -555,8 +549,7 @@ export function AddTransactionSheet({
               category,
               tag_id: tagId,
               card_id: cardId || null,
-              billing_type: recurringBillingType,
-              billing_day: recurringBillingType === "day_of_month" ? normalizedBillingDay : null,
+              ...recurringSchedulePayload(recurringBillingType, recurringBillingDay),
               starts_month: startsMonth,
               is_active: true,
               seed_transaction_id: created.id,
@@ -1044,7 +1037,7 @@ export function AddTransactionSheet({
                               checked={makeRecurring}
                               onCheckedChange={(checked) => {
                                 setMakeRecurring(checked)
-                                if (checked) {
+                                if (shouldInitializeRecurringOnEnable(checked, makeRecurring, recurringScheduleTouchedRef.current)) {
                                   applyRecurringDefaultsFromDate(date)
                                 }
                               }}
@@ -1056,7 +1049,10 @@ export function AddTransactionSheet({
                               <Label className="text-xs text-muted-foreground">Repeats</Label>
                               <Select
                                 value={recurringBillingType}
-                                onValueChange={(value) => setRecurringBillingType(value as RecurringBillingType)}
+                                onValueChange={(value) => {
+                                  recurringScheduleTouchedRef.current = true
+                                  setRecurringBillingType(value as RecurringBillingType)
+                                }}
                               >
                                 <SelectTrigger aria-label="Choose recurring schedule" className="mt-1.5 h-11 w-full min-w-0 rounded-xl border-border/60 text-left">
                                   <SelectValue />
@@ -1066,6 +1062,25 @@ export function AddTransactionSheet({
                                   <SelectItem value="last_day">On the last day of each month</SelectItem>
                                 </SelectContent>
                               </Select>
+                              {recurringBillingType === "day_of_month" && (
+                                <div className="mt-2">
+                                  <Label htmlFor="recurring-billing-day" className="text-xs text-muted-foreground">Day of month</Label>
+                                  <Input
+                                    id="recurring-billing-day"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    enterKeyHint="done"
+                                    value={recurringBillingDay}
+                                    onChange={(event) => {
+                                      recurringScheduleTouchedRef.current = true
+                                      setRecurringBillingDay(event.target.value)
+                                    }}
+                                    placeholder="1-31"
+                                    className="mt-1.5 h-11 w-full rounded-xl border-border/60 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
