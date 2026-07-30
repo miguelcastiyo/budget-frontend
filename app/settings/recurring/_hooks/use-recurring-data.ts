@@ -25,7 +25,15 @@ export function useRecurringData(month: string) {
       }
       if (authority.mode === "encrypted") {
         if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        await materializeEncryptedRecurring(authority.authority, month)
+        // Materialization is a write-side convenience for the selected/current
+        // month. It must not prevent already-decrypted recurring rules from
+        // being displayed if a stale occurrence or migrated record needs a
+        // later retry.
+        try {
+          await materializeEncryptedRecurring(authority.authority, month)
+        } catch {
+          // Continue with the authoritative decrypted rule state below.
+        }
         const recurringResponse = await authority.getRecurringExpenses(month) as RecurringExpensesResponse
         const state = authority.authority?.getState()
         setData(recurringResponse)
