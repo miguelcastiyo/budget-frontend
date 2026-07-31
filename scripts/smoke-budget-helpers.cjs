@@ -30,6 +30,12 @@ const recurringSeries = require("../app/settings/recurring/_lib/recurring-series
 const financialViewModels = require("../lib/domain/financial/view-models.ts")
 const recurringForm = require("../lib/domain/financial/recurring-form.ts")
 const recurringDomain = require("../lib/domain/financial/recurring.ts")
+const tagIcons = require("../lib/tag-icons.ts")
+
+for (const key of ["coffee", "utensils", "book_open", "shopping_bag", "shirt", "sparkles", "droplet", "scissors", "film", "cookie"]) {
+  assertEqual(tagIcons.CONTEXT_ICON_OPTIONS.some((option) => option.key === key), true, `context icon palette includes ${key}`)
+  assertEqual(Boolean(tagIcons.getContextIconByKey(key)), true, `context icon resolves ${key}`)
+}
 
 assertDeepEqual(
   recurringForm.initialRecurringSchedule(new Date(2026, 6, 27)),
