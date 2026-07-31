@@ -67,11 +67,6 @@ interface AddTransactionSheetProps {
   transaction?: Transaction | null
 }
 
-function formatOrdinalDay(day: number): string {
-  const suffix = day % 100 >= 11 && day % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[day % 10] ?? "th"
-  return `${day}${suffix}`
-}
-
 export function AddTransactionSheet({
   open,
   onOpenChange,
@@ -1046,7 +1041,7 @@ export function AddTransactionSheet({
 
                           {makeRecurring && (
                             <div className="min-w-0">
-                              <Label className="text-xs text-muted-foreground">Repeats</Label>
+                              <Label className="text-xs text-muted-foreground">Schedule</Label>
                               <Select
                                 value={recurringBillingType}
                                 onValueChange={(value) => {
@@ -1058,8 +1053,8 @@ export function AddTransactionSheet({
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="max-w-[calc(100vw-2rem)]">
-                                  <SelectItem value="day_of_month">On the {formatOrdinalDay(Math.min(Math.max(parseInt(recurringBillingDay || "1", 10), 1), 31))} of each month</SelectItem>
-                                  <SelectItem value="last_day">On the last day of each month</SelectItem>
+                                  <SelectItem value="day_of_month">Specific day each month</SelectItem>
+                                  <SelectItem value="last_day">Last day of each month</SelectItem>
                                 </SelectContent>
                               </Select>
                               {recurringBillingType === "day_of_month" && (
