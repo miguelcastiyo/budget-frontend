@@ -5,6 +5,7 @@ import { resolveRules, dueDate, recurringRuleFromRaw } from "@/lib/domain/financ
 import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
+import { getLocalDateKey } from "@/lib/date-filters"
 import type { RehydratedFinancialState } from "./rehydrate"
 
 const cents = (value: unknown) => value == null ? 0 : value === Number(value) ? Number(value) : parseMoneyCents(String(value))
@@ -41,7 +42,7 @@ function encryptedSavingsOverview(state: RehydratedFinancialState, month: string
   return { has_budget: savingsBudgetCents > 0, has_plan: allocations.length > 0, budget_amount: formatMoneyCents(savingsBudgetCents), saved_amount: formatMoneyCents(savedAmountCents), remaining_to_save: formatMoneyCents(Math.max(savingsBudgetCents - savedAmountCents, 0)), over_saved_amount: formatMoneyCents(Math.max(savedAmountCents - savingsBudgetCents, 0)), planned_to_funds: summary.planned, unassigned_budget: formatMoneyCents(unassignedCents), transaction_directed_to_funds: formatMoneyCents(transactionDirectedCents), saved_outside_funds: formatMoneyCents(Math.max(savedAmountCents - transactionDirectedCents, 0)), is_overallocated: false, overallocation_amount: "0.00", needs_attention: false }
 }
 
-export function encryptedMonthOverview(state: RehydratedFinancialState, month: string, currentDate = `${month}-15`): any {
+export function encryptedMonthOverview(state: RehydratedFinancialState, month: string, currentDate = getLocalDateKey()): any {
   const result: any = monthOverview({ transactions: state.transactions, budgets: state.budgets, occurrences: state.recurringOccurrences as any, month, currentDate })
   const budgetAmounts = result.budget?.allocations ?? { needs: "0.00", wants: "0.00", savings: "0.00" }
   const totalSpendCents = cents(result.summary.totalSpent)
