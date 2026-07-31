@@ -25,7 +25,7 @@ export async function remapNamedEncryptedContextIcons(authority: EncryptedFinanc
     const name = String(record.data.name ?? "").trim()
     const iconKey = CONTEXT_ICON_REMAP[name]
     if (!iconKey || record.data.icon_key === iconKey) continue
-    await authority.update(record.envelope.record_id, { ...record.data, icon_key: iconKey })
+    await authority.commitSourceDiff({ creates: [], updates: [{ id: record.envelope.record_id, family: record.family, data: { ...record.data, icon_key: iconKey } }], tombstones: [] })
     changed.push(name)
   }
   return changed
