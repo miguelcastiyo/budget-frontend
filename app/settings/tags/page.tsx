@@ -48,7 +48,7 @@ async function deleteEncryptedTag(authority: ReturnType<typeof useFinancialAutho
   if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
   const record = authority.store.values().find((item) => item.family === "taxonomy_tag" && (sameTagId(item.sourceId, tagId) || sameTagId(String(item.data.id ?? ""), tagId)))
   if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-  await authority.update(record.envelope.record_id, { ...record.data, is_deleted: true })
+  await authority.remove(record.envelope.record_id)
 }
 
 export default function TagsSettingsPage() {
