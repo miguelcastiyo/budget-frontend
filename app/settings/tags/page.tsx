@@ -48,7 +48,11 @@ async function deleteEncryptedTag(authority: ReturnType<typeof useFinancialAutho
   if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
   const record = authority.store.values().find((item) => item.family === "taxonomy_tag" && (sameTagId(item.sourceId, tagId) || sameTagId(String(item.data.id ?? ""), tagId)))
   if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-  await authority.remove(record.envelope.record_id)
+  await authority.commitSourceDiff({
+    creates: [],
+    updates: [],
+    tombstones: [{ id: record.envelope.record_id, family: record.family, data: record.data }],
+  })
 }
 
 export default function TagsSettingsPage() {
