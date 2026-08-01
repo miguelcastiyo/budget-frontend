@@ -357,12 +357,13 @@ export default function DataSettingsPage() {
       if (authority.mode === "encrypted") {
         const plan = await buildEncryptedPlan()
         const taxonomyCreates = plan.taxonomyCreates.map((item) => ({ id: item.id, family: item.family, data: { id: item.id, name: item.name, ...(item.family === "taxonomy_tag" ? { icon_key: null } : item.family === "taxonomy_card" ? { is_favorite: false } : { icon_key: null }), is_deleted: false } }))
-        const creates = [...taxonomyCreates, ...plan.accepted.map((record) => ({ id: record.id, family: "transaction", data: { ...record, amount_cents: record.amountCents, is_split: record.isSplit, tag_id: record.tagId, context_id: record.contextId, card_id: record.cardId, recurring_expense_id: null, import_fingerprint: record.importFingerprint, is_deleted: false } }))]
         const batchId = plan.accepted[0]?.id.split(":").slice(0, -1).join(":") ?? `csv_${createEncryptedRecordId()}`
+        const creates = [...taxonomyCreates, ...plan.accepted.map((record) => ({ id: record.id, family: "transaction", data: { ...record, amount_cents: record.amountCents, is_split: record.isSplit, tag_id: record.tagId, context_id: record.contextId, card_id: record.cardId, recurring_expense_id: null, import_fingerprint: record.importFingerprint, import_run_id: batchId, is_deleted: false } }))]
         creates.push({ id: batchId, family: "import_run", data: { id: batchId, source_filename: importFile.name, status: plan.errors.length ? "partial" : "completed", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, error_summary: plan.errors.length ? "CSV validation errors" : null } } as never)
-        await authority.authority!.commitSourceDiff({ creates, updates: [], tombstones: [] }, `csv_${createEncryptedRecordId()}`.replace(/[^A-Za-z0-9_-]/g, "_"))
+        await authority.authority!.commitSourceDiff({ creates, updates: [], tombstones: [] }, batchId)
         setCommitResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV imported into encrypted authority", mode: "commit", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("done")
+        await loadDataRuns()
         return
       }
       const result = await apiClient.importTransactions(importFile, "commit", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
@@ -454,8 +455,8 @@ export default function DataSettingsPage() {
     try {
       if (authority.mode === "encrypted") {
         if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const imported = authority.authority.store.values().filter((record) => record.family === "transaction" && record.sourceId.startsWith(`${importRunId}:`))
-        const run = authority.authority.store.values().find((record) => record.family === "import_run" && record.sourceId === importRunId)
+        const imported = authority.authority.store.values().filter((record) => record.family === "transaction" && (String(record.data.import_run_id ?? record.data.csv_import_run_id ?? "") === importRunId || record.sourceId === importRunId || record.sourceId.startsWith(`${importRunId}:`)))
+        const run = authority.authority.store.values().find((record) => record.family === "import_run" && (String(record.data.id ?? "") === importRunId || record.sourceId === importRunId || record.envelope.record_id === importRunId))
         await authority.authority.commitSourceDiff({ creates: [], updates: run ? [{ id: run.envelope.record_id, family: "import_run", data: { ...run.data, status: "rolled_back" } }] : [], tombstones: imported.map((record) => ({ id: record.envelope.record_id, family: "transaction", data: record.data })) })
       } else {
         await apiClient.rollbackImport(importRunId)

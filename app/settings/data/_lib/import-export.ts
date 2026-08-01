@@ -170,8 +170,12 @@ export function completeSummarySentence(result: CsvImportResponse): string {
 }
 
 export function importRunIdFromDataRun(item: DataRunItem): string | null {
-  if (item.type !== "import" || !item.id.startsWith("import_")) {
+  if (item.type !== "import") {
     return null
+  }
+
+  if (!item.id.startsWith("import_")) {
+    return item.id || null
   }
 
   const id = item.id.slice("import_".length)
