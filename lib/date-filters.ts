@@ -213,6 +213,13 @@ export function getPresetDateRange(preset: Preset | "all"): Partial<DateRangeFil
     }
   }
 
+  // Keep every finite preset as an explicit inclusive range. This is
+  // important for encrypted/local filtering, which cannot pass the legacy
+  // `preset` query parameter through to the API.
+  if (dateFrom && !dateTo) {
+    dateTo = new Date(now)
+  }
+
   return {
     date_from: dateFrom ? toIsoDate(dateFrom) : undefined,
     date_to: dateTo ? toIsoDate(dateTo) : undefined,
