@@ -249,7 +249,7 @@ export default function RecurringSettingsPage() {
   }
 
   const handleCreateTag = async (name: string, iconKey: string): Promise<Tag> => {
-    const created = await apiClient.createTag({
+    const created = await authority.createTag({
       name: name.trim(),
       icon_key: iconKey || null,
     })
@@ -258,7 +258,7 @@ export default function RecurringSettingsPage() {
   }
 
   const handleCreateCard = async (name: string): Promise<CardType> => {
-    const created = await apiClient.createCard({ name: name.trim() })
+    const created = await authority.createCard({ name: name.trim() })
     setCards((previous) => sortCards([...previous, created]))
     return created
   }
