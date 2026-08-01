@@ -97,7 +97,62 @@ export function encryptedRecurring(state: RehydratedFinancialState, month: strin
 }
 
 export function encryptedSavingsPlan(state: RehydratedFinancialState, month: string): any {
-  const { funds, entries } = fundState(state); const raw = state.savingsPlans.find((item) => String(item.month ?? item.effective_month ?? "") === month); const plan: SavingsPlan = { id: String(raw?.id ?? `plan:${month}`), month, savingsBudgetCents: Number(raw?.savings_budget_cents ?? cents(raw?.savings_budget ?? 0)), allocations: state.savingsPlans.filter((item) => String(item.month ?? "") === month && item.fund_id != null).map((item) => ({ fundId: String(item.fund_id), month, plannedAmountCents: Number(item.planned_amount_cents ?? cents(item.planned_amount ?? 0)) })), status: String(raw?.status ?? "active") as SavingsPlan["status"] }; const summary = planSummary(plan, funds, entries); return { month, status: plan.status === "completed" ? "closed" : "open", has_plan: plan.allocations.length > 0, is_editable: true, budget: { has_budget: plan.savingsBudgetCents > 0, savings_budget: formatMoneyCents(plan.savingsBudgetCents) }, summary: { saved_amount: "0.00", remaining_to_save: summary.unassigned, over_saved_amount: "0.00", planned_to_funds: summary.planned, unassigned_budget: summary.unassigned, is_overallocated: false, overallocation_amount: "0.00" }, funds: summary.funds.map((item) => ({ fund: { id: item.fundId, name: funds.find((fund) => fund.id === item.fundId)?.name ?? "", status: "active", goal_amount: item.goal }, planned_amount: item.planned, transaction_contributed: "0.00", closeout_contributed: "0.00", progress_amount: item.balance, remaining_planned: "0.00", over_plan_amount: "0.00", pace: { status: item.goalMet ? "goal_met" : "unavailable", planning_basis_balance: item.balance, goal_shortfall: null, months_remaining: null, recommended_amount: null } })), goal_pacing: { status: "unavailable" } }
+  const { funds, entries } = fundState(state)
+  const budgetResolution = (() => {
+    try { return resolvedBudget(state.budgets, month) } catch { return null }
+  })()
+  const savingsBudgetCents = budgetResolution ? cents(resolvedAmounts(budgetResolution.settings).savings) : null
+  const rawPlans = state.savingsPlans.filter((item) => String(item.month ?? item.effective_month ?? "").slice(0, 7) === month && item.fund_id == null)
+  const rawPlan = rawPlans[rawPlans.length - 1]
+  const allocations = state.savingsPlans
+    .filter((item) => String(item.month ?? "").slice(0, 7) === month && item.fund_id != null && (item.plan_id == null || rawPlan?.id == null || sameReferenceId(String(item.plan_id), String(rawPlan.id))))
+    .map((item) => ({ fundId: String(item.fund_id), month, plannedAmountCents: Number(item.planned_amount_cents ?? cents(item.planned_amount ?? 0)) }))
+  const savedTransactions = state.transactions.filter((item) => !item.isDeleted && item.category === "savings" && item.date.startsWith(month))
+  const savedAmountCents = savedTransactions.reduce((sum, item) => sum + item.amountCents, 0)
+  const transactionIds = savedTransactions.map((item) => item.id)
+  const transactionContributions = new Map<string, number>()
+  for (const entry of entries) {
+    if (entry.sourceType !== "transaction" || entry.direction !== "in" || entry.sourceTransactionId == null || !transactionIds.some((id) => sameReferenceId(id, entry.sourceTransactionId!))) continue
+    transactionContributions.set(entry.fundId, (transactionContributions.get(entry.fundId) ?? 0) + entry.amountCents)
+  }
+  const closeout = state.closeouts.find((item) => !item.is_deleted && String(item.month ?? "").slice(0, 7) === month)
+  const closeoutContributions = new Map<string, number>()
+  for (const entry of entries) {
+    if (entry.sourceType !== "month_closeout" || entry.direction !== "in" || closeout == null || entry.sourceCloseoutId == null || !sameReferenceId(entry.sourceCloseoutId, String(closeout.id ?? ""))) continue
+    closeoutContributions.set(entry.fundId, (closeoutContributions.get(entry.fundId) ?? 0) + entry.amountCents)
+  }
+  const plan: SavingsPlan = { id: String(rawPlan?.id ?? `plan:${month}`), month, savingsBudgetCents: savingsBudgetCents ?? 0, allocations, status: String(rawPlan?.status ?? "active") as SavingsPlan["status"] }
+  const summary = planSummary(plan, funds, entries)
+  const plannedCents = cents(summary.planned)
+  const referencedFundIds = new Set([...allocations.map((item) => item.fundId), ...transactionContributions.keys(), ...closeoutContributions.keys()])
+  const responseFunds = funds.filter((fund) => fund.status === "active" || referencedFundIds.has(fund.id))
+  const fundRows = responseFunds.map((fund) => {
+    const planned = allocations.filter((item) => item.fundId === fund.id).reduce((sum, item) => sum + item.plannedAmountCents, 0)
+    const transaction = transactionContributions.get(fund.id) ?? 0
+    const closeoutAmount = closeoutContributions.get(fund.id) ?? 0
+    const progress = transaction + closeoutAmount
+    const rawFund = state.funds.find((item) => sameReferenceId(String(item.id ?? ""), fund.id))
+    const goal = fund.goalAmountCents
+    const targetMonth = rawFund?.target_month == null ? null : String(rawFund.target_month).slice(0, 7)
+    const balance = ledgerBalance(entries, fund.id)
+    const basis = balance - transaction
+    const shortfall = goal == null ? null : Math.max(goal - basis, 0)
+    let pace: any = { status: "unavailable", planning_basis_balance: null, goal_shortfall: null, months_remaining: null, recommended_amount: null }
+    if (fund.status !== "active") pace = { status: "unavailable", planning_basis_balance: null, goal_shortfall: null, months_remaining: null, recommended_amount: null }
+    else if (goal == null) pace = { status: "no_goal", planning_basis_balance: null, goal_shortfall: null, months_remaining: null, recommended_amount: null }
+    else if (targetMonth == null) pace = { status: "no_target", planning_basis_balance: null, goal_shortfall: null, months_remaining: null, recommended_amount: null }
+    else if (targetMonth < month) pace = { status: "overdue", planning_basis_balance: formatMoneyCents(basis), goal_shortfall: formatMoneyCents(shortfall ?? 0), months_remaining: null, recommended_amount: null }
+    else {
+      const monthsRemaining = ((Number(targetMonth.slice(0, 4)) * 12) + Number(targetMonth.slice(5, 7))) - ((Number(month.slice(0, 4)) * 12) + Number(month.slice(5, 7))) + 1
+      const recommended = shortfall === 0 ? 0 : Math.ceil((shortfall ?? 0) / monthsRemaining)
+      pace = { status: shortfall === 0 ? "goal_met" : "on_track_calculable", planning_basis_balance: formatMoneyCents(basis), goal_shortfall: formatMoneyCents(shortfall ?? 0), months_remaining: monthsRemaining, recommended_amount: formatMoneyCents(recommended) }
+    }
+    return { fund: { id: fund.id, name: fund.name, status: fund.status, goal_amount: goal == null ? null : formatMoneyCents(goal), target_month: targetMonth, current_balance: formatMoneyCents(balance) }, planned_amount: formatMoneyCents(planned), transaction_contributed: formatMoneyCents(transaction), closeout_contributed: formatMoneyCents(closeoutAmount), progress_amount: formatMoneyCents(progress), remaining_planned: formatMoneyCents(Math.max(planned - progress, 0)), over_plan_amount: formatMoneyCents(Math.max(progress - planned, 0)), pace }
+  })
+  const transactionDirectedCents = [...transactionContributions.values()].reduce((sum, value) => sum + value, 0)
+  const closeoutDirectedCents = [...closeoutContributions.values()].reduce((sum, value) => sum + value, 0)
+  const goalPacing = savingsBudgetCents == null ? { status: "unavailable", recommended_total: null, gap_to_savings_budget: null, headroom_vs_savings_budget: null } : month !== getCurrentMonthKey() ? { status: "historical", recommended_total: null, gap_to_savings_budget: null, headroom_vs_savings_budget: null } : (() => { const recommended = fundRows.reduce((sum, item) => sum + cents(item.pace.recommended_amount), 0); return { status: "available", recommended_total: formatMoneyCents(recommended), gap_to_savings_budget: formatMoneyCents(Math.max(recommended - savingsBudgetCents, 0)), headroom_vs_savings_budget: formatMoneyCents(Math.max(savingsBudgetCents - recommended, 0)) } })()
+  return { month, status: savingsBudgetCents == null ? "missing_budget" : closeout?.status === "closed" ? "closed" : "active", is_editable: savingsBudgetCents != null && closeout?.status !== "closed", has_plan: allocations.length > 0, budget: { has_budget: savingsBudgetCents != null, resolved_effective_month: budgetResolution?.resolvedEffectiveMonth ?? null, savings_budget: savingsBudgetCents == null ? null : formatMoneyCents(savingsBudgetCents) }, summary: { saved_amount: formatMoneyCents(savedAmountCents), remaining_to_save: formatMoneyCents(savingsBudgetCents == null ? 0 : Math.max(savingsBudgetCents - savedAmountCents, 0)), over_saved_amount: formatMoneyCents(savingsBudgetCents == null ? 0 : Math.max(savedAmountCents - savingsBudgetCents, 0)), planned_to_funds: summary.planned, unassigned_budget: formatMoneyCents(savingsBudgetCents == null ? 0 : Math.max(savingsBudgetCents - plannedCents, 0)), transaction_directed_to_funds: formatMoneyCents(transactionDirectedCents), saved_outside_funds: formatMoneyCents(Math.max(savedAmountCents - transactionDirectedCents, 0)), closeout_directed_to_funds: formatMoneyCents(closeoutDirectedCents), is_overallocated: savingsBudgetCents != null && plannedCents > savingsBudgetCents, overallocation_amount: formatMoneyCents(savingsBudgetCents == null ? 0 : Math.max(plannedCents - savingsBudgetCents, 0)) }, funds: fundRows, goal_pacing: goalPacing }
 }
 
 export function encryptedCloseout(state: RehydratedFinancialState, month: string): any {

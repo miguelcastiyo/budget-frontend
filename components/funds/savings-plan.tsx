@@ -65,7 +65,7 @@ function FundPlanRow({ item, editing, value, onChange, onRemove }: { item: Savin
 
 export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { month?: string }) {
   const financialAuthority = useFinancialAuthority()
-  if (financialAuthority.isLoading || financialAuthority.mode === "encrypted") return null
+  if (financialAuthority.isLoading) return null
   const { data, isLoading } = useSavingsPlan(month)
   if (isLoading) return <div className="space-y-3 border-y border-border/70 py-5"><div className="h-3 w-24 animate-pulse rounded bg-muted" /><div className="h-7 w-44 animate-pulse rounded bg-muted" /></div>
   if (!data) return null
@@ -84,7 +84,7 @@ export function SavingsPlanInlineSummary({ month = getCurrentMonthKey() }: { mon
 
 export function SavingsPlanFundContext({ fundId, month = getCurrentMonthKey() }: { fundId: string; month?: string }) {
   const financialAuthority = useFinancialAuthority()
-  if (financialAuthority.isLoading || financialAuthority.mode === "encrypted") return null
+  if (financialAuthority.isLoading) return null
   const { data, isLoading } = useSavingsPlan(month)
   const item = data?.funds.find((entry) => entry.fund.id === fundId)
   if (isLoading || !item) return null
