@@ -263,10 +263,14 @@ export default function TransactionsPage() {
         // Materialization remains idempotent and only creates eligible
         // occurrences for the current/selected month.
         try {
-          await materializeEncryptedRecurring(financialAuthority.authority, activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
-        } catch {
+          const materialization = await materializeEncryptedRecurring(financialAuthority.authority, activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
+          if (materialization.status === "failed") {
+            setError({ title: "Recurring transactions could not be posted", message: "Some recurring transactions could not be materialized for this month. Existing transactions remain visible; retry to try again.", code: materialization.code })
+          }
+        } catch (err) {
           // Existing decrypted transactions should remain visible even if a
           // best-effort occurrence write is temporarily unavailable.
+          setError(transactionError(err, "Some recurring transactions could not be materialized. Existing transactions remain visible; retry to try again."))
         }
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
