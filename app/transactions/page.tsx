@@ -358,7 +358,16 @@ export default function TransactionsPage() {
   const revalidateLoadedTransactions = useCallback(async (loadedPageCount: number) => {
     try {
       if (financialAuthority.mode === "encrypted") {
-        await loadTransactionsData()
+        const state = financialAuthority.authority?.getState()
+        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+        const pageOptions = { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" as "date_asc" | "date_desc" }
+        const responses = Array.from({ length: loadedPageCount }, (_, index) => transactionsPageFromState(state, { ...pageOptions, page: index + 1 }, getLocalDateKey(), true))
+        const firstResponse = responses[0]
+        if (!firstResponse) return
+        setTransactions(mergeTransactionPages(responses.map((response) => response.items)))
+        setCurrentPage(loadedPageCount)
+        setTotalItems(firstResponse.total_items)
+        setSummary(firstResponse.summary)
         return
       }
       const responses = await Promise.all(
@@ -380,7 +389,7 @@ export default function TransactionsPage() {
     } catch (err) {
       setError(transactionError(err, "Unable to refresh transactions"))
     }
-  }, [activeTransactionFilters, financialAuthority, loadTransactionsData])
+  }, [activeTransactionFilters, financialAuthority])
 
   const dismissError = useCallback(() => {
     setError(null)
