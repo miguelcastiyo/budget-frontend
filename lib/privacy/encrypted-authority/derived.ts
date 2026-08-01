@@ -5,7 +5,7 @@ import { resolveRules, dueDate, generatedTransaction, recurringRuleFromRaw, type
 import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
-import { getLocalDateKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
 import { monthDateRange } from "@/lib/domain/financial/clock"
 import { recurringTimeline } from "@/lib/domain/financial/recurring-timeline"
 import { filterTransactions } from "@/lib/domain/financial/transactions"
@@ -103,6 +103,24 @@ export function encryptedSavingsPlan(state: RehydratedFinancialState, month: str
 export function encryptedCloseout(state: RehydratedFinancialState, month: string): any {
   const saved = state.closeouts.find((item) => String(item.month ?? "") === month && item.is_deleted !== true)
   const allocations = state.closeoutAllocations.filter((item) => String(item.month ?? item.closeout_month ?? "") === month && item.is_deleted !== true).map((item) => ({ id: String(item.id ?? ""), fund_id: item.fund_id == null ? null : String(item.fund_id), label: item.label == null ? null : String(item.label), amount: formatMoneyCents(item.amount_cents == null ? cents(item.amount) : Number(item.amount_cents)), allocation_type: String(item.allocation_type ?? "fund") }))
-  const resultType = String(saved?.result_type ?? "balanced")
-  return { month, status: saved ? (saved.is_reopened ? "reopened" : "closed") : "open", computed: { result_type: resultType, surplus_amount: formatMoneyCents(saved?.surplus_amount_cents == null ? cents(saved?.surplus_amount ?? 0) : Number(saved.surplus_amount_cents)), deficit_amount: formatMoneyCents(saved?.deficit_amount_cents == null ? cents(saved?.deficit_amount ?? 0) : Number(saved.deficit_amount_cents)), allocations }, closeout: saved ? { id: String(saved.id ?? ""), month, result_type: resultType, surplus_amount: formatMoneyCents(saved?.surplus_amount_cents == null ? cents(saved?.surplus_amount ?? 0) : Number(saved.surplus_amount_cents)), deficit_amount: formatMoneyCents(saved?.deficit_amount_cents == null ? cents(saved?.deficit_amount ?? 0) : Number(saved.deficit_amount_cents)), allocations, is_stale: false, closed_at: String(saved.closed_at ?? "") } : null }
+  let budget: ReturnType<typeof resolvedBudget> | null = null
+  try { budget = resolvedBudget(state.budgets, month) } catch { budget = null }
+  if (!budget) return { month, status: "missing_budget", is_closeable: false, computed: null, closeout: null }
+  const plannedAmounts = resolvedAmounts(budget.settings)
+  const actual = state.transactions.filter((item) => !item.isDeleted && item.date.startsWith(month)).reduce((result, item) => { result[item.category] += item.amountCents; return result }, { needs: 0, wants: 0, savings: 0 })
+  const planned = { needs: cents(plannedAmounts.needs), wants: cents(plannedAmounts.wants), savings: cents(plannedAmounts.savings) }
+  const plannedTotal = planned.needs + planned.wants + planned.savings
+  const actualTotal = actual.needs + actual.wants + actual.savings
+  const difference = plannedTotal - actualTotal
+  const resultType = difference > 0 ? "surplus" : difference < 0 ? "deficit" : "balanced"
+  const surplus = Math.max(difference, 0)
+  const deficit = Math.max(-difference, 0)
+  const spendingDifference = planned.needs + planned.wants - actual.needs - actual.wants
+  const computed = { month, budget_effective_month: budget.resolvedEffectiveMonth, budget_allocation_mode: budget.settings.allocationMode, monthly_income: formatMoneyCents(budget.settings.monthlyIncomeCents), planned: { needs: formatMoneyCents(planned.needs), wants: formatMoneyCents(planned.wants), savings: formatMoneyCents(planned.savings), total: formatMoneyCents(plannedTotal) }, actual: { needs: formatMoneyCents(actual.needs), wants: formatMoneyCents(actual.wants), savings: formatMoneyCents(actual.savings), total: formatMoneyCents(actualTotal) }, result_type: resultType, surplus_amount: formatMoneyCents(surplus), deficit_amount: formatMoneyCents(deficit), spending_surplus_amount: formatMoneyCents(Math.max(spendingDifference, 0)), spending_deficit_amount: formatMoneyCents(Math.max(-spendingDifference, 0)) }
+  const resultAmount = saved?.result_type === "surplus" ? surplus : deficit
+  const allocated = allocations.reduce((sum, item) => sum + cents(item.amount), 0)
+  const closeout = saved ? { id: String(saved.id ?? ""), month, status: saved.is_reopened ? "reopened" : "closed", result_type: String(saved.result_type ?? resultType), surplus_amount: formatMoneyCents(saved.surplus_amount_cents == null ? (saved.result_type === "surplus" ? resultAmount : 0) : Number(saved.surplus_amount_cents)), deficit_amount: formatMoneyCents(saved.deficit_amount_cents == null ? (saved.result_type === "deficit" ? resultAmount : 0) : Number(saved.deficit_amount_cents)), allocated_amount: formatMoneyCents(allocated), unallocated_amount: formatMoneyCents(Math.max(resultAmount - allocated, 0)), allocations, is_stale: false, stale_reasons: [], closed_at: String(saved.closed_at ?? ""), reopened_at: null, notes: saved.notes == null ? null : String(saved.notes) } : null
+  const currentMonth = getCurrentMonthKey()
+  const status = closeout ? (closeout.status === "reopened" ? "reopened" : "closed") : month < currentMonth ? "ready_to_close" : month > currentMonth ? "future" : "open"
+  return { month, status, is_closeable: month < currentMonth, computed, closeout }
 }

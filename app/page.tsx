@@ -73,7 +73,7 @@ export default function DashboardPage() {
         : authority.getMonthOverview(currentMonth)
       const [overviewResult, closeoutResult] = await Promise.allSettled([
         overviewRequest,
-        authority.mode === "encrypted" ? Promise.resolve(null) : apiClient.getMonthCloseout(currentMonth),
+        authority.getMonthCloseout(currentMonth),
       ])
 
       if (overviewResult.status === "rejected") {

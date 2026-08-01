@@ -35,15 +35,16 @@ export async function commitEncryptedCloseout(
     (priorCloseoutIds.has(String(record.data.source_closeout_id ?? "")) || priorAllocationIds.has(String(record.data.source_closeout_allocation_id ?? ""))),
   )
 
+  const computed = encryptedCloseout(state, month).computed
+  if (!computed) throw new Error("MONTH_CLOSEOUT_NOT_CLOSEABLE")
   const closeoutId = createEncryptedRecordId()
-  const prior = state.closeouts.find((item) => String(item.month ?? "") === month)
   const closeoutData = {
     id: closeoutId,
     month,
     status: "closed",
-    result_type: String(prior?.result_type ?? "balanced"),
-    surplus_amount_cents: Number(prior?.surplus_amount_cents ?? 0),
-    deficit_amount_cents: Number(prior?.deficit_amount_cents ?? 0),
+    result_type: computed.result_type,
+    surplus_amount_cents: parseMoneyCents(computed.surplus_amount),
+    deficit_amount_cents: parseMoneyCents(computed.deficit_amount),
     notes: payload.notes ?? null,
     is_reopened: false,
     is_deleted: false,
