@@ -408,7 +408,9 @@ export default function DataSettingsPage() {
 
     try {
       if (authority.mode === "encrypted") {
-        const csv = exportEncryptedTransactions(authority.authority?.getState().transactions ?? [], { createdAt: "", updatedAt: "", tagName: (id) => authority.authority?.getState().tags.find((tag) => tag.id === id)?.name ?? null })
+        const state = authority.authority?.getState()
+        const records = (state?.transactions ?? []).filter((record) => (!filters.date_from || record.date >= filters.date_from) && (!filters.date_to || record.date <= filters.date_to))
+        const csv = exportEncryptedTransactions(records, { createdAt: "", updatedAt: "", tagName: (id) => state?.tags.find((tag) => tag.id === id)?.name ?? null, cardName: (id) => state?.cards.find((card) => card.id === id)?.name ?? null })
         const blob = new Blob([csv], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
         const anchor = document.createElement("a")
