@@ -980,7 +980,6 @@ function SingleNotableSpendingRow({ item }: { item: InsightsLargestTransactionIt
         </div>
       </div>
       <p className="shrink-0 text-right text-sm font-semibold">-{formatMoney(item.amount)}</p>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
     </div>
   )
 }
@@ -1071,22 +1070,35 @@ function NotableSpendingGroupSheet({
 
         <div>
           <h3 className="text-sm font-semibold">Transactions</h3>
-          <div className="mt-2 divide-y divide-border/60 rounded-2xl border border-border/60 bg-card">
-            {transactionsDescending.map((transaction) => (
-              <div key={transaction.transaction_id} className="flex items-center justify-between gap-3 px-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{format(dateFromIso(transaction.date), "MMM d, yyyy")}</p>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <p className="truncate">{transaction.expense}</p>
-                    <TransactionPresenceIndicators
-                      hasCard={Boolean(transaction.card_name)}
-                      hasNotes={Boolean(transaction.notes)}
-                    />
+          <div className="mt-2 overflow-hidden rounded-2xl border border-border/60 bg-card divide-y divide-border/50">
+            {transactionsDescending.map((transaction) => {
+              const TransactionTagIcon = getTagIcon(group.tag.name, group.tag.icon_key)
+              return (
+                <div key={transaction.transaction_id}>
+                  <div className="bg-secondary/40 px-3 py-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      {format(dateFromIso(transaction.date), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3 p-3">
+                    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", getCategoryColorClass(transaction.category))}>
+                      <TransactionTagIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{transaction.expense}</p>
+                      <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate">{group.tag.name}</span>
+                        <TransactionPresenceIndicators
+                          hasCard={Boolean(transaction.card_name)}
+                          hasNotes={Boolean(transaction.notes)}
+                        />
+                      </div>
+                    </div>
+                    <p className="shrink-0 text-right text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
                   </div>
                 </div>
-                <p className="shrink-0 text-sm font-semibold">-{formatMoney(transaction.amount)}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
