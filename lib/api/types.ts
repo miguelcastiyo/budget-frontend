@@ -378,7 +378,7 @@ export interface Transaction {
   category: Category
   is_split: boolean
   notes: string | null
-  source: "manual" | "import"
+  source: "manual" | "import" | "recurring"
   recurring_expense_id: string | null
   tag: Tag
   context: Context | null

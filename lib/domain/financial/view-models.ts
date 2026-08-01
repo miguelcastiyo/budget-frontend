@@ -4,7 +4,7 @@ import { filterTransactions, paginateTransactions, transactionSummary, type Tran
 import { ledgerBalance, orderedFunds, type Fund, type FundLedgerEntry } from "./funds"
 import type { RehydratedFinancialState } from "../../privacy/encrypted-authority/rehydrate"
 import type { TransactionRecord } from "./types"
-import { dueDate, generatedTransaction, resolveRules, recurringRuleFromRaw, type RecurringOccurrence } from "./recurring"
+import { dueDate, generatedTransaction, resolveRules, recurringRuleFromRaw, sameRecurringReference, type RecurringOccurrence } from "./recurring"
 
 export interface TransactionListItemVM { id: string; date: string; expense: string; amount: string; category: TransactionRecord["category"]; isSplit: boolean; notes: string | null; source: TransactionRecord["source"]; recurringExpenseId: string | null; tag: Tag; context: Context | null; card: Card | null }
 export interface TransactionSummaryVM { totalSpent: string; count: number; average: string; splitCount: number }
@@ -68,7 +68,9 @@ export function transactionsPageFromState(state: RehydratedFinancialState, filte
   const month = filter.from?.slice(0, 7)
   const hasSingleMonthRange = Boolean(month && filter.to?.slice(0, 7) === month)
   const projected = includeProjectedRecurring && hasSingleMonthRange
-    ? resolveRules(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month as string)), month as string).map((rule) => generatedTransaction(rule, { id: `projected:${rule.id}:${month}`, recurringExpenseId: rule.id, occurrenceMonth: `${month}-01`, dueDate: dueDate(rule, month as string), transactionId: `projected:${rule.id}:${month}` } as RecurringOccurrence))
+    ? resolveRules(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month as string)), month as string)
+      .map((rule) => generatedTransaction(rule, { id: `projected:${rule.id}:${month}`, recurringExpenseId: rule.id, occurrenceMonth: `${month}-01`, dueDate: dueDate(rule, month as string), transactionId: `projected:${rule.id}:${month}` } as RecurringOccurrence))
+      .filter((item) => !visibleTransactions.some((existing) => existing.source === "recurring" && existing.date === item.date && sameRecurringReference(existing.recurringExpenseId, item.recurringExpenseId)))
     : []
   const sourceRecords = projected.length > 0 ? [...visibleTransactions, ...projected] : visibleTransactions
   const visibleState = { ...state, transactions: sourceRecords }
