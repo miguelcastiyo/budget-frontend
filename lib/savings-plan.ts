@@ -6,6 +6,7 @@ import type { ReplaceSavingsPlanRequest, SavingsPlanResponse } from "@/lib/api/t
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
 import { parseMoneyCents } from "@/lib/domain/financial/money"
+import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
 
 export function useSavingsPlan(month: string) {
   const [data, setData] = useState<SavingsPlanResponse | null>(null)
@@ -55,6 +56,7 @@ export function useReplaceSavingsPlan(month: string) {
         if (!encryptedAuthority) {
           throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         }
+        const savingsBudgetCents = parseMoneyCents(String(resolvedAmounts(resolvedBudget(encryptedAuthority.getState().budgets, month).settings).savings))
         const prior = encryptedAuthority.store.values().filter((record) =>
           (record.family === "savings_plan" || record.family === "savings_plan_allocation") &&
           String(record.data.month ?? "") === month,
@@ -64,7 +66,7 @@ export function useReplaceSavingsPlan(month: string) {
           {
             id: planId,
             family: "savings_plan",
-            data: { id: planId, month, status: "active", savings_budget_cents: 0 },
+            data: { id: planId, month, status: "active", savings_budget_cents: savingsBudgetCents },
           },
           ...request.allocations.map((allocation) => {
             const id = createEncryptedRecordId()
