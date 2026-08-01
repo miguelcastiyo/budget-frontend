@@ -3,10 +3,18 @@ import { existingTransactionForOccurrence, generatedTransaction, planMaterializa
 import type { TransactionRecord } from "@/lib/domain/financial/types"
 import type { EncryptedFinancialAuthority } from "./authority"
 import { createDeterministicEncryptedRecordId, createDeterministicEncryptedRecordMutationId } from "../encrypted-records/crypto"
+import { validateRecurringRule } from "@/lib/domain/financial/recurring-validation"
 
-export async function materializeEncryptedRecurring(authority: EncryptedFinancialAuthority, month: string) {
+export type RecurringMaterializationResult =
+  | { status: "not_needed"; month: string; created_count: 0 }
+  | { status: "completed" | "conflict_retried"; month: string; created_count: number }
+  | { status: "failed"; month: string; created_count: 0; code: string }
+
+export async function materializeEncryptedRecurring(authority: EncryptedFinancialAuthority, month: string): Promise<RecurringMaterializationResult> {
+ try {
   const state = authority.getState()
   const rules = state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month))
+  for (const rule of rules) if (rule.isActive && !rule.isDeleted) validateRecurringRule(rule, state)
   const existing: RecurringOccurrence[] = state.recurringOccurrences.map((raw) => ({
     id: String(raw.id ?? ""),
     recurringExpenseId: String(raw.recurring_expense_id ?? ""),
@@ -21,7 +29,7 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
     tagId: raw.tagId, contextId: raw.contextId, cardId: raw.cardId, isDeleted: raw.isDeleted, createdSequence: 0,
   }))
   const planned = planMaterialization(rules, month, existing, transactions, getCurrentMonthKey(), getLocalDateKey())
-  if (planned.length === 0) return
+  if (planned.length === 0) return { status: "not_needed", month, created_count: 0 }
   const creates = (await Promise.all(planned.map(async (occurrence) => {
     const rule = rules.find((item) => sameRecurringReference(item.id, occurrence.recurringExpenseId))
     if (!rule) return []
@@ -41,6 +49,12 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
   if (creates.length > 0) {
     const plannedKey = planned.map((occurrence) => `${occurrence.recurringExpenseId}:${occurrence.occurrenceMonth.slice(0, 7)}`).sort().join("|")
     const batchKey = await createDeterministicEncryptedRecordMutationId(`recurring-materialize:${month}:${plannedKey}`)
-    await authority.commitSourceDiff({ creates, updates: [], tombstones: [] }, batchKey)
+    const result = await authority.commitSourceDiff({ creates, updates: [], tombstones: [] }, batchKey)
+    return { status: result.idempotent ? "conflict_retried" : "completed", month, created_count: planned.length }
   }
+  return { status: "not_needed", month, created_count: 0 }
+ } catch (error) {
+   const code = error instanceof Error && error.message ? error.message.split(":")[0] : "RECURRING_MATERIALIZATION_FAILED"
+   return { status: "failed", month, created_count: 0, code }
+ }
 }

@@ -91,20 +91,16 @@ export function groupRecurringRulesBySeries(items: RecurringExpense[]): Map<stri
   return grouped
 }
 
-export function getActiveVersionForMonth(
+export function getVersionForMonth(
   seriesItems: RecurringExpense[],
   selectedMonth: string
 ): RecurringExpense | null {
-  const applicableItems = seriesItems.filter((item) => {
-    return item.is_active && isMonthWithinRecurringWindow(item, selectedMonth)
-  })
-
-  if (applicableItems.length === 0) {
-    return null
-  }
-
-  return [...applicableItems].sort((first, second) => second.starts_month.localeCompare(first.starts_month))[0] ?? null
+  const ordered = [...seriesItems].sort((first, second) => first.starts_month.localeCompare(second.starts_month) || first.id.localeCompare(second.id))
+  const started = ordered.filter((item) => item.starts_month <= selectedMonth)
+  return started[started.length - 1] ?? ordered[0] ?? null
 }
+
+export const getActiveVersionForMonth = getVersionForMonth
 
 export function getNextScheduledVersion(
   seriesItems: RecurringExpense[],
@@ -145,7 +141,7 @@ export function buildRecurringSeriesEntries(
   const entries: RecurringSeriesEntry[] = []
 
   grouped.forEach((seriesItems, seriesId) => {
-    const currentItem = getActiveVersionForMonth(seriesItems, selectedMonth)
+    const currentItem = getVersionForMonth(seriesItems, selectedMonth)
     if (!currentItem) {
       return
     }

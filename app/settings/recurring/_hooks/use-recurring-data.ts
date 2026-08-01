@@ -29,10 +29,9 @@ export function useRecurringData(month: string) {
         // month. It must not prevent already-decrypted recurring rules from
         // being displayed if a stale occurrence or migrated record needs a
         // later retry.
-        try {
-          await materializeEncryptedRecurring(authority.authority, month)
-        } catch {
-          // Continue with the authoritative decrypted rule state below.
+        const materialization = await materializeEncryptedRecurring(authority.authority, month)
+        if (materialization.status === "failed") {
+          setError("Recurring items could not be fully posted. Retry to complete materialization.")
         }
         const recurringResponse = await authority.getRecurringExpenses(month) as RecurringExpensesResponse
         const state = authority.authority?.getState()

@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isCloseoutLoading, setIsCloseoutLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [recurringWarning, setRecurringWarning] = useState<string | null>(null)
   const [detailView, setDetailView] = useState<"tags" | "recent">("tags")
   const [isDismissingFirstRun, setIsDismissingFirstRun] = useState(false)
   const [isProgressDismissed, setIsProgressDismissed] = useState(false)
@@ -65,7 +66,10 @@ export default function DashboardPage() {
 
     try {
       const overviewRequest = authority.mode === "encrypted" && authority.authority
-        ? materializeEncryptedRecurring(authority.authority, currentMonth).catch(() => undefined).then(() => authority.getMonthOverview(currentMonth))
+        ? materializeEncryptedRecurring(authority.authority, currentMonth).then((result) => {
+          setRecurringWarning(result.status === "failed" ? "Recurring items could not be fully posted. Overview is showing the last committed state." : null)
+          return authority.getMonthOverview(currentMonth)
+        })
         : authority.getMonthOverview(currentMonth)
       const [overviewResult, closeoutResult] = await Promise.allSettled([
         overviewRequest,
@@ -195,6 +199,14 @@ export default function DashboardPage() {
               <Button variant="outline" size="sm" onClick={() => void loadDashboardData()}>
                 Retry
               </Button>
+            </div>
+          </Card>
+        )}
+        {recurringWarning && (
+          <Card className="p-4 mb-6 border-0 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">{recurringWarning}</p>
+              <Button variant="outline" size="sm" onClick={() => void loadDashboardData()}>Retry</Button>
             </div>
           </Card>
         )}

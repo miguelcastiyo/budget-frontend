@@ -6,6 +6,7 @@ import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
 import { getLocalDateKey } from "@/lib/date-filters"
+import { recurringTimeline } from "@/lib/domain/financial/recurring-timeline"
 import type { RehydratedFinancialState } from "./rehydrate"
 
 const cents = (value: unknown) => value == null ? 0 : value === Number(value) ? Number(value) : parseMoneyCents(String(value))
@@ -74,12 +75,14 @@ export function encryptedInsights(state: RehydratedFinancialState, from: string,
 
 export function encryptedRecurring(state: RehydratedFinancialState, month: string): any {
   const rules = state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month))
-  const items = resolveRules(rules, month).map((rule) => { const raw = state.recurringRules.find((candidate) => String(candidate.id ?? candidate.source_id ?? "") === rule.id); const tagId = String(raw?.tag_id ?? raw?.tagId ?? ""); const cardId = String(raw?.card_id ?? raw?.cardId ?? ""); const tag = state.tags.find((candidate) => sameReferenceId(candidate.id, tagId)); const card = state.cards.find((candidate) => sameReferenceId(candidate.id, cardId)); return { id: rule.id, series_id: rule.seriesId, expense: rule.expense, amount: formatMoneyCents(rule.amountCents), category: rule.category, billing_type: rule.billingType, billing_day: rule.billingDay, projected_date_for_month: dueDate(rule, month), starts_month: rule.startsMonth, ends_month: rule.endsMonth, is_active: rule.isActive, generated_for_month: state.recurringOccurrences.some((occurrence) => sameReferenceId(String(occurrence.recurring_expense_id ?? ""), rule.id) && String(occurrence.occurrence_month ?? "").startsWith(month)), tag: { id: tagId, name: tag?.name ?? "", icon_key: tag?.iconKey ?? null }, card: card ? { id: card.id, name: card.name, is_favorite: card.isFavorite } : null } })
-  const committedCents = items.reduce((sum, item) => sum + cents(item.amount), 0)
-  const generatedItems = items.filter((item) => item.generated_for_month)
+  const resolved = new Set(resolveRules(rules, month).map((rule) => rule.id))
+  const items = recurringTimeline(rules).map((rule) => { const raw = state.recurringRules.find((candidate) => String(candidate.id ?? candidate.source_id ?? "") === rule.id); const tagId = String(raw?.tag_id ?? raw?.tagId ?? ""); const cardId = String(raw?.card_id ?? raw?.cardId ?? ""); const tag = state.tags.find((candidate) => sameReferenceId(candidate.id, tagId)); const card = state.cards.find((candidate) => sameReferenceId(candidate.id, cardId)); return { id: rule.id, series_id: rule.seriesId, expense: rule.expense, amount: formatMoneyCents(rule.amountCents), category: rule.category, billing_type: rule.billingType, billing_day: rule.billingDay, projected_date_for_month: dueDate(rule, month), starts_month: rule.startsMonth, ends_month: rule.endsMonth, is_active: rule.isActive, generated_for_month: state.recurringOccurrences.some((occurrence) => sameReferenceId(String(occurrence.recurring_expense_id ?? ""), rule.id) && String(occurrence.occurrence_month ?? "").startsWith(month)), created_at: String(raw?.created_at ?? ""), updated_at: String(raw?.updated_at ?? ""), tag: { id: tagId, name: tag?.name ?? "", icon_key: tag?.iconKey ?? null }, card: card ? { id: card.id, name: card.name, is_favorite: card.isFavorite } : null } })
+  const committedItems = items.filter((item) => resolved.has(item.id))
+  const committedCents = committedItems.reduce((sum, item) => sum + cents(item.amount), 0)
+  const generatedItems = committedItems.filter((item) => item.generated_for_month)
   const generatedCents = generatedItems.reduce((sum, item) => sum + cents(item.amount), 0)
   const generatedCount = generatedItems.length
-  const upcomingCount = items.length - generatedCount
+  const upcomingCount = Math.max(committedItems.length - generatedCount, 0)
   return { month, items, committed_total: formatMoneyCents(committedCents), generated_total: formatMoneyCents(generatedCents), upcoming_total: formatMoneyCents(committedCents - generatedCents), items_count: items.length, generated_count: generatedCount, upcoming_count: upcomingCount, logged_count: generatedCount }
 }
 

@@ -30,6 +30,7 @@ const recurringSeries = require("../app/settings/recurring/_lib/recurring-series
 const financialViewModels = require("../lib/domain/financial/view-models.ts")
 const recurringForm = require("../lib/domain/financial/recurring-form.ts")
 const recurringDomain = require("../lib/domain/financial/recurring.ts")
+const recurringTimeline = require("../lib/domain/financial/recurring-timeline.ts")
 const tagIcons = require("../lib/tag-icons.ts")
 
 for (const key of ["coffee", "utensils", "book_open", "shopping_bag", "shirt", "sparkles", "droplet", "scissors", "film", "cookie"]) {
@@ -76,6 +77,9 @@ assertEqual(savedRule.billingDay, 27, "commitment hydration preserves its stored
 const scheduledRule = { ...savedRule, id: "rule_27:v2026-08", startsMonth: "2026-08", endsMonth: null, amountCents: 130000 }
 assertEqual(recurringDomain.previousMonth("2026-01"), "2025-12", "recurring version boundary handles year rollover")
 assertEqual(recurringDomain.resolveRules([savedRule, scheduledRule], "2026-08")[0].id, scheduledRule.id, "scheduled recurring version wins at its effective month")
+assertEqual(recurringTimeline.recurringVersionForMonth([savedRule, scheduledRule], savedRule.seriesId, "2026-07").id, savedRule.id, "timeline selector keeps the historical version for its month")
+assertEqual(recurringTimeline.recurringVersionForMonth([savedRule, scheduledRule], savedRule.seriesId, "2026-09").id, scheduledRule.id, "timeline selector uses the effective scheduled version")
+assertEqual(recurringTimeline.recurringVersionOverlaps([savedRule, { ...scheduledRule, endsMonth: null }]).length, 1, "overlapping recurring versions are detectable")
 const seedTransaction = { id: "seed_txn", date: "2026-07-27", expense: "Rent", amountCents: 120000, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_1", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 1 }
 const seedOccurrence = { id: "rule_27:2026-07", recurringExpenseId: "rule_27", occurrenceMonth: "2026-07-01", dueDate: "2026-07-27", transactionId: "seed_txn" }
 assertEqual(recurringDomain.existingTransactionForOccurrence([seedTransaction], seedOccurrence, savedRule)?.id, "seed_txn", "manual seed transaction is reused for its first occurrence")
