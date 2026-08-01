@@ -1,7 +1,7 @@
 "use client"
 
 import type { RecurringExpense, RecurringBillingType } from "@/lib/api/types"
-import { formatDateValue, getLocalDateKey } from "@/lib/date-filters"
+import { formatDateValue, getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
 import { getCommitmentDisplayStatus, type CommitmentDisplayStatus } from "./recurring-status"
 
 export type CommitmentOccurrenceStatus = CommitmentDisplayStatus
@@ -49,7 +49,19 @@ export function getRecurringOccurrenceStatus(
   selectedMonth: string,
   today = new Date()
 ): CommitmentOccurrenceStatus {
-  void selectedMonth
+  if (rule.generated_for_month) {
+    return "logged"
+  }
+
+  const normalizedMonth = selectedMonth.slice(0, 7)
+  const currentMonth = getCurrentMonthKey(today)
+  if (normalizedMonth < currentMonth) {
+    return "due"
+  }
+  if (normalizedMonth > currentMonth) {
+    return "upcoming"
+  }
+
   return getCommitmentDisplayStatus(rule, getLocalDateKey(today))
 }
 

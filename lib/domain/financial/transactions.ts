@@ -33,7 +33,25 @@ export function updateTransaction(current: TransactionRecord, command: Partial<T
 
 export function deleteTransaction(current: TransactionRecord): TransactionRecord { return { ...current, isDeleted: true } }
 
-export function visibleTransactions(records: TransactionRecord[]): TransactionRecord[] { return records.filter((record) => !record.isDeleted) }
+function recurringReferenceKey(value: string): string { return value.trim().split(":").pop() ?? value.trim() }
+function recurringCompleteness(record: TransactionRecord): number { return [record.tagId, record.contextId, record.cardId, record.notes].filter(Boolean).length }
+export function visibleTransactions(records: TransactionRecord[]): TransactionRecord[] {
+  const visible = records.filter((record) => !record.isDeleted)
+  const recurring = new Map<string, TransactionRecord>()
+  const result: TransactionRecord[] = []
+  for (const record of visible) {
+    if (record.source !== "recurring" || !record.recurringExpenseId) { result.push(record); continue }
+    const key = `${recurringReferenceKey(record.recurringExpenseId)}:${record.date}`
+    const prior = recurring.get(key)
+    if (!prior) { recurring.set(key, record); result.push(record); continue }
+    if (recurringCompleteness(record) > recurringCompleteness(prior)) {
+      const index = result.indexOf(prior)
+      if (index >= 0) result[index] = record
+      recurring.set(key, record)
+    }
+  }
+  return result
+}
 
 export interface TransactionFilter { from?: string; to?: string; search?: string; category?: FinancialCategory; categories?: FinancialCategory[]; tagId?: string; tagIds?: string[]; contextId?: string; contextIds?: string[]; cardId?: string; cardIds?: string[]; isSplit?: boolean; page?: number; pageSize?: number; sort?: "date_asc" | "date_desc" }
 

@@ -25,6 +25,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { materializeEncryptedRecurring } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
 
@@ -63,8 +64,11 @@ export default function DashboardPage() {
     setError(null)
 
     try {
+      const overviewRequest = authority.mode === "encrypted" && authority.authority
+        ? materializeEncryptedRecurring(authority.authority, currentMonth).catch(() => undefined).then(() => authority.getMonthOverview(currentMonth))
+        : authority.getMonthOverview(currentMonth)
       const [overviewResult, closeoutResult] = await Promise.allSettled([
-        authority.getMonthOverview(currentMonth),
+        overviewRequest,
         authority.mode === "encrypted" ? Promise.resolve(null) : apiClient.getMonthCloseout(currentMonth),
       ])
 

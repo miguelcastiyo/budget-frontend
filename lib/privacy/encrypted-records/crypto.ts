@@ -18,6 +18,14 @@ function mutationId(): string {
 export function createEncryptedRecordId(): string { return recordId() }
 export function createEncryptedRecordMutationId(): string { return mutationId() }
 
+async function deterministicToken(prefix: string, value: string): Promise<string> {
+  const digest = await webCrypto().subtle.digest("SHA-256", new TextEncoder().encode(value))
+  return `${prefix}${bytesToBase64Url(new Uint8Array(digest).slice(0, 18))}`
+}
+
+export function createDeterministicEncryptedRecordId(value: string): Promise<string> { return deterministicToken("rec_", value) }
+export function createDeterministicEncryptedRecordMutationId(value: string): Promise<string> { return deterministicToken("mut_", value) }
+
 export async function encryptSyntheticRecord(runtimeKey: CryptoKey, vaultId: string, value: unknown, revision = 1, id = recordId()): Promise<{ envelope: EncryptedRecordEnvelope; idempotencyKey: string }> {
   if (!runtimeKey || runtimeKey.extractable) throw new EncryptedRecordClientError("VAULT_LOCKED", "An unlocked non-extractable Vault is required")
   const crypto = webCrypto()

@@ -6,6 +6,7 @@ export interface RecurringRule {
   id: string; seriesId: string; expense: string; amountCents: number; category: "needs" | "wants" | "savings"
   billingType: "day_of_month" | "last_day"; billingDay: number | null; startsMonth: string; endsMonth: string | null
   isActive: boolean; isDeleted: boolean; seedTransactionId?: string | null
+  tagId?: string | null; contextId?: string | null; cardId?: string | null
 }
 
 export interface RecurringOccurrence { id: string; recurringExpenseId: string; occurrenceMonth: string; dueDate: string; transactionId: string }
@@ -51,6 +52,9 @@ export function recurringRuleFromRaw(raw: Record<string, unknown>, fallbackMonth
     isActive: rawBoolean(raw.is_active ?? raw.isActive, true),
     isDeleted: rawBoolean(raw.is_deleted ?? raw.isDeleted, false),
     seedTransactionId: raw.seed_transaction_id == null && raw.seedTransactionId == null ? null : rawString(raw.seed_transaction_id ?? raw.seedTransactionId),
+    tagId: rawString(raw.tag_id ?? raw.tagId) || null,
+    contextId: rawString(raw.context_id ?? raw.contextId) || null,
+    cardId: rawString(raw.card_id ?? raw.cardId) || null,
   }
 }
 
@@ -67,7 +71,13 @@ export function ruleApplies(rule: RecurringRule, month: string): boolean {
 
 export function resolveRules(rules: RecurringRule[], month: string): RecurringRule[] {
   const normalized = monthKey(month)
-  return rules.filter((rule) => ruleApplies(rule, normalized)).sort((a, b) => a.id.localeCompare(b.id))
+  const applicable = new Map<string, RecurringRule>()
+  for (const rule of rules) {
+    if (!ruleApplies(rule, normalized)) continue
+    const current = applicable.get(rule.seriesId)
+    if (!current || rule.startsMonth > current.startsMonth || (rule.startsMonth === current.startsMonth && rule.id > current.id)) applicable.set(rule.seriesId, rule)
+  }
+  return [...applicable.values()].sort((a, b) => a.id.localeCompare(b.id))
 }
 
 export function scheduleChange(rules: RecurringRule[], ruleId: string, effectiveMonth: string, changes: Partial<Pick<RecurringRule, "expense" | "amountCents" | "category" | "billingType" | "billingDay">>): RecurringRule[] {
@@ -81,7 +91,7 @@ export function scheduleChange(rules: RecurringRule[], ruleId: string, effective
   return rules.map((rule) => rule.id === ruleId ? prior : rule).concat(next)
 }
 
-function previousMonth(month: string): string {
+export function previousMonth(month: string): string {
   const [year, number] = monthKey(month).split("-").map(Number)
   const date = new Date(Date.UTC(year, number - 2, 1))
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`
@@ -101,8 +111,12 @@ export function planMaterialization(rules: RecurringRule[], month: string, exist
   return planned
 }
 
+export function existingTransactionForOccurrence(transactions: TransactionRecord[], occurrence: RecurringOccurrence, rule: RecurringRule): TransactionRecord | undefined {
+  return transactions.find((candidate) => candidate.id === occurrence.transactionId || (candidate.source === "recurring" && candidate.date === occurrence.dueDate && candidate.recurringExpenseId != null && sameRecurringReference(candidate.recurringExpenseId, rule.id)))
+}
+
 export function generatedTransaction(rule: RecurringRule, occurrence: RecurringOccurrence): TransactionRecord {
-  return { id: occurrence.transactionId, userId: "record_1", date: occurrence.dueDate, expense: rule.expense, amountCents: rule.amountCents, category: rule.category, isSplit: false, notes: null, source: "recurring", recurringExpenseId: rule.id, importFingerprint: null, tagId: null, contextId: null, cardId: null, isDeleted: false, createdSequence: 0 }
+  return { id: occurrence.transactionId, userId: "record_1", date: occurrence.dueDate, expense: rule.expense, amountCents: rule.amountCents, category: rule.category, isSplit: false, notes: null, source: "recurring", recurringExpenseId: rule.id, importFingerprint: null, tagId: rule.tagId ?? null, contextId: rule.contextId ?? null, cardId: rule.cardId ?? null, isDeleted: false, createdSequence: 0 }
 }
 
 export function monthWindow(month: string): { from: string; to: string } { return monthDateRange(month) }

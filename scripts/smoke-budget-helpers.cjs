@@ -73,6 +73,12 @@ const savedRule = recurringDomain.recurringRuleFromRaw({
   is_active: true,
 }, "2026-07")
 assertEqual(savedRule.billingDay, 27, "commitment hydration preserves its stored billing day")
+const scheduledRule = { ...savedRule, id: "rule_27:v2026-08", startsMonth: "2026-08", endsMonth: null, amountCents: 130000 }
+assertEqual(recurringDomain.previousMonth("2026-01"), "2025-12", "recurring version boundary handles year rollover")
+assertEqual(recurringDomain.resolveRules([savedRule, scheduledRule], "2026-08")[0].id, scheduledRule.id, "scheduled recurring version wins at its effective month")
+const seedTransaction = { id: "seed_txn", date: "2026-07-27", expense: "Rent", amountCents: 120000, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_1", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 1 }
+const seedOccurrence = { id: "rule_27:2026-07", recurringExpenseId: "rule_27", occurrenceMonth: "2026-07-01", dueDate: "2026-07-27", transactionId: "seed_txn" }
+assertEqual(recurringDomain.existingTransactionForOccurrence([seedTransaction], seedOccurrence, savedRule)?.id, "seed_txn", "manual seed transaction is reused for its first occurrence")
 assertEqual(
   recurringDomain.planMaterialization(
     [savedRule],
@@ -273,6 +279,17 @@ assertEqual(
   recurringStatus.getCommitmentDisplayStatus(commitment("2026-07-21", false), july23),
   "due",
   "past ungenerated commitment is due"
+)
+const recurringStatusItem = { projected_date_for_month: "2026-06-27", generated_for_month: false }
+assertEqual(
+  recurringSeries.getRecurringOccurrenceStatus(recurringStatusItem, "2026-06", new Date(2026, 6, 23)),
+  "due",
+  "historical ungenerated month is not shown as upcoming"
+)
+assertEqual(
+  recurringSeries.getRecurringOccurrenceStatus({ ...recurringStatusItem, projected_date_for_month: "2026-08-27" }, "2026-08", new Date(2026, 6, 23)),
+  "upcoming",
+  "future month is upcoming regardless of its day number"
 )
 
 const upcomingCommitments = [

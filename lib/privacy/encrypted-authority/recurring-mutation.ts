@@ -1,8 +1,8 @@
 import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
-import { generatedTransaction, planMaterialization, recurringRuleFromRaw, sameRecurringReference, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
+import { existingTransactionForOccurrence, generatedTransaction, planMaterialization, recurringRuleFromRaw, sameRecurringReference, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
 import type { TransactionRecord } from "@/lib/domain/financial/types"
 import type { EncryptedFinancialAuthority } from "./authority"
-import { createEncryptedRecordId } from "../encrypted-records/crypto"
+import { createDeterministicEncryptedRecordId, createDeterministicEncryptedRecordMutationId } from "../encrypted-records/crypto"
 
 export async function materializeEncryptedRecurring(authority: EncryptedFinancialAuthority, month: string) {
   const state = authority.getState()
@@ -22,16 +22,25 @@ export async function materializeEncryptedRecurring(authority: EncryptedFinancia
   }))
   const planned = planMaterialization(rules, month, existing, transactions, getCurrentMonthKey(), getLocalDateKey())
   if (planned.length === 0) return
-  const creates = planned.flatMap((occurrence) => {
+  const creates = (await Promise.all(planned.map(async (occurrence) => {
     const rule = rules.find((item) => sameRecurringReference(item.id, occurrence.recurringExpenseId))
     if (!rule) return []
     const transaction = generatedTransaction(rule, occurrence)
-    const transactionId = createEncryptedRecordId()
-    const occurrenceId = createEncryptedRecordId()
+    // A rule created from an existing transaction links its first occurrence
+    // directly to that seed transaction. The seed remains a manual row until
+    // rehydration sees the occurrence link, so matching only source="recurring"
+    // would create a duplicate for the first month.
+    const existingTransaction = existingTransactionForOccurrence(transactions, occurrence, rule)
+    const transactionId = existingTransaction?.id ?? await createDeterministicEncryptedRecordId(`recurring-transaction:${rule.id}:${occurrence.occurrenceMonth.slice(0, 7)}`)
+    const occurrenceId = await createDeterministicEncryptedRecordId(`recurring-occurrence:${rule.id}:${occurrence.occurrenceMonth.slice(0, 7)}`)
     return [
-      { id: transactionId, family: "transaction", data: { id: transactionId, date: transaction.date, expense: transaction.expense, amount_cents: transaction.amountCents, category: transaction.category, is_split: false, notes: null, source: "recurring", recurring_expense_id: rule.id, is_deleted: false } },
+      ...(existingTransaction ? [] : [{ id: transactionId, family: "transaction", data: { id: transactionId, date: transaction.date, expense: transaction.expense, amount_cents: transaction.amountCents, category: transaction.category, is_split: false, notes: null, source: "recurring", recurring_expense_id: rule.id, tag_id: rule.tagId ?? null, context_id: rule.contextId ?? null, card_id: rule.cardId ?? null, is_deleted: false } }]),
       { id: occurrenceId, family: "recurring_occurrence", data: { id: occurrenceId, recurring_expense_id: rule.id, occurrence_month: occurrence.occurrenceMonth, due_date: occurrence.dueDate, transaction_id: transactionId, is_deleted: false } },
     ]
-  })
-  if (creates.length > 0) await authority.commitSourceDiff({ creates, updates: [], tombstones: [] })
+  }))).flat()
+  if (creates.length > 0) {
+    const plannedKey = planned.map((occurrence) => `${occurrence.recurringExpenseId}:${occurrence.occurrenceMonth.slice(0, 7)}`).sort().join("|")
+    const batchKey = await createDeterministicEncryptedRecordMutationId(`recurring-materialize:${month}:${plannedKey}`)
+    await authority.commitSourceDiff({ creates, updates: [], tombstones: [] }, batchKey)
+  }
 }

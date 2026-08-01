@@ -1,7 +1,7 @@
 import { monthOverview } from "@/lib/domain/financial/overview"
 import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
 import { insights } from "@/lib/domain/financial/insights"
-import { resolveRules, dueDate, recurringRuleFromRaw } from "@/lib/domain/financial/recurring"
+import { resolveRules, dueDate, generatedTransaction, recurringRuleFromRaw, type RecurringOccurrence } from "@/lib/domain/financial/recurring"
 import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
@@ -43,7 +43,9 @@ function encryptedSavingsOverview(state: RehydratedFinancialState, month: string
 }
 
 export function encryptedMonthOverview(state: RehydratedFinancialState, month: string, currentDate = getLocalDateKey()): any {
-  const result: any = monthOverview({ transactions: state.transactions, budgets: state.budgets, occurrences: state.recurringOccurrences as any, month, currentDate })
+  const rules = resolveRules(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month)), month)
+  const projectedRecurring = rules.map((rule) => generatedTransaction(rule, { id: `${rule.id}:${month}`, recurringExpenseId: rule.id, occurrenceMonth: `${month}-01`, dueDate: dueDate(rule, month), transactionId: `projected:${rule.id}:${month}` } as RecurringOccurrence))
+  const result: any = monthOverview({ transactions: state.transactions, budgets: state.budgets, occurrences: state.recurringOccurrences as any, projectedRecurring, month, currentDate })
   const budgetAmounts = result.budget?.allocations ?? { needs: "0.00", wants: "0.00", savings: "0.00" }
   const totalSpendCents = cents(result.summary.totalSpent)
   const categories = result.categories.map((item: any) => { const budget = budgetAmounts[item.category as keyof typeof budgetAmounts] ?? "0.00"; return { category: item.category, budget_amount: budget, actual_spend: item.total, percent_used: percent(cents(item.total), cents(budget)) } })
@@ -73,7 +75,12 @@ export function encryptedInsights(state: RehydratedFinancialState, from: string,
 export function encryptedRecurring(state: RehydratedFinancialState, month: string): any {
   const rules = state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month))
   const items = resolveRules(rules, month).map((rule) => { const raw = state.recurringRules.find((candidate) => String(candidate.id ?? candidate.source_id ?? "") === rule.id); const tagId = String(raw?.tag_id ?? raw?.tagId ?? ""); const cardId = String(raw?.card_id ?? raw?.cardId ?? ""); const tag = state.tags.find((candidate) => sameReferenceId(candidate.id, tagId)); const card = state.cards.find((candidate) => sameReferenceId(candidate.id, cardId)); return { id: rule.id, series_id: rule.seriesId, expense: rule.expense, amount: formatMoneyCents(rule.amountCents), category: rule.category, billing_type: rule.billingType, billing_day: rule.billingDay, projected_date_for_month: dueDate(rule, month), starts_month: rule.startsMonth, ends_month: rule.endsMonth, is_active: rule.isActive, generated_for_month: state.recurringOccurrences.some((occurrence) => sameReferenceId(String(occurrence.recurring_expense_id ?? ""), rule.id) && String(occurrence.occurrence_month ?? "").startsWith(month)), tag: { id: tagId, name: tag?.name ?? "", icon_key: tag?.iconKey ?? null }, card: card ? { id: card.id, name: card.name, is_favorite: card.isFavorite } : null } })
-  return { month, items, committed_total: formatMoneyCents(items.reduce((sum, item) => sum + cents(item.amount), 0)), generated_total: "0.00", logged_count: items.filter((item) => item.generated_for_month).length, upcoming_count: items.filter((item) => !item.generated_for_month).length }
+  const committedCents = items.reduce((sum, item) => sum + cents(item.amount), 0)
+  const generatedItems = items.filter((item) => item.generated_for_month)
+  const generatedCents = generatedItems.reduce((sum, item) => sum + cents(item.amount), 0)
+  const generatedCount = generatedItems.length
+  const upcomingCount = items.length - generatedCount
+  return { month, items, committed_total: formatMoneyCents(committedCents), generated_total: formatMoneyCents(generatedCents), upcoming_total: formatMoneyCents(committedCents - generatedCents), items_count: items.length, generated_count: generatedCount, upcoming_count: upcomingCount, logged_count: generatedCount }
 }
 
 export function encryptedSavingsPlan(state: RehydratedFinancialState, month: string): any {
