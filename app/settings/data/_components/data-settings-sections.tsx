@@ -681,11 +681,15 @@ export function MobileSampleRows({ preview, mapping }: { preview: CsvImportPrevi
 export function ActivityRow({
   item,
   onRollback,
+  onRepair,
   isRollingBack,
+  isRepairing,
 }: {
   item: DataRunItem
   onRollback: (item: DataRunItem) => void
+  onRepair: (item: DataRunItem) => void
   isRollingBack: boolean
+  isRepairing: boolean
 }) {
   const rangeLabel = item.type === "export"
     ? item.date_from && item.date_to
@@ -734,8 +738,13 @@ export function ActivityRow({
                 )}
               </Button>
             )}
+            {item.type === "import" && item.lineage_repair_status === "repairable_automatically" && (
+              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 w-full rounded-lg sm:w-auto" disabled={isRepairing} onClick={() => onRepair(item)}>
+                {isRepairing ? "Repairing rollback" : "Repair rollback history"}
+              </Button>
+            )}
             {item.type === "import" && item.rollback_unavailable_reason === "pre_rollback_feature" && (
-              <p className="mt-2 text-xs text-muted-foreground">Rollback unavailable for imports before this feature.</p>
+              <p className="mt-2 text-xs text-muted-foreground">{item.lineage_repair_status === "ambiguous" ? "Rollback unavailable: historical transaction lineage is ambiguous." : item.lineage_repair_status === "source_file_required" ? "Rollback unavailable: the original CSV is required to repair its history." : "Rollback unavailable for imports before this feature."}</p>
             )}
             {item.error_summary && (
               <p className="mt-2 text-xs text-destructive">{item.error_summary}</p>

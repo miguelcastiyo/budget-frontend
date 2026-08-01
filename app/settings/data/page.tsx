@@ -32,6 +32,7 @@ import { useDataRuns } from "./_hooks/use-data-runs"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { exportTransactions as exportEncryptedTransactions } from "@/lib/domain/financial/csv"
 import { planCsvImport, type CsvRow } from "@/lib/domain/financial/csv"
+import { analyzeImportLineage, applyImportLineageRepair } from "@/lib/domain/financial/import-lineage-repair"
 import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
 import {
   bestCategorySource,
@@ -77,6 +78,9 @@ export default function DataSettingsPage() {
   const [rollbackTarget, setRollbackTarget] = useState<DataRunItem | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const [rollingBackImportId, setRollingBackImportId] = useState<string | null>(null)
+  const [repairTarget, setRepairTarget] = useState<DataRunItem | null>(null)
+  const [repairError, setRepairError] = useState<string | null>(null)
+  const [repairingImportId, setRepairingImportId] = useState<string | null>(null)
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -476,6 +480,23 @@ export default function DataSettingsPage() {
     }
   }
 
+  const handleRepairImport = async () => {
+    if (!repairTarget || authority.mode !== "encrypted" || !authority.authority) return
+    setRepairingImportId(repairTarget.id)
+    setRepairError(null)
+    try {
+      const preview = analyzeImportLineage(authority.authority, repairTarget.id)
+      if (preview.status !== "repairable_automatically") throw new Error("IMPORT_LINEAGE_REPAIR_NOT_SAFE")
+      await applyImportLineageRepair(authority.authority, preview)
+      setRepairTarget(null)
+      await loadDataRuns()
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : "Unable to repair import rollback history.")
+    } finally {
+      setRepairingImportId(null)
+    }
+  }
+
   const requiredMappingComplete = HEADER_IMPORT_FIELDS
     .filter((field) => field.required)
     .every((field) => Boolean(importMapping[field.key]))
@@ -699,7 +720,12 @@ export default function DataSettingsPage() {
                     setRollbackError(null)
                     setRollbackTarget(target)
                   }}
+                  onRepair={(target) => {
+                    setRepairError(null)
+                    setRepairTarget(target)
+                  }}
                   isRollingBack={rollingBackImportId === item.id}
+                  isRepairing={repairingImportId === item.id}
                 />
               ))}
             </Card>
@@ -991,6 +1017,32 @@ export default function DataSettingsPage() {
             </div>
           )}
           {rollbackError && <p className="text-sm text-destructive">{rollbackError}</p>}
+        </>
+      </ResponsiveConfirmDialog>
+
+      <ResponsiveConfirmDialog
+        open={!!repairTarget}
+        onOpenChange={(open) => {
+          if (!open && !repairingImportId) {
+            setRepairTarget(null)
+            setRepairError(null)
+          }
+        }}
+        title="Repair rollback history?"
+        description="This will restore the encrypted import markers needed to roll back this historical import. No transaction or taxonomy content will be changed."
+        confirmLabel={repairingImportId ? "Repairing..." : "Repair history"}
+        confirmDisabled={!!repairingImportId}
+        closeDisabled={!!repairingImportId}
+        onConfirm={() => void handleRepairImport()}
+      >
+        <>
+          {repairTarget && (
+            <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+              <p className="truncate font-medium">{repairTarget.source_filename || "CSV import"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{repairTarget.imported_rows ?? 0} imported transactions will be linked to this import.</p>
+            </div>
+          )}
+          {repairError && <p className="text-sm text-destructive">Unable to repair this import automatically. Refresh and try again.</p>}
         </>
       </ResponsiveConfirmDialog>
 

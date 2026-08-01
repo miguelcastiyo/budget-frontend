@@ -1093,6 +1093,8 @@ export interface DataRunItem {
   rolled_back_at: string | null
   rolled_back_rows: number
   rollback_unavailable_reason: "pre_rollback_feature" | null
+  lineage_repair_status?: "not_needed" | "repairable_automatically" | "source_file_required" | "ambiguous" | "repaired"
+  lineage_repair_evidence?: string | null
 }
 
 export interface DataRunsResponse {

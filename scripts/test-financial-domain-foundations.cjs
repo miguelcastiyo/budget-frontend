@@ -12,6 +12,7 @@ const transactions = require("../lib/domain/financial/transactions.ts")
 const budgets = require("../lib/domain/financial/budgets.ts")
 const viewModels = require("../lib/domain/financial/view-models.ts")
 const fundDiff = require("../lib/domain/financial/transaction-fund-diff.ts")
+const lineageRepair = require("../lib/domain/financial/import-lineage-repair.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
 assert(money.parseMoneyCents("1,234.50") === 123450, "money parsing")
 assert(money.formatMoneyCents(123450) === "1234.50", "money formatting")
@@ -32,4 +33,17 @@ assert(fundDiff.transactionFundDiff(null, fundDiff.transactionFundState(txSource
 const moved = fundDiff.transactionFundDiff(fundDiff.transactionFundState(txSource, entryA), fundDiff.transactionFundState({ ...txSource, data: { amount_cents: 10000, fund_id: "fund_b" } }, entryB))
 assert(moved.updates.length === 1 && moved.creates.length === 1 && moved.tombstones.length === 1, "fund transition diff")
 assert(fundDiff.transactionFundDiff(fundDiff.transactionFundState(txSource, entryA), fundDiff.transactionFundState(txSource, null)).tombstones.length === 1, "fund unlink diff")
+const envelope = (id, revision = 1) => ({ vault_id: "vault_1", record_id: id, envelope_version: 1, record_revision: revision, sync_sequence: "1", deleted: false })
+const legacyRun = { envelope: envelope("run_legacy"), family: "import_run", schemaVersion: "import_run_v1", sourceId: "run_legacy", data: { id: "run_legacy", imported_rows: 1, status: "completed" } }
+const legacyTransaction = { envelope: envelope("txn_legacy"), family: "transaction", schemaVersion: "transaction_v1", sourceId: "run_legacy:2", data: { id: "run_legacy:2", date: "2026-01-15", expense: "Imported", amount_cents: 1000, category: "needs", source: "import", is_deleted: false } }
+const repairAuthority = { store: { values: () => [legacyRun, legacyTransaction] } }
+const legacyAnalysis = lineageRepair.analyzeImportLineage(repairAuthority, "run_legacy")
+assert(legacyAnalysis.status === "repairable_automatically" && legacyAnalysis.evidenceMethod === "legacy_row_id" && legacyAnalysis.canCommit, "legacy import lineage is repairable from exact row identity")
+const stableRun = { ...legacyRun, envelope: envelope("run_stable"), sourceId: "run_stable", data: { ...legacyRun.data, id: "run_stable" } }
+const stableTransaction = { ...legacyTransaction, envelope: envelope("txn_stable"), sourceId: "txn_stable", data: { ...legacyTransaction.data, id: "txn_stable", import_run_id: "run_stable" } }
+const stableAnalysis = lineageRepair.analyzeImportLineage({ store: { values: () => [stableRun, stableTransaction] } }, "run_stable")
+assert(stableAnalysis.status === "not_needed" && stableAnalysis.alreadyMarkedTransactionCount === 1, "stable import lineage is not re-repairable")
+const ambiguousTransaction = { ...legacyTransaction, envelope: envelope("run_legacy:3"), sourceId: "run_legacy:3", data: { ...legacyTransaction.data, id: "run_legacy:3" } }
+const ambiguousAnalysis = lineageRepair.analyzeImportLineage({ store: { values: () => [legacyRun, legacyTransaction, ambiguousTransaction] } }, "run_legacy")
+assert(ambiguousAnalysis.status === "ambiguous", "duplicate legacy row identity remains unavailable")
 console.log("Phase 4 financial-domain foundation tests passed")
