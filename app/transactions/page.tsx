@@ -402,7 +402,11 @@ export default function TransactionsPage() {
 
   const handleCustomDateRangeChange = useCallback(
     (range: DateRangeFilter | null) => {
-      setPreset("all")
+      // Selecting a preset clears the custom range by passing null after the
+      // preset callback. Do not reset that newly selected preset in response.
+      if (range) {
+        setPreset("all")
+      }
       setCustomDateRange(range)
 
       if (!searchParams.get("month")) {
