@@ -6,6 +6,7 @@ import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
 import { getLocalDateKey } from "@/lib/date-filters"
+import { monthDateRange } from "@/lib/domain/financial/clock"
 import { recurringTimeline } from "@/lib/domain/financial/recurring-timeline"
 import { filterTransactions } from "@/lib/domain/financial/transactions"
 import type { RehydratedFinancialState } from "./rehydrate"
@@ -58,10 +59,16 @@ export function encryptedMonthOverview(state: RehydratedFinancialState, month: s
 }
 
 export function encryptedInsights(state: RehydratedFinancialState, from: string, to: string): any {
+  // Insights ranges such as "last 6 months" end on today, but the final
+  // month must still represent its full recurring commitment picture. Keep
+  // future manual transactions out while allowing projected recurring rows
+  // through the end of that calendar month.
+  const analyticalTo = monthDateRange(to.slice(0, 7)).to
+  const actualTransactions = filterTransactions(state.transactions, { from, to, sort: "date_asc" })
   const projectedRecurring = monthsBetween(from.slice(0, 7), to.slice(0, 7)).flatMap((month) => resolveRules(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month)), month).map((rule) => generatedTransaction(rule, { id: `projected:${rule.id}:${month}`, recurringExpenseId: rule.id, occurrenceMonth: `${month}-01`, dueDate: dueDate(rule, month), transactionId: `projected:${rule.id}:${month}` } as RecurringOccurrence)))
-  const insightTransactions = [...state.transactions, ...projectedRecurring]
-  const result = insights({ transactions: insightTransactions, from, to })
-  const records = filterTransactions(insightTransactions, { from, to, sort: "date_asc" })
+  const insightTransactions = [...actualTransactions, ...projectedRecurring]
+  const result = insights({ transactions: insightTransactions, from, to: analyticalTo })
+  const records = filterTransactions(insightTransactions, { from, to: analyticalTo, sort: "date_asc" })
   const tagTotals = new Map<string, number>(); for (const item of records) if (item.tagId) tagTotals.set(item.tagId, (tagTotals.get(item.tagId) ?? 0) + item.amountCents)
   const totalSpendCents = cents(result.total)
   const weekdayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
