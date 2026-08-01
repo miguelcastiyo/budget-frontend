@@ -201,6 +201,9 @@ export function getPresetDateRange(preset: Preset | "all"): Partial<DateRangeFil
       break
     case "month_to_date":
       dateFrom = new Date(now.getFullYear(), now.getMonth(), 1)
+      // Transactions uses this preset as the monthly planning view, so its
+      // range must include projected recurring items due later this month.
+      dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       break
     case "last_month":
       dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1)
