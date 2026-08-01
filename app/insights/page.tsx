@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import {
-  ArrowRight,
   CalendarIcon,
   ChevronRight,
   Folder,
@@ -935,20 +934,20 @@ function NotableSpendingSection({
   onGroupOpen: (group: Extract<NotableSpendingItem, { type: "group" }>) => void
 }) {
   return (
-    <ReviewSection
-      title="Notable spending"
-      description="Largest individual and repeated expenses in this range."
-      action={
-        <Link href="/transactions" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
-          View transactions
-          <ArrowRight className="h-4 w-4" />
+    <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-0 p-0 shadow-sm">
+      <div className="flex min-w-0 items-center justify-between border-b border-border/50 px-5 py-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold">Notable spending</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Largest individual and repeated expenses in this range.</p>
+        </div>
+        <Link href="/transactions" className="shrink-0 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+          See All
         </Link>
-      }
-    >
+      </div>
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notable spending found for this range.</p>
+        <p className="p-5 text-sm text-muted-foreground">No notable spending found for this range.</p>
       ) : (
-        <div className="divide-y divide-border/60">
+        <div className="divide-y divide-border/50">
           {items.slice(0, 5).map((item) => (
             item.type === "group" ? (
               <GroupedNotableSpendingRow key={item.groupKey} item={item} onOpen={() => onGroupOpen(item)} />
@@ -958,7 +957,7 @@ function NotableSpendingSection({
           ))}
         </div>
       )}
-    </ReviewSection>
+    </Card>
   )
 }
 
