@@ -4,15 +4,26 @@ import { formatMoneyCents, parseMoneyCents } from "./money"
 import type { TransactionRecord } from "./types"
 
 export interface CsvRow { row: number; date: string; expense: string; amount: string; externalCategory?: string; tag?: string; context?: string; card?: string; isSplit?: boolean; notes?: string }
-export interface CsvImportPlan { accepted: TransactionRecord[]; errors: { row: number; field: string; message: string }[]; skippedBlankAmountRows: number; duplicates: CsvRow[]; newTags: string[] }
+export interface CsvImportTaxonomyCreate { family: "taxonomy_tag" | "taxonomy_card" | "taxonomy_context"; id: string; name: string }
+export interface CsvImportPlan { accepted: TransactionRecord[]; errors: { row: number; field: string; message: string }[]; skippedBlankAmountRows: number; duplicates: CsvRow[]; newTags: string[]; newCards: string[]; newContexts: string[]; taxonomyCreates: CsvImportTaxonomyCreate[] }
 
 export function normalizeCsvDate(value: string, year: number): string {
   const trimmed = value.trim(); const normalized = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : /^\d{1,2}\/\d{1,2}$/.test(trimmed) ? `${year}-${trimmed.split("/").map((part) => part.padStart(2, "0")).join("-")}` : ""
   return dateOnly(normalized)
 }
 export function mapCategory(value: string | undefined): "needs" | "wants" | "savings" { const normalized = value?.trim().toLowerCase(); if (normalized === "debit" || normalized === "needs") return "needs"; if (normalized === "wants") return "wants"; if (normalized === "savings") return "savings"; throw new Error("INVALID_CATEGORY") }
-export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], options: { year: number; userId: string; batchId: string }): CsvImportPlan {
-  const accepted: TransactionRecord[] = []; const errors: CsvImportPlan["errors"] = []; const duplicates: CsvRow[] = []; const newTags: string[] = []
+export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], options: { year: number; userId: string; batchId: string; tags?: Array<{ id: string; name: string }>; cards?: Array<{ id: string; name: string }>; contexts?: Array<{ id: string; name: string }>; tagValueMap?: Record<string, { mode?: "existing" | "new"; tag_id?: string; name?: string }> }): CsvImportPlan {
+  const accepted: TransactionRecord[] = []; const errors: CsvImportPlan["errors"] = []; const duplicates: CsvRow[] = []; const newTags: string[] = []; const newCards: string[] = []; const newContexts: string[] = []; const taxonomyCreates: CsvImportPlan["taxonomyCreates"] = []
+  const taxonomyId = (family: CsvImportTaxonomyCreate["family"], name: string) => `${options.batchId}:${family}:${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+  const resolveTaxonomy = (family: CsvImportTaxonomyCreate["family"], value: string | undefined, existingItems: Array<{ id: string; name: string }> | undefined, onNew: (name: string) => void) => {
+    const name = value?.trim() ?? ""
+    if (!name) return null
+    const existing = existingItems?.find((item) => item.name.trim().toLowerCase() === name.toLowerCase())
+    if (existing) return existing.id
+    const id = taxonomyId(family, name)
+    if (!taxonomyCreates.some((item) => item.id === id)) { taxonomyCreates.push({ family, id, name }); onNew(name) }
+    return id
+  }
   for (const row of rows) {
     if (!row.amount.trim()) continue
     let date: string; let amountCents: number; let category: "needs" | "wants" | "savings"
@@ -20,12 +31,17 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     try { amountCents = parseMoneyCents(row.amount) } catch { errors.push({ row: row.row, field: "amount", message: "must be a decimal number" }); continue }
     try { category = mapCategory(row.externalCategory) } catch { errors.push({ row: row.row, field: "category", message: "must be a supported category" }); continue }
     if (amountCents <= 0) { errors.push({ row: row.row, field: "amount", message: "must be greater than 0" }); continue }
-    const candidate = createTransaction({ id: `${options.batchId}:${row.row}`, userId: options.userId, date, expense: row.expense, amount: formatMoneyCents(amountCents), category, isSplit: row.isSplit, notes: row.notes, source: "import", importFingerprint: null, sequence: row.row })
-    const fingerprint = duplicateFingerprint({ date, amount: formatMoneyCents(amountCents), expense: row.expense, category, isSplit: candidate.isSplit, tagId: null, cardId: null })
+    const tagMapping = row.tag?.trim() ? options.tagValueMap?.[row.tag] : undefined
+    const tagName = tagMapping?.mode === "new" ? tagMapping.name : row.tag
+    const tagId = tagMapping?.mode === "existing" && tagMapping.tag_id ? tagMapping.tag_id : resolveTaxonomy("taxonomy_tag", tagName, options.tags, (name) => { if (!newTags.includes(name)) newTags.push(name) })
+    const cardId = resolveTaxonomy("taxonomy_card", row.card, options.cards, (name) => { if (!newCards.includes(name)) newCards.push(name) })
+    const contextId = resolveTaxonomy("taxonomy_context", row.context, options.contexts, (name) => { if (!newContexts.includes(name)) newContexts.push(name) })
+    const candidate = createTransaction({ id: `${options.batchId}:${row.row}`, userId: options.userId, date, expense: row.expense, amount: formatMoneyCents(amountCents), category, isSplit: row.isSplit, notes: row.notes, source: "import", importFingerprint: null, tagId, contextId, cardId, sequence: row.row })
+    const fingerprint = duplicateFingerprint({ date, amount: formatMoneyCents(amountCents), expense: row.expense, category, isSplit: candidate.isSplit, tagId, cardId })
     if (existing.concat(accepted).some((item) => item.importFingerprint === fingerprint || duplicateFingerprint({ date: item.date, amount: formatMoneyCents(item.amountCents), expense: item.expense, category: item.category, isSplit: item.isSplit, tagId: item.tagId, cardId: item.cardId }) === fingerprint)) { duplicates.push(row); continue }
-    accepted.push({ ...candidate, importFingerprint: fingerprint }); if (row.tag && !newTags.includes(row.tag)) newTags.push(row.tag)
+    accepted.push({ ...candidate, importFingerprint: fingerprint })
   }
-  return { accepted, errors, skippedBlankAmountRows: rows.filter((row) => !row.amount.trim()).length, duplicates, newTags }
+  return { accepted, errors, skippedBlankAmountRows: rows.filter((row) => !row.amount.trim()).length, duplicates, newTags, newCards, newContexts, taxonomyCreates }
 }
 export function rollbackImport(records: TransactionRecord[], batchPrefix: string): TransactionRecord[] { return records.map((record) => record.id.startsWith(`${batchPrefix}:`) ? { ...record, isDeleted: true } : record) }
 export function escapeCsvField(value: string | null | undefined): string { const text = value ?? ""; return /^[=+\-@]/.test(text) ? `'${text}` : /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text }
