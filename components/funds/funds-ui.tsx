@@ -71,6 +71,7 @@ import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { encryptedFundCloseoutSummary } from "@/lib/privacy/encrypted-authority/derived"
 import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
 import { parseMoneyCents } from "@/lib/domain/financial/money"
 
@@ -439,7 +440,7 @@ export function FundsOverviewPage() {
       const [fundsResult, activeMetricsResult, summaryResult] = await Promise.allSettled([
         financialAuthority.getFunds({ status: filter }),
         metricsPromise ?? Promise.resolve(null),
-        financialAuthority.mode === "encrypted" ? Promise.resolve(null) : apiClient.getFundCloseoutSummary(new Date().getFullYear()),
+        financialAuthority.mode === "encrypted" && financialAuthority.authority ? Promise.resolve(encryptedFundCloseoutSummary(financialAuthority.authority.getState(), new Date().getFullYear())) : apiClient.getFundCloseoutSummary(new Date().getFullYear()),
       ])
 
       if (fundsResult.status === "rejected") {

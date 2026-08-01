@@ -96,6 +96,43 @@ export function encryptedRecurring(state: RehydratedFinancialState, month: strin
   return { month, items, committed_total: formatMoneyCents(committedCents), generated_total: formatMoneyCents(generatedCents), upcoming_total: formatMoneyCents(committedCents - generatedCents), items_count: items.length, generated_count: generatedCount, upcoming_count: upcomingCount, logged_count: generatedCount }
 }
 
+export function encryptedFundCloseoutSummary(state: RehydratedFinancialState, year: number): any {
+  const { funds, entries } = fundState(state)
+  const yearPrefix = `${year}-`
+  const closeouts = state.closeouts.filter((item) => !item.is_deleted && String(item.month ?? "").startsWith(yearPrefix) && String(item.status ?? "") === "closed")
+  const allocations = state.closeoutAllocations.filter((item) => !item.is_deleted && String(item.month ?? item.closeout_month ?? "").startsWith(yearPrefix) && String(item.allocation_type ?? "fund") === "fund")
+  const fundById = new Map(funds.map((fund) => [fund.id, fund]))
+  const fundCloseoutEntries = entries.filter((entry) => entry.sourceType === "month_closeout" && entry.direction === "in" && entry.entryDate.startsWith(yearPrefix))
+  const totalCloseoutContributed = fundCloseoutEntries.reduce((sum, entry) => sum + entry.amountCents, 0)
+  const fundTotals = new Map<string, { amountCents: number; count: number }>()
+  for (const entry of fundCloseoutEntries) {
+    const current = fundTotals.get(entry.fundId) ?? { amountCents: 0, count: 0 }
+    current.amountCents += entry.amountCents
+    current.count += 1
+    fundTotals.set(entry.fundId, current)
+  }
+  const months = closeouts
+    .filter((closeout) => String(closeout.result_type ?? "") === "surplus")
+    .map((closeout) => {
+      const closeoutId = String(closeout.id ?? "")
+      const monthKey = String(closeout.month ?? "").slice(0, 7)
+      const monthAllocations = allocations.filter((allocation) => String(allocation.month ?? allocation.closeout_month ?? "").slice(0, 7) === monthKey && (allocation.closeout_id == null || sameReferenceId(String(allocation.closeout_id), closeoutId)))
+      const allocatedCents = monthAllocations.reduce((sum, allocation) => sum + cents(allocation.amount_cents ?? allocation.amount ?? 0), 0)
+      const surplusCents = cents(closeout.surplus_amount_cents ?? closeout.surplus_amount ?? 0)
+      return { month: String(closeout.month ?? "").slice(0, 7), result_type: String(closeout.result_type), surplus_amount: formatMoneyCents(surplusCents), allocated_to_funds: formatMoneyCents(allocatedCents), unassigned_amount: formatMoneyCents(Math.max(surplusCents - allocatedCents, 0)), fund_allocations: monthAllocations.map((allocation) => { const fundId = String(allocation.fund_id ?? ""); return { fund_id: fundId, fund_name: fundById.get(fundId)?.name ?? "", amount: formatMoneyCents(cents(allocation.amount_cents ?? allocation.amount ?? 0)) } }) }
+    })
+  const fundRows = [...fundTotals.entries()]
+    .sort((left, right) => right[1].amountCents - left[1].amountCents || (fundById.get(left[0])?.name ?? "").localeCompare(fundById.get(right[0])?.name ?? ""))
+    .map(([fundId, total]) => {
+      const fund = fundById.get(fundId)
+      if (!fund) return null
+      const balanceCents = ledgerBalance(entries, fundId)
+      return { fund: { id: fund.id, name: fund.name, fund_type: fund.fundType, goal_amount: fund.goalAmountCents == null ? null : formatMoneyCents(fund.goalAmountCents), current_balance: formatMoneyCents(balanceCents), percent_funded: fund.goalAmountCents == null || fund.goalAmountCents === 0 ? null : formatMoneyCents(Math.round((balanceCents * 10000) / fund.goalAmountCents)) }, closeout_contributed: formatMoneyCents(total.amountCents), closeout_count: total.count }
+    }).filter(Boolean)
+  const unassignedCloseoutTotal = months.reduce((sum, month) => sum + cents(month.unassigned_amount), 0)
+  return { year, total_closeout_contributed: formatMoneyCents(totalCloseoutContributed), funds: fundRows, unassigned_closeout_total: formatMoneyCents(unassignedCloseoutTotal), months }
+}
+
 export function encryptedSavingsPlan(state: RehydratedFinancialState, month: string): any {
   const { funds, entries } = fundState(state)
   const budgetResolution = (() => {
