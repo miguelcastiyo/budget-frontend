@@ -173,9 +173,14 @@ export function TransactionDetailSheet({
               </div>
             </div>
           )}
+          {transaction.is_projected && (
+            <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+              Projected recurring commitment. It will become a posted transaction on its due date.
+            </p>
+          )}
           
           {/* Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          {!transaction.is_projected && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <Button
               variant="outline"
               className="h-12 rounded-xl w-full"
@@ -214,7 +219,7 @@ export function TransactionDetailSheet({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
+          </div>}
         </div>
       </SheetContent>
     </Sheet>

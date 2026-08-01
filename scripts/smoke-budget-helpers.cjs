@@ -95,6 +95,13 @@ assertEqual(
   0,
   "existing seed-linked occurrence is not duplicated"
 )
+const projectedTransactions = financialViewModels.transactionsPageFromState(
+  { transactions: [], tags: [], contexts: [], cards: [], budgets: [], recurringRules: [savedRule], recurringOccurrences: [], funds: [], fundLedgerEntries: [], savingsPlans: [], closeouts: [], closeoutAllocations: [], importRuns: [] },
+  { from: "2026-07-01", to: "2026-07-31", page: 1, pageSize: 50, sort: "date_desc" },
+  "2026-07-02",
+  true
+)
+assertEqual(projectedTransactions.items.some((item) => item.expense === "Rent" && item.date === "2026-07-27"), true, "Transactions page includes the full month's projected recurring spend")
 
 const hourlyMonthly = income.calculateHourlyMonthlyIncome("20.00", "10.00")
 assertApprox(hourlyMonthly, 866.6666666667, 0.000001, "hourly income uses 52/12 monthly average")

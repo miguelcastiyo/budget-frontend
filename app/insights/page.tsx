@@ -6,6 +6,7 @@ import { format } from "date-fns"
 import {
   ArrowRight,
   CalendarIcon,
+  ChevronRight,
   Folder,
   LineChart,
   ReceiptText,
@@ -965,27 +966,21 @@ function SingleNotableSpendingRow({ item }: { item: InsightsLargestTransactionIt
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
-    <div className="flex min-w-0 items-center gap-3 py-2.5 sm:py-3">
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
-        <TagIcon className="h-5 w-5 text-white" />
+    <div className="flex min-w-0 items-center gap-3 p-3">
+      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", getCategoryColorClass(item.category))}>
+        <TagIcon className="h-4 w-4 text-white" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{item.expense}</p>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium">
-            <TagGlyph className="h-3 w-3 text-muted-foreground" />
-            <span className="truncate">{item.tag.name}</span>
-          </span>
-          <TransactionPresenceIndicators
-            hasCard={Boolean(item.card_name)}
-            hasNotes={Boolean(item.notes)}
-            className="rounded-full border border-border/70 bg-background px-2 py-1"
-            iconClassName="h-3 w-3"
-          />
+        <p className="truncate text-sm font-medium">{item.expense}</p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <span className="min-w-0 truncate">{item.tag.name}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0">{format(dateFromIso(item.date), "MMM d, yyyy")}</span>
+          <TransactionPresenceIndicators hasNotes={Boolean(item.notes)} />
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">{format(dateFromIso(item.date), "MMM d, yyyy")}</p>
       </div>
-      <p className="max-w-[6.5rem] shrink-0 truncate text-right text-sm font-semibold sm:max-w-none">-{formatMoney(item.amount)}</p>
+      <p className="shrink-0 text-right text-sm font-semibold">-{formatMoney(item.amount)}</p>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
     </div>
   )
 }
@@ -1003,37 +998,26 @@ function GroupedNotableSpendingRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full min-w-0 cursor-pointer items-center gap-3 py-2.5 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:py-3"
+    className="flex w-full min-w-0 cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       aria-label={`Open details for ${item.expense}, ${item.count} payments totaling ${formatMoney(item.totalAmount)}`}
     >
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", getCategoryColorClass(item.category))}>
-        <TagIcon className="h-5 w-5 text-white" />
+      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", getCategoryColorClass(item.category))}>
+        <TagIcon className="h-4 w-4 text-white" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{item.expense}</p>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-secondary/50 px-2 py-0.5 text-[10px] font-medium">
-            <TagGlyph className="h-3 w-3 text-muted-foreground" />
-            <span className="truncate">{item.tag.name}</span>
-          </span>
-          <TransactionPresenceIndicators
-            hasCard={Boolean(item.cardName)}
-            hasNotes={item.transactions.some((transaction) => Boolean(transaction.notes))}
-            className="rounded-full border border-border/70 bg-background px-2 py-1"
-            iconClassName="h-3 w-3"
-          />
+        <p className="truncate text-sm font-medium">{item.expense}</p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <span className="min-w-0 truncate">{item.tag.name}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0">{item.count} payments</span>
+          <TransactionPresenceIndicators hasNotes={item.transactions.some((transaction) => Boolean(transaction.notes))} />
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {item.count} payments · {formatMoney(item.amountEach)} each
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {formatCompactDateRange(item.firstDate, item.lastDate)}
-        </p>
       </div>
-      <p className="max-w-[7rem] shrink-0 truncate text-right text-sm font-semibold sm:max-w-none">
+      <p className="shrink-0 text-right text-sm font-semibold">
         -{formatMoney(item.totalAmount)}
         <span className="block text-[10px] font-medium text-muted-foreground">total</span>
       </p>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
     </button>
   )
 }

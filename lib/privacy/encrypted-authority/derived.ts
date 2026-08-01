@@ -7,6 +7,7 @@ import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from 
 import { planSummary, type SavingsPlan } from "@/lib/domain/financial/savings"
 import { getLocalDateKey } from "@/lib/date-filters"
 import { recurringTimeline } from "@/lib/domain/financial/recurring-timeline"
+import { filterTransactions } from "@/lib/domain/financial/transactions"
 import type { RehydratedFinancialState } from "./rehydrate"
 
 const cents = (value: unknown) => value == null ? 0 : value === Number(value) ? Number(value) : parseMoneyCents(String(value))
@@ -57,8 +58,10 @@ export function encryptedMonthOverview(state: RehydratedFinancialState, month: s
 }
 
 export function encryptedInsights(state: RehydratedFinancialState, from: string, to: string): any {
-  const result = insights({ transactions: state.transactions, from, to })
-  const records = state.transactions.filter((item) => !item.isDeleted && item.date >= from && item.date <= to)
+  const projectedRecurring = monthsBetween(from.slice(0, 7), to.slice(0, 7)).flatMap((month) => resolveRules(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, month)), month).map((rule) => generatedTransaction(rule, { id: `projected:${rule.id}:${month}`, recurringExpenseId: rule.id, occurrenceMonth: `${month}-01`, dueDate: dueDate(rule, month), transactionId: `projected:${rule.id}:${month}` } as RecurringOccurrence)))
+  const insightTransactions = [...state.transactions, ...projectedRecurring]
+  const result = insights({ transactions: insightTransactions, from, to })
+  const records = filterTransactions(insightTransactions, { from, to, sort: "date_asc" })
   const tagTotals = new Map<string, number>(); for (const item of records) if (item.tagId) tagTotals.set(item.tagId, (tagTotals.get(item.tagId) ?? 0) + item.amountCents)
   const totalSpendCents = cents(result.total)
   const weekdayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]

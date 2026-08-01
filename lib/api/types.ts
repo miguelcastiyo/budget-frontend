@@ -385,6 +385,7 @@ export interface Transaction {
   card: Card | null
   created_at: string
   updated_at: string
+  is_projected?: boolean
 }
 
 export interface CreateTransactionRequest {
