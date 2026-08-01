@@ -23,6 +23,7 @@ export const HEADER_IMPORT_FIELDS: Array<{ key: HeaderImportField; label: string
   { key: "amount", label: "Amount", required: true, hint: "Positive transaction amount" },
   { key: "tag", label: "Spending tag", required: true, hint: "Creates or matches spending tags" },
   { key: "card", label: "Card", required: false, hint: "Creates or matches cards" },
+  { key: "context", label: "Context", required: false, hint: "Encrypted mode: creates or matches contexts" },
   { key: "is_split", label: "Split", required: false, hint: "Optional true/false flag" },
   { key: "notes", label: "Note", required: false, hint: "Optional transaction note" },
 ]

@@ -314,16 +314,18 @@ export function MappingControls({
   preview,
   mapping,
   onChange,
+  includeContext = false,
 }: {
   preview: CsvImportPreviewResponse
   mapping: CsvImportMapping
   onChange: (field: HeaderImportField, header: string | null) => void
+  includeContext?: boolean
 }) {
   const usedHeaders = new Set(Object.values(mapping).filter(Boolean))
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
-      {HEADER_IMPORT_FIELDS.map((field) => {
+      {HEADER_IMPORT_FIELDS.filter((field) => includeContext || field.key !== "context").map((field) => {
         const value = mapping[field.key] ?? ""
         return (
           <div key={field.key} className="grid gap-2 border-b border-border/70 p-3 last:border-b-0 sm:grid-cols-[minmax(8rem,0.42fr)_minmax(0,1fr)] sm:items-center">

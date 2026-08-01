@@ -982,7 +982,7 @@ export interface CsvImportErrorItem {
   message: string
 }
 
-export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" | "card" | "is_split" | "notes"
+export type CsvImportField = "date" | "expense" | "amount" | "category" | "tag" | "card" | "context" | "is_split" | "notes"
 
 export type CsvImportMapping = Partial<Record<CsvImportField, string>>
 

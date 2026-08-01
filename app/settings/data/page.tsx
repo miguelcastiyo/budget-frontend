@@ -169,7 +169,7 @@ export default function DataSettingsPage() {
         const parsed = parseCsvText(await file.text())
         const lower = new Map(parsed.headers.map((header) => [header.toLowerCase(), header]))
         const suggestedMapping: CsvImportMapping = {}
-        for (const field of ["date", "expense", "amount", "category", "tag", "card", "is_split", "notes"] as const) {
+        for (const field of ["date", "expense", "amount", "category", "tag", "card", "context", "is_split", "notes"] as const) {
           const header = lower.get(field) ?? lower.get(field.replace("is_split", "is split"))
           if (header) suggestedMapping[field] = header
         }
@@ -331,7 +331,7 @@ export default function DataSettingsPage() {
         setImportStep("review")
         return
       }
-      const result = await apiClient.importTransactions(importFile, "dry_run", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
+      const result = await apiClient.importTransactions(importFile, "dry_run", legacyImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setValidationResult(result)
       setImportStep("review")
     } catch (err) {
@@ -366,7 +366,7 @@ export default function DataSettingsPage() {
         await loadDataRuns()
         return
       }
-      const result = await apiClient.importTransactions(importFile, "commit", effectiveImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
+      const result = await apiClient.importTransactions(importFile, "commit", legacyImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
       setCommitResult(result)
       setImportStep("done")
       await loadDataRuns()
@@ -410,7 +410,7 @@ export default function DataSettingsPage() {
       if (authority.mode === "encrypted") {
         const state = authority.authority?.getState()
         const records = (state?.transactions ?? []).filter((record) => (!filters.date_from || record.date >= filters.date_from) && (!filters.date_to || record.date <= filters.date_to))
-        const csv = exportEncryptedTransactions(records, { createdAt: "", updatedAt: "", tagName: (id) => state?.tags.find((tag) => tag.id === id)?.name ?? null, cardName: (id) => state?.cards.find((card) => card.id === id)?.name ?? null })
+        const csv = exportEncryptedTransactions(records, { createdAt: "", updatedAt: "", tagName: (id) => state?.tags.find((tag) => tag.id === id)?.name ?? null, cardName: (id) => state?.cards.find((card) => card.id === id)?.name ?? null, contextName: (id) => state?.contexts.find((context) => context.id === id)?.name ?? null })
         const blob = new Blob([csv], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
         const anchor = document.createElement("a")
@@ -488,6 +488,10 @@ export default function DataSettingsPage() {
     }
     return mapping
   }, [categoryMode, categorySourceHeader, importMapping])
+  const legacyImportMapping = useMemo<CsvImportMapping>(() => {
+    const { context: _context, ...mapping } = effectiveImportMapping
+    return mapping
+  }, [effectiveImportMapping])
   const mappedHeaders = Object.values(effectiveImportMapping).filter(Boolean)
   const hasDuplicateMapping = new Set(mappedHeaders).size !== mappedHeaders.length
   const categoryProfile = profileForHeader(importPreview, categorySourceHeader)
@@ -528,7 +532,7 @@ export default function DataSettingsPage() {
   const buildEncryptedPlan = async () => {
     if (!importFile || !authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     const parsed = parseCsvText(await importFile.text())
-    const contextHeader = parsed.headers.find((header) => header.trim().toLowerCase() === "context")
+    const contextHeader = effectiveImportMapping.context ?? parsed.headers.find((header) => header.trim().toLowerCase() === "context")
     const rows: CsvRow[] = parsed.rows.map((item, index) => ({ row: index + 2, date: item[effectiveImportMapping.date ?? ""] ?? "", expense: item[effectiveImportMapping.expense ?? ""] ?? "", amount: item[effectiveImportMapping.amount ?? ""] ?? "", externalCategory: item[effectiveImportMapping.category ?? categorySourceHeader] ?? defaultCategory, tag: item[effectiveImportMapping.tag ?? ""] ?? "", card: item[effectiveImportMapping.card ?? ""] ?? "", context: contextHeader ? item[contextHeader] ?? "" : "", notes: item[effectiveImportMapping.notes ?? ""] ?? "", isSplit: (item[effectiveImportMapping.is_split ?? ""] ?? "").toLowerCase() === "true" }))
     const state = authority.authority.getState()
     return planCsvImport(rows, state.transactions, { year: Number(dateYear) || currentImportYear(), userId: "authority-user", batchId: `csv_${createEncryptedRecordId()}`, tags: state.tags.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), cards: state.cards.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), contexts: state.contexts.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), tagValueMap })
@@ -855,7 +859,7 @@ export default function DataSettingsPage() {
                       <h3 className="text-sm font-semibold">Map columns</h3>
                       <p className="text-xs text-muted-foreground">Match CSV columns to Budget fields. {pluralize(importPreview.headers.length, "column")} detected.</p>
                     </div>
-                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} />
+                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} includeContext={authority.mode === "encrypted"} />
                     {!requiredMappingComplete && (
                       <p className="text-xs text-destructive">Map every required field before continuing.</p>
                     )}
