@@ -83,8 +83,7 @@ export default function TagsSettingsPage() {
           const state = financialAuthority.authority.getState()
           setTags(taxonomyFromState({ ...state, tags: state.tags.filter((tag) => !tag.isDeleted) }).tags)
         } else {
-          const response = await apiClient.getTags()
-          setTags(response.items)
+          throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
         }
       } catch (err) {
         if (err instanceof ApiError) {
@@ -119,9 +118,8 @@ export default function TagsSettingsPage() {
         name: editingName.trim(),
         icon_key: editingIconKey || null,
       }
-      const updated = financialAuthority.mode === "encrypted"
-        ? await updateEncryptedTag(financialAuthority.authority, editingId, payload)
-        : await apiClient.updateTag(editingId, payload)
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const updated = await updateEncryptedTag(financialAuthority.authority, editingId, payload)
       setTags((previous) => previous.map((tag) => (tag.id === editingId ? updated : tag)))
       setEditingId(null)
       setEditingName("")
@@ -163,9 +161,8 @@ export default function TagsSettingsPage() {
         name,
         icon_key: newTagIconKey || null,
       }
-      const created = financialAuthority.mode === "encrypted"
-        ? await createEncryptedTag(financialAuthority.authority, payload)
-        : await apiClient.createTag(payload)
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const created = await createEncryptedTag(financialAuthority.authority, payload)
       setTags((previous) => [...previous, created])
       setNewTagName("")
       setNewTagIconKey("")
@@ -190,8 +187,8 @@ export default function TagsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") await deleteEncryptedTag(financialAuthority.authority, deleteTagId)
-      else await apiClient.deleteTag(deleteTagId)
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      await deleteEncryptedTag(financialAuthority.authority, deleteTagId)
       setTags((previous) => previous.filter((tag) => tag.id !== deleteTagId))
       setDeleteTagId(null)
     } catch (err) {

@@ -68,8 +68,7 @@ export default function CardsSettingsPage() {
           const state = financialAuthority.authority.getState()
           setCards(sortCards(taxonomyFromState({ ...state, cards: state.cards.filter((item) => !item.isDeleted) }).cards))
         } else {
-          const response = await apiClient.getCards()
-          setCards(sortCards(response.items))
+          throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
         }
       } catch (err) {
         if (err instanceof ApiError) {
@@ -99,7 +98,8 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      const updated = financialAuthority.mode === "encrypted" ? await updateEncryptedCard(financialAuthority.authority, editingId, { name: editingName.trim() }) : await apiClient.updateCard(editingId, { name: editingName.trim() })
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const updated = await updateEncryptedCard(financialAuthority.authority, editingId, { name: editingName.trim() })
       setCards((previous) => upsertUpdatedCard(previous, updated))
       setEditingId(null)
       setEditingName("")
@@ -129,7 +129,8 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      const created = financialAuthority.mode === "encrypted" ? await createEncryptedCard(financialAuthority.authority, name) : await apiClient.createCard({ name })
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const created = await createEncryptedCard(financialAuthority.authority, name)
       setCards((previous) => sortCards([...previous, created]))
       setNewCardName("")
       setShowNewCard(false)
@@ -153,8 +154,8 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") await deleteEncryptedCard(financialAuthority.authority, deleteCardId)
-      else await apiClient.deleteCard(deleteCardId)
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      await deleteEncryptedCard(financialAuthority.authority, deleteCardId)
       setCards((previous) => previous.filter((card) => card.id !== deleteCardId))
       setDeleteCardId(null)
     } catch (err) {
@@ -173,7 +174,8 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      const updated = financialAuthority.mode === "encrypted" ? await updateEncryptedCard(financialAuthority.authority, card.id, { is_favorite: !card.is_favorite }) : await apiClient.updateCard(card.id, { is_favorite: !card.is_favorite })
+      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const updated = await updateEncryptedCard(financialAuthority.authority, card.id, { is_favorite: !card.is_favorite })
       setCards((previous) => upsertUpdatedCard(previous, updated))
     } catch (err) {
       if (err instanceof ApiError) {

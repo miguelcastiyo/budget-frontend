@@ -166,9 +166,10 @@ export default function BudgetSettingsPage() {
       setIncomeForm(defaultIncomeFormState)
       setAllocationForm(defaultBudgetAllocationFormState)
       setLoadedPayloadKey(null)
-      const [budgetResult, versionsResult] = financialAuthority.mode === "encrypted"
-        ? await Promise.allSettled([getEncryptedBudgetResolution(financialAuthority.authority?.getState(), selectedMonth), getEncryptedBudgetVersions(financialAuthority.authority?.getState())])
-        : await Promise.allSettled([apiClient.getBudgetSettings(selectedMonth), apiClient.getBudgetSettingsVersions()])
+      if (financialAuthority.mode !== "encrypted" || !financialAuthority.authority) {
+        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      }
+      const [budgetResult, versionsResult] = await Promise.allSettled([getEncryptedBudgetResolution(financialAuthority.authority.getState(), selectedMonth), getEncryptedBudgetVersions(financialAuthority.authority.getState())])
 
       if (cancelled) {
         return
@@ -285,9 +286,10 @@ export default function BudgetSettingsPage() {
         effective_month: selectedMonth,
         ...budgetSettingsPayload(incomeForm, allocationForm),
       }
-      const response = financialAuthority.mode === "encrypted"
-        ? await updateEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
-        : await apiClient.updateBudgetSettings(payload)
+      if (financialAuthority.mode !== "encrypted" || !financialAuthority.authority) {
+        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      }
+      const response = await updateEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
 
       hydrateForm(response)
       setBudgetResolution({
@@ -297,7 +299,7 @@ export default function BudgetSettingsPage() {
         settings: response,
       })
       try {
-        const versions = financialAuthority.mode === "encrypted" ? await getEncryptedBudgetVersions(financialAuthority.authority?.getState()) : await apiClient.getBudgetSettingsVersions()
+        const versions = await getEncryptedBudgetVersions(financialAuthority.authority.getState())
         setBudgetVersions(versions.items)
         setVersionsError(null)
       } catch (versionsErr) {

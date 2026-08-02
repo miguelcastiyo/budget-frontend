@@ -182,24 +182,7 @@ export default function DataSettingsPage() {
         setImportPreview(preview); setExistingTags(tagsResponse); setImportMapping(suggestedMapping); setDateYear(String(currentImportYear())); setCategoryMode(suggestedMapping.category ? "exact_column" : "default"); setCategorySourceHeader(suggestedMapping.category ?? ""); setCategoryValueMap({}); setTagValueMap({}); setImportStep("map")
         return
       }
-      const [preview, tagsResponse] = await Promise.all([
-        apiClient.previewImportTransactions(file),
-        apiClient.getTags(),
-      ])
-      const sourceHeader = bestCategorySource(preview)
-      const suggestedMapping = { ...preview.suggested_mapping }
-      delete suggestedMapping.category
-      setImportPreview(preview)
-      setExistingTags(tagsResponse.items)
-      setImportMapping(suggestedMapping)
-      setDateYear(String(currentImportYear()))
-      setCategoryMode("value_map")
-      setCategorySourceHeader(sourceHeader)
-      setCategoryValueMap(defaultCategoryMap(preview, sourceHeader))
-      setTagValueMap(defaultTagValueMap(preview, suggestedMapping.tag ?? "", tagsResponse.items))
-      setDefaultCategory("needs")
-      setAmountStrategy({ blank_mapped_amount: "skip" })
-      setImportStep("map")
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       setImportFile(null)
       if (err instanceof ApiError) {
@@ -335,9 +318,7 @@ export default function DataSettingsPage() {
         setImportStep("review")
         return
       }
-      const result = await apiClient.importTransactions(importFile, "dry_run", legacyImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
-      setValidationResult(result)
-      setImportStep("review")
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       if (err instanceof ApiError) {
         setImportError(err.error.message)
@@ -370,10 +351,7 @@ export default function DataSettingsPage() {
         await loadDataRuns()
         return
       }
-      const result = await apiClient.importTransactions(importFile, "commit", legacyImportMapping, resolvedCategoryStrategy, amountStrategy, resolvedDateStrategy, resolvedTagStrategy)
-      setCommitResult(result)
-      setImportStep("done")
-      await loadDataRuns()
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       if (err instanceof ApiError) {
         setImportError(err.error.message)
@@ -425,14 +403,7 @@ export default function DataSettingsPage() {
         setIsExporting(false)
         return
       }
-      const blob = await apiClient.exportTransactions(filters)
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      anchor.href = url
-      anchor.download = "transactions.csv"
-      anchor.click()
-      URL.revokeObjectURL(url)
-      await loadDataRuns()
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       if (err instanceof ApiError) {
         setExportError(err.error.message)
@@ -465,7 +436,7 @@ export default function DataSettingsPage() {
         const run = authority.authority.store.values().find((record) => record.family === "import_run" && (String(record.data.id ?? "") === importRunId || record.sourceId === importRunId || record.envelope.record_id === importRunId))
         await authority.authority.commitSourceDiff({ creates: [], updates: run ? [{ id: run.envelope.record_id, family: "import_run", data: { ...run.data, status: "rolled_back" } }] : [], tombstones: imported.map((record) => ({ id: record.envelope.record_id, family: "transaction", data: record.data })) })
       } else {
-        await apiClient.rollbackImport(importRunId)
+        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
       }
       setRollbackTarget(null)
       await loadDataRuns()

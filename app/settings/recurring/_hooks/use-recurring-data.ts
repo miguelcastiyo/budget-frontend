@@ -40,10 +40,7 @@ export function useRecurringData(month: string) {
         setCards((state?.cards ?? []).map((item) => ({ id: item.id, name: item.name, is_favorite: item.isFavorite })))
         return
       }
-      const [recurringResponse, tagsResponse, cardsResponse] = await Promise.all([apiClient.getRecurringExpenses(month), apiClient.getTags(), apiClient.getCards()])
-      setData(recurringResponse)
-      setTags(tagsResponse.items)
-      setCards(sortCards(cardsResponse.items))
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)

@@ -37,7 +37,13 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     const cardId = resolveTaxonomy("taxonomy_card", row.card, options.cards, (name) => { if (!newCards.includes(name)) newCards.push(name) })
     const contextId = resolveTaxonomy("taxonomy_context", row.context, options.contexts, (name) => { if (!newContexts.includes(name)) newContexts.push(name) })
     const candidate = createTransaction({ id: `${options.batchId}:${row.row}`, userId: options.userId, date, expense: row.expense, amount: formatMoneyCents(amountCents), category, isSplit: row.isSplit, notes: row.notes, source: "import", importFingerprint: null, tagId, contextId, cardId, sequence: row.row })
-    const fingerprint = duplicateFingerprint({ date, amount: formatMoneyCents(amountCents), expense: row.expense, category, isSplit: candidate.isSplit, tagId, cardId })
+    const stableTaxonomyValue = (id: string | null, name: string | undefined, items: Array<{ id: string; name: string }> | undefined) => {
+      if (name?.trim()) return name.trim().toLocaleLowerCase()
+      return items?.find((item) => item.id === id)?.name.trim().toLocaleLowerCase() ?? id
+    }
+    const fingerprintTagId = stableTaxonomyValue(tagId, tagName, options.tags)
+    const fingerprintCardId = stableTaxonomyValue(cardId, row.card, options.cards)
+    const fingerprint = duplicateFingerprint({ date, amount: formatMoneyCents(amountCents), expense: row.expense, category, isSplit: candidate.isSplit, tagId: fingerprintTagId, cardId: fingerprintCardId })
     if (existing.concat(accepted).some((item) => item.importFingerprint === fingerprint || duplicateFingerprint({ date: item.date, amount: formatMoneyCents(item.amountCents), expense: item.expense, category: item.category, isSplit: item.isSplit, tagId: item.tagId, cardId: item.cardId }) === fingerprint)) { duplicates.push(row); continue }
     accepted.push({ ...candidate, importFingerprint: fingerprint })
   }

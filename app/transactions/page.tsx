@@ -232,17 +232,7 @@ export default function TransactionsPage() {
         setContexts(references.contexts)
         return
       }
-      const [tagsResponse, quickPicksResponse, cardsResponse, contextsResponse] = await Promise.all([
-        apiClient.getTags(),
-        apiClient.getTagQuickPicks(5),
-        apiClient.getCards(),
-        apiClient.getContexts(),
-      ])
-
-      setTags(tagsResponse.items)
-      setQuickPickTags(quickPicksResponse.items)
-      setCards(cardsResponse.items)
-      setContexts(contextsResponse.items)
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     }
@@ -277,27 +267,7 @@ export default function TransactionsPage() {
         const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
         setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
       }
-      const response = await apiClient.getTransactions({
-        ...activeTransactionFilters,
-        page: 1,
-        page_size: TRANSACTIONS_PAGE_SIZE,
-      })
-
-      setTransactions(response.items)
-      setCurrentPage(response.page)
-      setTotalItems(response.total_items)
-      setSummary(response.summary)
-
-      const hasExplicitFilters = Object.entries(activeTransactionFilters).some(([key, value]) => {
-        if (key === "sort" || key === "page_size") {
-          return false
-        }
-        return value !== undefined && value !== "" && value !== "all"
-      })
-
-      if (!hasExplicitFilters) {
-        setHasAnyTransactions(response.total_items > 0)
-      }
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     } finally {
@@ -320,16 +290,7 @@ export default function TransactionsPage() {
         const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
         setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); return
       }
-      const response = await apiClient.getTransactions({
-        ...activeTransactionFilters,
-        page: currentPage + 1,
-        page_size: TRANSACTIONS_PAGE_SIZE,
-      })
-
-      setTransactions((current) => [...current, ...response.items])
-      setCurrentPage(response.page)
-      setTotalItems(response.total_items)
-      setSummary(response.summary)
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       setError(transactionError(err, "Unable to load more transactions"))
     } finally {
@@ -370,22 +331,7 @@ export default function TransactionsPage() {
         setSummary(firstResponse.summary)
         return
       }
-      const responses = await Promise.all(
-        Array.from({ length: loadedPageCount }, (_, index) => apiClient.getTransactions({
-          ...activeTransactionFilters,
-          page: index + 1,
-          page_size: TRANSACTIONS_PAGE_SIZE,
-        }))
-      )
-
-      const firstResponse = responses[0]
-      if (!firstResponse) {
-        return
-      }
-
-      setTransactions(mergeTransactionPages(responses.map((response) => response.items)))
-      setTotalItems(firstResponse.total_items)
-      setSummary(firstResponse.summary)
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       setError(transactionError(err, "Unable to refresh transactions"))
     }

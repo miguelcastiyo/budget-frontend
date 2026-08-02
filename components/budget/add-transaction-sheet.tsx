@@ -160,15 +160,7 @@ export function AddTransactionSheet({
         setCards(sortCards(references.cards))
         return
       }
-      const [tagsResponse, cardsResponse, quickPickTagsResponse] = await Promise.all([
-        apiClient.getTags(),
-        apiClient.getCards(),
-        apiClient.getTagQuickPicks(5).catch(() => ({ items: [] })),
-      ])
-
-      setTags(tagsResponse.items)
-      setQuickPickTags(quickPickTagsResponse.items.length > 0 ? quickPickTagsResponse.items : tagsResponse.items.slice(0, 5))
-      setCards(sortCards(cardsResponse.items))
+      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
