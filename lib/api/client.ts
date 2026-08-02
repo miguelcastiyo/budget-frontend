@@ -1,4 +1,3 @@
-import { createApiKeysApi } from "./api-keys"
 import { createAuthApi } from "./auth"
 import { ApiClientCore, ApiError, GLOBAL_API_ERROR_EVENT } from "./core"
 import { createFundsApi } from "./funds"
@@ -26,7 +25,6 @@ type ApiClient = ApiClientCore
   & ReturnType<typeof createImportExportApi>
   & ReturnType<typeof createMonthCloseoutsApi>
   & ReturnType<typeof createSavingsPlanApi>
-  & ReturnType<typeof createApiKeysApi>
   & ReturnType<typeof createVaultApi>
   & ReturnType<typeof createEncryptedRecordsApi>
   & ReturnType<typeof createDevicesApi>
@@ -43,7 +41,6 @@ export const apiClient: ApiClient = Object.assign(
   createImportExportApi(core),
   createMonthCloseoutsApi(core),
   createSavingsPlanApi(core),
-  createApiKeysApi(core),
   createVaultApi(core),
   createEncryptedRecordsApi(core),
   createDevicesApi(core),

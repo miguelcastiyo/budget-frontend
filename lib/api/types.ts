@@ -955,26 +955,6 @@ export interface InsightsMetricsResponse {
   recurring_vs_variable: InsightsRecurringVsVariable
 }
 
-// API Keys
-export interface MasterApiKeyMetadata {
-  id: string
-  name: string
-  key_prefix: string
-  created_at: string
-  last_used_at: string | null
-  expires_at: string | null
-  status: "active" | "expired" | "revoked"
-}
-
-export interface CreateMasterApiKeyRequest {
-  name: string
-  expires_at?: string | null
-}
-
-export interface CreateMasterApiKeyResponse extends MasterApiKeyMetadata {
-  api_key: string
-}
-
 // Import/Export
 export interface CsvImportErrorItem {
   row: number

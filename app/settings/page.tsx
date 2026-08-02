@@ -14,7 +14,6 @@ import {
   Tag,
   CreditCard,
   Repeat,
-  Key,
   UserPlus,
   ChevronRight,
   Moon,
@@ -167,7 +166,6 @@ export default function SettingsPage() {
   const storedTheme = profile?.user_preferences.appearance.theme ?? "system"
   const isDarkMode = storedTheme === "dark"
   const isOwner = profile?.role === "owner"
-  const canManageApiKeys = profile?.role === "owner"
 
   const handleThemeToggle = async (checked: boolean) => {
     const nextTheme = checked ? "dark" : "light"
@@ -332,7 +330,7 @@ export default function SettingsPage() {
               </SettingsSection>
             </div>
 
-            {(isOwner || canManageApiKeys) && (
+            {isOwner && (
               <div className="lg:order-3">
                 <SettingsSection title="Account & Access">
                   <SettingsItem
@@ -347,14 +345,6 @@ export default function SettingsPage() {
                       label="Invites"
                       description="Invite others to your budget"
                       href="/settings/invites"
-                    />
-                  )}
-                  {canManageApiKeys && (
-                    <SettingsItem
-                      icon={<Key className="w-5 h-5 text-muted-foreground" />}
-                      label="API Keys"
-                      description="Manage API access"
-                      href="/settings/api-keys"
                     />
                   )}
                 </SettingsSection>

@@ -87,6 +87,15 @@ The browser also holds the usable Vault key in memory. A browser extension,
 compromised device, or malicious future JavaScript deployment could capture
 secrets or plaintext while the account is unlocked.
 
+## Retired master API keys
+
+The frontend never persisted raw master API keys. An audit of localStorage,
+sessionStorage, IndexedDB, persisted state libraries, service-worker and Cache
+Storage paths, PWA offline state, and development configuration found no
+master-key storage key or state field. No one-time browser cleanup is needed;
+unrelated storage is left intact so CSRF, device, Vault, and Quick Unlock
+behavior is not disturbed.
+
 ## Quick Unlock
 
 Quick Unlock is an optional convenience method for the existing Vault. When

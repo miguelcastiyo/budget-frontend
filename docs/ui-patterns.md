@@ -30,7 +30,6 @@ Current users:
 - Settings profile edit flow
 - Settings -> Tags create/edit flows
 - Settings -> Invites create flow
-- Settings -> API Keys create and reveal flows
 
 ## Mobile Bottom Navigation
 
@@ -53,7 +52,6 @@ Current users:
 - Settings -> Tags remove confirmation
 - Settings -> Recurring delete confirmation
 - Settings -> Data import rollback confirmation
-- Settings -> API key revoke confirmation
 
 Use page-specific `DialogContent` or `SheetContent` directly only when the layout does not fit the header/body/footer model or when a component already has a specialized interaction contract.
 

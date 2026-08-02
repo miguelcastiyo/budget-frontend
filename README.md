@@ -22,6 +22,14 @@ If port `3000` is already occupied, either open the URL if the existing process 
 PORT=3001 scripts/dev-local.sh
 ```
 
+## Authentication during development
+
+Use the normal sign-in UI or authentication endpoint. The resulting session
+cookie authenticates web requests, and the CSRF token returned with the
+session must be sent with cookie-session mutations. For supported native-client
+testing, use `Authorization: Session <session_token>`; the frontend does not
+use API keys as an alternative login or request credential.
+
 Run diagnostics when local startup is confusing:
 
 ```bash
