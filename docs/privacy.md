@@ -1,7 +1,7 @@
 # Frontend privacy architecture
 
-The frontend supports two financial authority modes: legacy server-backed
-financial routes and encrypted client-owned financial authority. The mode is
+The frontend supports Vault setup and encrypted client-owned financial
+authority. The mode is
 selected from the backend privacy status and is applied consistently through
 `FinancialAuthorityProvider`.
 
@@ -14,8 +14,6 @@ to these client modes:
 | Client mode | Backend state | Behavior |
 | --- | --- | --- |
 | `setup` | `vault_setup_required` | Financial features remain blocked until Vault setup completes. |
-| `legacy` | `legacy_plaintext` or `migration_failed` | Existing financial API routes remain authoritative. |
-| `migration` | `migration_in_progress` | Migration UI is active; ordinary financial writes remain blocked. |
 | `encrypted` | `encrypted` | The browser-owned encrypted authority handles financial reads and writes. |
 
 When the mode is not `encrypted`, the provider clears the encrypted authority

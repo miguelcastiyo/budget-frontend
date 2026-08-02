@@ -79,7 +79,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     setIsLoading(true)
     try {
       const status = await apiClient.getPrivacyStatus()
-      const next: FinancialAuthorityMode = status.financial_privacy_state === "encrypted" ? "encrypted" : status.financial_privacy_state === "vault_setup_required" ? "setup" : status.financial_privacy_state === "migration_in_progress" ? "migration" : "legacy"
+      const next: FinancialAuthorityMode = status.financial_privacy_state === "encrypted" ? "encrypted" : "setup"
       setMode(next); if (next !== "encrypted") { setAuthority(null); setQuickUnlockStatus("unknown"); vaultManager.lock() } else { try { const quick = await apiClient.getQuickUnlockStatus(); setQuickUnlockStatus(quick.status) } catch { setQuickUnlockStatus("unknown") } }; setFinancialAuthorityMode(next)
     } finally { setIsLoading(false) }
   }

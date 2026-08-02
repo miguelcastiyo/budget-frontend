@@ -3,10 +3,7 @@ import path from "node:path"
 
 const root = process.cwd()
 const scanRoots = ["app", "components", "lib"]
-const allowedLegacyCallers = new Set([
-  "app/onboarding/page.tsx",
-  "app/dev/privacy/migration-validation/migration-validation-client.tsx",
-])
+const allowedLegacyCallers = new Set()
 const legacyMethods = [
   "getBudgetSettings", "updateBudgetSettings", "getTags", "getTagQuickPicks", "createTag", "updateTag", "deleteTag",
   "getCards", "createCard", "updateCard", "deleteCard", "getContexts", "createContext", "updateContext", "deleteContext",
@@ -45,4 +42,3 @@ if (violations.length) {
 }
 
 console.log("Encrypted-only frontend financial boundary passed")
-

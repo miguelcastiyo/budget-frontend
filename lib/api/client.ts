@@ -1,6 +1,5 @@
 import { createApiKeysApi } from "./api-keys"
 import { createAuthApi } from "./auth"
-import { createBudgetApi } from "./budget"
 import { ApiClientCore, ApiError, GLOBAL_API_ERROR_EVENT } from "./core"
 import { createFundsApi } from "./funds"
 import { createImportExportApi } from "./import-export"
@@ -12,8 +11,8 @@ import { createTaxonomyApi } from "./taxonomy"
 import { createTransactionsApi } from "./transactions"
 import { createVaultApi } from "./vault"
 import { createEncryptedRecordsApi } from "./encrypted-records"
-import { createPrivacyMigrationApi } from "./privacy-migration"
 import { createDevicesApi } from "./devices"
+import { createPrivacyStatusApi } from "./privacy-status"
 
 const core = new ApiClientCore()
 
@@ -22,7 +21,6 @@ type ApiClient = ApiClientCore
   & ReturnType<typeof createProfileApi>
   & ReturnType<typeof createTaxonomyApi>
   & ReturnType<typeof createRecurringApi>
-  & ReturnType<typeof createBudgetApi>
   & ReturnType<typeof createFundsApi>
   & ReturnType<typeof createTransactionsApi>
   & ReturnType<typeof createImportExportApi>
@@ -31,8 +29,8 @@ type ApiClient = ApiClientCore
   & ReturnType<typeof createApiKeysApi>
   & ReturnType<typeof createVaultApi>
   & ReturnType<typeof createEncryptedRecordsApi>
-  & ReturnType<typeof createPrivacyMigrationApi>
   & ReturnType<typeof createDevicesApi>
+  & ReturnType<typeof createPrivacyStatusApi>
 
 export const apiClient: ApiClient = Object.assign(
   core,
@@ -40,7 +38,6 @@ export const apiClient: ApiClient = Object.assign(
   createProfileApi(core),
   createTaxonomyApi(core),
   createRecurringApi(core),
-  createBudgetApi(core),
   createFundsApi(core),
   createTransactionsApi(core),
   createImportExportApi(core),
@@ -49,8 +46,8 @@ export const apiClient: ApiClient = Object.assign(
   createApiKeysApi(core),
   createVaultApi(core),
   createEncryptedRecordsApi(core),
-  createPrivacyMigrationApi(core)
-  ,createDevicesApi(core)
+  createDevicesApi(core),
+  createPrivacyStatusApi(core)
 )
 
 export { ApiError, GLOBAL_API_ERROR_EVENT }

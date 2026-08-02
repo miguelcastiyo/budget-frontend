@@ -1,5 +1,5 @@
 import type { ApiClientCore } from "../../api/core"
-import type { PrivacyStatus } from "../../api/privacy-migration"
+import type { PrivacyStatus } from "../../api/privacy-status"
 import type { EncryptedRecordEnvelope } from "../encrypted-records/types"
 import { decryptSyntheticRecord, encryptSyntheticRecord } from "../encrypted-records/crypto"
 import { EncryptedRecordClientError } from "../encrypted-records/types"
