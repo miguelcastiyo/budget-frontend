@@ -11,7 +11,7 @@ function isVaultManagementPath(pathname: string) {
 export function EncryptedVaultBoundary({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const authority = useFinancialAuthority()
-  if (authority.isLoading || authority.mode === "legacy" || authority.mode === "migration" || authority.authority || isVaultManagementPath(pathname)) {
+  if (authority.isLoading || authority.authority || isVaultManagementPath(pathname)) {
     return <>{children}</>
   }
 

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
-import { ApiError, apiClient } from "@/lib/api/client"
+import { ApiError } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import { getCurrentMonthKey, getNextMonthKey } from "@/lib/date-filters"
 import type {
@@ -124,9 +124,7 @@ export default function RecurringSettingsPage() {
       items: detailEntry?.seriesItems ?? [detailItem],
     })
 
-    const seriesRequest = authority.mode === "encrypted"
-      ? Promise.resolve({ series_id: detailEntry?.seriesId ?? detailItem.series_id, items: detailEntry?.seriesItems ?? [detailItem] } as RecurringExpenseSeriesResponse)
-      : apiClient.getRecurringExpenseSeries(detailItem.id)
+    const seriesRequest = Promise.resolve({ series_id: detailEntry?.seriesId ?? detailItem.series_id, items: detailEntry?.seriesItems ?? [detailItem] } as RecurringExpenseSeriesResponse)
     void seriesRequest
       .then((response) => {
         if (cancelled) {

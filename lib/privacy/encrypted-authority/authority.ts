@@ -7,7 +7,7 @@ import { EncryptedRecordStore, type DecryptedFinancialRecord } from "./record-st
 import { rehydrateFinancialState, type RehydratedFinancialState } from "./rehydrate"
 import type { SourceMutationDiff } from "../../domain/financial/transaction-fund-diff"
 
-export type FinancialAuthorityMode = "legacy" | "encrypted"
+export type FinancialAuthorityMode = "encrypted"
 export interface BatchCommitOptions { expectedRevisionOverrides?: Record<string, number> }
 
 export class EncryptedFinancialAuthority {
@@ -108,7 +108,7 @@ export class EncryptedFinancialAuthority {
 }
 
 export async function selectFinancialAuthority(api: ApiClientCore, status: PrivacyStatus, runtimeKey: CryptoKey | null, vaultId: string | null): Promise<{ mode: FinancialAuthorityMode; authority?: EncryptedFinancialAuthority }> {
-  if (status.financial_privacy_state !== "encrypted") return { mode: "legacy" }
+  if (status.financial_privacy_state !== "encrypted") throw new Error("VAULT_SETUP_REQUIRED")
   if (!runtimeKey || !vaultId) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
   const authority = new EncryptedFinancialAuthority(api, runtimeKey, vaultId)
   await authority.bootstrap()
