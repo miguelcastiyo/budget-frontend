@@ -78,6 +78,8 @@ function formatRecurringCommandError(error: unknown, fallback: string): string {
       return "That month already has a posted recurring transaction. Choose a later month for the change."
     case "RECURRING_EFFECTIVE_MONTH_IN_PAST":
       return "Choose a future month for the scheduled change. Past months cannot be rescheduled."
+    case "RECURRING_NO_OP_CHANGE":
+      return "Change the amount or billing schedule before scheduling an update."
     case "RECURRING_CHANGE_ALREADY_SCHEDULED":
       return "A future change is already scheduled. Edit or cancel it before scheduling another change."
     case "RECURRING_SCHEDULE_ALREADY_MATERIALIZED":
@@ -410,6 +412,14 @@ export default function RecurringSettingsPage() {
 
     if (scheduleChangeEffectiveMonth <= getCurrentMonthKey()) {
       setError("Choose a future month for the scheduled change. Past months cannot be rescheduled.")
+      return
+    }
+
+    const amountChanged = scheduleChangeAmount !== detailItem.amount
+    const billingChanged = scheduleChangeBillingType !== detailItem.billing_type
+      || (scheduleChangeBillingType === "day_of_month" && Number(scheduleChangeBillingDay) !== (detailItem.billing_day ?? 1))
+    if (!amountChanged && !billingChanged) {
+      setError("Change the amount or billing schedule before scheduling an update.")
       return
     }
 

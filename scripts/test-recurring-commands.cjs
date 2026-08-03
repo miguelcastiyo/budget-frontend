@@ -82,6 +82,15 @@ const currentData = {
   }
   assert(historicalError?.code === "RECURRING_EFFECTIVE_MONTH_IN_PAST", "backdated schedule returns its domain error code")
 
+  const noOpSchedule = createAuthority([record("rule_1", currentData)])
+  let noOpError = null
+  try {
+    await commands.scheduleEncryptedRecurringExpenseChange(noOpSchedule.authority, "rule_1", { effective_month: "2026-09" })
+  } catch (error) {
+    noOpError = error
+  }
+  assert(noOpError?.code === "RECURRING_NO_OP_CHANGE", "no-op schedule returns its domain error code")
+
   await commands.cancelEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", scheduledRecord.sourceId)
   assert(scheduled.records.get("rule_1").data.ends_month === null && scheduled.records.size === 1, "cancel restores the current version and removes the future version")
 

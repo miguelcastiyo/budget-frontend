@@ -78,6 +78,12 @@ export async function scheduleEncryptedRecurringExpenseChange(authority: Encrypt
   })
   if (hasScheduledChange) throw new FinancialDomainError("RECURRING_CHANGE_ALREADY_SCHEDULED")
   if (effectiveMonth <= sourceRule.startsMonth || (sourceRule.endsMonth !== null && effectiveMonth > sourceRule.endsMonth)) throw new FinancialDomainError("RECURRING_VERSION_CONFLICT")
+  const requestedAmountCents = input.amount == null ? sourceRule.amountCents : parseMoneyCents(String(input.amount))
+  const requestedBillingType = String(input.billing_type ?? sourceRule.billingType) as typeof sourceRule.billingType
+  const requestedBillingDay = requestedBillingType === "last_day" ? null : input.billing_day == null ? sourceRule.billingDay : Number(input.billing_day)
+  if (requestedAmountCents === sourceRule.amountCents && requestedBillingType === sourceRule.billingType && requestedBillingDay === sourceRule.billingDay) {
+    throw new FinancialDomainError("RECURRING_NO_OP_CHANGE")
+  }
   assertEffectiveMonthAvailable(authority, sourceRule, effectiveMonth)
   const nextId = createEncryptedRecordId()
   const prior = { ...current.data, ends_month: previousMonth(effectiveMonth) }
