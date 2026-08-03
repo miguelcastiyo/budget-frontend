@@ -86,6 +86,35 @@ export async function scheduleEncryptedRecurringExpenseChange(authority: Encrypt
   await authority.commitSourceDiff({ creates: [{ id: nextId, family: "recurring_series", data: next }], updates: [{ id: current.envelope.record_id, family: current.family, data: prior }], tombstones: [] })
 }
 
+export async function cancelEncryptedRecurringExpenseChange(authority: EncryptedFinancialAuthority, currentId: string, scheduledId: string): Promise<void> {
+  const current = recurringRecord(authority, currentId)
+  const scheduled = recurringRecord(authority, scheduledId)
+  if (!current || !scheduled) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+
+  const currentRule = recurringRuleFromRaw(current.data, getCurrentMonthKey())
+  const scheduledRule = recurringRuleFromRaw(scheduled.data, getCurrentMonthKey())
+  if (currentRule.seriesId !== scheduledRule.seriesId || scheduledRule.startsMonth <= currentRule.startsMonth) {
+    throw new FinancialDomainError("RECURRING_VERSION_CONFLICT")
+  }
+
+  const hasMaterializedOccurrence = authority.getState().recurringOccurrences.some((occurrence) =>
+    sameRecurringReference(String(occurrence.recurring_expense_id ?? ""), scheduledRule.id)
+    && Boolean(occurrence.transaction_id)
+  )
+  if (hasMaterializedOccurrence) throw new FinancialDomainError("RECURRING_SCHEDULE_ALREADY_MATERIALIZED")
+
+  const expectedEnd = previousMonth(scheduledRule.startsMonth)
+  if (String(current.data.ends_month ?? "") !== expectedEnd) {
+    throw new FinancialDomainError("RECURRING_VERSION_CONFLICT")
+  }
+
+  await authority.commitSourceDiff({
+    creates: [],
+    updates: [{ id: current.envelope.record_id, family: current.family, data: { ...current.data, ends_month: null } }],
+    tombstones: [{ id: scheduled.envelope.record_id, family: scheduled.family, data: scheduled.data }],
+  })
+}
+
 export async function createEncryptedRecurringExpense(authority: EncryptedFinancialAuthority, input: Record<string, unknown>): Promise<void> {
   const id = createEncryptedRecordId()
   const data = { id, series_id: id, ...input, amount_cents: parseMoneyCents(String(input.amount ?? "0")), starts_month: input.starts_month ?? getCurrentMonthKey(), ends_month: input.ends_month ?? null, is_active: input.is_active ?? true, is_deleted: false }

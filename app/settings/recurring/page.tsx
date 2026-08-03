@@ -74,6 +74,7 @@ export default function RecurringSettingsPage() {
   const [scheduleChangeBillingType, setScheduleChangeBillingType] = useState<RecurringBillingType>("day_of_month")
   const [scheduleChangeBillingDay, setScheduleChangeBillingDay] = useState("1")
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [cancelScheduledChange, setCancelScheduledChange] = useState<{ currentId: string; scheduledId: string } | null>(null)
 
   const [isMutating, setIsMutating] = useState(false)
   const { data, tags, cards, isLoading, error, setTags, setCards, setError, loadData } = useRecurringData(month)
@@ -325,6 +326,28 @@ export default function RecurringSettingsPage() {
         setError(formatApiErrorMessage(err))
       } else {
         setError("Unable to delete recurring expense")
+      }
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const handleCancelScheduledChange = async () => {
+    if (!cancelScheduledChange) return
+    setIsMutating(true)
+    setError(null)
+    try {
+      await authority.cancelRecurringExpenseChange(cancelScheduledChange.currentId, cancelScheduledChange.scheduledId)
+      setCancelScheduledChange(null)
+      setDetailTrayMode("details")
+      await loadData()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(formatApiErrorMessage(err))
+      } else if (err instanceof Error && err.message === "RECURRING_SCHEDULE_ALREADY_MATERIALIZED") {
+        setError("This scheduled change has already been posted and cannot be canceled.")
+      } else {
+        setError("Unable to cancel scheduled change")
       }
     } finally {
       setIsMutating(false)
@@ -702,10 +725,27 @@ export default function RecurringSettingsPage() {
         onScheduleChangeSubmit={() => void handleScheduleChange()}
         onEdit={startEdit}
         onScheduleChange={startScheduleChange}
+        onCancelScheduledChange={(scheduled) => {
+          if (detailItem) setCancelScheduledChange({ currentId: detailItem.id, scheduledId: scheduled.id })
+        }}
         onDelete={(item) => {
           setDetailId(null)
           setDeleteId(item.id)
         }}
+      />
+
+      <ResponsiveConfirmDialog
+        open={!!cancelScheduledChange}
+        onOpenChange={(open) => {
+          if (!open && !isMutating) setCancelScheduledChange(null)
+        }}
+        title="Cancel scheduled change?"
+        description="The current recurring amount and schedule will continue. No existing transactions will be changed."
+        confirmLabel={isMutating ? "Canceling..." : "Cancel scheduled change"}
+        confirmVariant="destructive"
+        confirmDisabled={isMutating}
+        closeDisabled={isMutating}
+        onConfirm={() => void handleCancelScheduledChange()}
       />
 
       <ResponsiveConfirmDialog

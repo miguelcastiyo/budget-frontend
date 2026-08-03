@@ -593,6 +593,7 @@ interface RecurringDetailDialogProps {
   onScheduleChangeSubmit: () => void
   onEdit: (item: RecurringExpense) => void
   onScheduleChange: (item: RecurringExpense) => void
+  onCancelScheduledChange: (item: RecurringExpense) => void
   onDelete: (item: RecurringExpense) => void
 }
 
@@ -660,6 +661,7 @@ export function RecurringDetailDialog({
   onScheduleChangeSubmit,
   onEdit,
   onScheduleChange,
+  onCancelScheduledChange,
   onDelete,
 }: RecurringDetailDialogProps) {
   if (!item) {
@@ -811,10 +813,22 @@ export function RecurringDetailDialog({
 
           {nextScheduledItem ? (
             <div className="rounded-2xl border border-border/60 bg-muted/10 p-3 sm:p-5">
-              <p className="text-sm font-semibold">Scheduled change</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {formatCurrency(nextScheduledItem.amount)} · Starts {formatAddedMonth(nextScheduledItem.starts_month)} · {formatBillingSchedule(nextScheduledItem)}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Scheduled change</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {formatCurrency(nextScheduledItem.amount)} · Starts {formatAddedMonth(nextScheduledItem.starts_month)} · {formatBillingSchedule(nextScheduledItem)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" variant="outline" className="h-9 rounded-xl px-3 text-xs" onClick={() => onEdit(nextScheduledItem)}>
+                    Edit
+                  </Button>
+                  <Button type="button" variant="outline" className="h-9 rounded-xl px-3 text-xs text-destructive hover:text-destructive" onClick={() => onCancelScheduledChange(nextScheduledItem)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : null}
 
