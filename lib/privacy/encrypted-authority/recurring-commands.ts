@@ -18,6 +18,21 @@ function validate(authority: EncryptedFinancialAuthority, data: Record<string, u
   validateRecurringRule(recurringRuleFromRaw(data, getCurrentMonthKey()), authority.getState())
 }
 
+function validateScheduledVersion(
+  authority: EncryptedFinancialAuthority,
+  current: { sourceId: string; data: Record<string, unknown> },
+  prior: Record<string, unknown>,
+  next: Record<string, unknown>
+): void {
+  const state = authority.getState()
+  const currentId = current.sourceId
+  const rules = state.recurringRules.map((raw) => {
+    const rawId = String(raw.id ?? raw.source_id ?? raw.sourceId ?? "")
+    return rawId === currentId || sameRecurringReference(rawId, currentId) ? prior : raw
+  })
+  validateRecurringRule(recurringRuleFromRaw(next, getCurrentMonthKey()), { ...state, recurringRules: rules })
+}
+
 function assertEffectiveMonthAvailable(authority: EncryptedFinancialAuthority, rule: ReturnType<typeof recurringRuleFromRaw>, month: string): void {
   const conflict = authority.getState().recurringOccurrences.some((occurrence) => {
     if (String(occurrence.occurrence_month ?? "").slice(0, 7) !== month || !occurrence.transaction_id) return false
@@ -47,7 +62,7 @@ export async function updateEncryptedRecurringExpense(authority: EncryptedFinanc
   const nextId = createEncryptedRecordId()
   const prior = { ...current.data, ends_month: previousMonth(effectiveMonth) }
   const next: Record<string, unknown> = { ...withAmount(current.data, input), id: nextId, series_id: current.data.series_id ?? current.data.id, starts_month: effectiveMonth, ends_month: null }
-  validate(authority, next)
+  validateScheduledVersion(authority, current, prior, next)
   await authority.commitSourceDiff({ creates: [{ id: nextId, family: "recurring_series", data: next }], updates: [{ id: current.envelope.record_id, family: current.family, data: prior }], tombstones: [] })
 }
 
