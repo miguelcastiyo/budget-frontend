@@ -80,6 +80,11 @@ assertEqual(recurringDomain.resolveRules([savedRule, scheduledRule], "2026-08")[
 assertEqual(recurringTimeline.recurringVersionForMonth([savedRule, scheduledRule], savedRule.seriesId, "2026-07").id, savedRule.id, "timeline selector keeps the historical version for its month")
 assertEqual(recurringTimeline.recurringVersionForMonth([savedRule, scheduledRule], savedRule.seriesId, "2026-09").id, scheduledRule.id, "timeline selector uses the effective scheduled version")
 assertEqual(recurringTimeline.recurringVersionOverlaps([savedRule, { ...scheduledRule, endsMonth: null }]).length, 1, "overlapping recurring versions are detectable")
+const futureCommitment = { ...savedRule, id: "future_rule", starts_month: "2026-09", ends_month: null }
+const endedCommitment = { ...savedRule, id: "ended_rule", starts_month: "2026-01", ends_month: "2026-06" }
+assertEqual(recurringSeries.getVersionForMonth([futureCommitment], "2026-08"), null, "future recurring commitment is hidden before its start month")
+assertEqual(recurringSeries.getVersionForMonth([endedCommitment], "2026-07"), null, "ended recurring commitment is hidden after its end month")
+assertEqual(recurringSeries.getVersionForMonth([endedCommitment], "2026-06")?.id, "ended_rule", "recurring commitment remains visible through its end month")
 const seedTransaction = { id: "seed_txn", date: "2026-07-27", expense: "Rent", amountCents: 120000, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_1", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 1 }
 const seedOccurrence = { id: "rule_27:2026-07", recurringExpenseId: "rule_27", occurrenceMonth: "2026-07-01", dueDate: "2026-07-27", transactionId: "seed_txn" }
 assertEqual(recurringDomain.existingTransactionForOccurrence([seedTransaction], seedOccurrence, savedRule)?.id, "seed_txn", "manual seed transaction is reused for its first occurrence")

@@ -77,7 +77,7 @@ export async function scheduleEncryptedRecurringExpenseChange(authority: Encrypt
   const prior = { ...current.data, ends_month: previousMonth(effectiveMonth) }
   const next: Record<string, unknown> = { ...withAmount(current.data, input), id: nextId, series_id: current.data.series_id ?? current.data.id, starts_month: effectiveMonth, ends_month: null }
   delete next.effective_month
-  validate(authority, next)
+  validateScheduledVersion(authority, current, prior, next)
   await authority.commitSourceDiff({ creates: [{ id: nextId, family: "recurring_series", data: next }], updates: [{ id: current.envelope.record_id, family: current.family, data: prior }], tombstones: [] })
 }
 

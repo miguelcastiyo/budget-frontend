@@ -97,7 +97,12 @@ export function getVersionForMonth(
 ): RecurringExpense | null {
   const ordered = [...seriesItems].sort((first, second) => first.starts_month.localeCompare(second.starts_month) || first.id.localeCompare(second.id))
   const started = ordered.filter((item) => item.starts_month <= selectedMonth)
-  return started[started.length - 1] ?? ordered[0] ?? null
+  const current = started[started.length - 1] ?? null
+  if (!current || !isMonthWithinRecurringWindow(current, selectedMonth)) {
+    return null
+  }
+
+  return current
 }
 
 export const getActiveVersionForMonth = getVersionForMonth
