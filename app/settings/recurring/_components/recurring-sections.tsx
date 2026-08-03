@@ -711,9 +711,14 @@ export function RecurringDetailDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            <Button type="button" className="h-11 w-full rounded-xl sm:h-12" onClick={() => onScheduleChange(item)}>
-              Schedule change
+            <Button type="button" className="h-11 w-full rounded-xl sm:h-12" onClick={() => onScheduleChange(item)} disabled={nextScheduledItem !== null}>
+              {nextScheduledItem ? "Change already scheduled" : "Schedule change"}
             </Button>
+            {nextScheduledItem ? (
+              <p className="text-center text-xs text-muted-foreground">
+                A change is already scheduled for {formatAddedMonth(nextScheduledItem.starts_month)}.
+              </p>
+            ) : null}
             <div className="grid grid-cols-2 gap-3">
               <Button type="button" variant="outline" className="order-2 h-11 rounded-xl sm:h-12" onClick={() => onEdit(item)}>
                 <Pencil className="h-4 w-4" />

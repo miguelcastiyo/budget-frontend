@@ -85,6 +85,7 @@ const endedCommitment = { ...savedRule, id: "ended_rule", starts_month: "2026-01
 assertEqual(recurringSeries.getVersionForMonth([futureCommitment], "2026-08"), null, "future recurring commitment is hidden before its start month")
 assertEqual(recurringSeries.getVersionForMonth([endedCommitment], "2026-07"), null, "ended recurring commitment is hidden after its end month")
 assertEqual(recurringSeries.getVersionForMonth([endedCommitment], "2026-06")?.id, "ended_rule", "recurring commitment remains visible through its end month")
+assertEqual(recurringSeries.hasFutureScheduledChange([{ id: "rule_27", series_id: "rule_27", starts_month: "2026-01", is_active: true }, { id: "rule_27:v2026-08", series_id: "rule_27", starts_month: "2026-08", is_active: true }], "2026-07"), true, "recurring series detects an existing future scheduled change")
 const seedTransaction = { id: "seed_txn", date: "2026-07-27", expense: "Rent", amountCents: 120000, category: "needs", isSplit: false, notes: null, source: "manual", recurringExpenseId: null, importFingerprint: null, tagId: "tag_1", contextId: null, cardId: "card_1", isDeleted: false, createdSequence: 1 }
 const seedOccurrence = { id: "rule_27:2026-07", recurringExpenseId: "rule_27", occurrenceMonth: "2026-07-01", dueDate: "2026-07-27", transactionId: "seed_txn" }
 assertEqual(recurringDomain.existingTransactionForOccurrence([seedTransaction], seedOccurrence, savedRule)?.id, "seed_txn", "manual seed transaction is reused for its first occurrence")

@@ -71,6 +71,11 @@ export async function scheduleEncryptedRecurringExpenseChange(authority: Encrypt
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
   const effectiveMonth = String(input.effective_month).slice(0, 7)
   const sourceRule = recurringRuleFromRaw(current.data, getCurrentMonthKey())
+  const hasScheduledChange = authority.getState().recurringRules.some((raw) => {
+    const rule = recurringRuleFromRaw(raw, getCurrentMonthKey())
+    return rule.seriesId === sourceRule.seriesId && rule.id !== sourceRule.id && rule.startsMonth > sourceRule.startsMonth && rule.isActive && !rule.isDeleted
+  })
+  if (hasScheduledChange) throw new FinancialDomainError("RECURRING_CHANGE_ALREADY_SCHEDULED")
   if (effectiveMonth <= sourceRule.startsMonth || (sourceRule.endsMonth !== null && effectiveMonth > sourceRule.endsMonth)) throw new FinancialDomainError("RECURRING_VERSION_CONFLICT")
   assertEffectiveMonthAvailable(authority, sourceRule, effectiveMonth)
   const nextId = createEncryptedRecordId()
