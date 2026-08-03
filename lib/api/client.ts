@@ -1,5 +1,5 @@
 import { createAuthApi } from "./auth"
-import { ApiClientCore, ApiError, GLOBAL_API_ERROR_EVENT } from "./core"
+import { ApiClientCore, ApiError, GLOBAL_API_ERROR_EVENT, GLOBAL_AUTH_ERROR_EVENT } from "./core"
 import { createProfileApi } from "./profile"
 import { createVaultApi } from "./vault"
 import { createEncryptedRecordsApi } from "./encrypted-records"
@@ -26,4 +26,4 @@ export const apiClient: ApiClient = Object.assign(
   createPrivacyStatusApi(core)
 )
 
-export { ApiError, GLOBAL_API_ERROR_EVENT }
+export { ApiError, GLOBAL_API_ERROR_EVENT, GLOBAL_AUTH_ERROR_EVENT }

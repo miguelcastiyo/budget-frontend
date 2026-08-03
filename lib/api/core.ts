@@ -19,6 +19,7 @@ export class ApiError extends Error {
 }
 
 export const GLOBAL_API_ERROR_EVENT = "budget:global-api-error"
+export const GLOBAL_AUTH_ERROR_EVENT = "budget:global-auth-error"
 
 function notifyGlobalApiError(error: ApiError) {
   if (typeof window === "undefined" || error.status < 500) {
@@ -60,6 +61,9 @@ export class ApiClientCore {
       },
       requestId
     )
+    if (apiError.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent<ApiError>(GLOBAL_AUTH_ERROR_EVENT, { detail: apiError }))
+    }
     notifyGlobalApiError(apiError)
     return apiError
   }

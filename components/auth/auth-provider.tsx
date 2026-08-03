@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import { ApiError, apiClient } from "@/lib/api/client"
+import { ApiError, apiClient, GLOBAL_AUTH_ERROR_EVENT } from "@/lib/api/client"
 import type { AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
 import { isPublicPath } from "@/lib/auth-routes"
 
@@ -152,6 +152,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setTheme(theme)
     }
   }, [profile?.user_preferences?.appearance?.theme, setTheme])
+
+  useEffect(() => {
+    const handleGlobalAuthError = () => {
+      setProfile(null)
+      setSetupStatus(null)
+    }
+
+    window.addEventListener(GLOBAL_AUTH_ERROR_EVENT, handleGlobalAuthError)
+    return () => window.removeEventListener(GLOBAL_AUTH_ERROR_EVENT, handleGlobalAuthError)
+  }, [])
 
   const signOut = useCallback(async () => {
     try {
