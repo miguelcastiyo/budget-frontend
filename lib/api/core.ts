@@ -36,6 +36,16 @@ function notifyGlobalApiError(error: ApiError) {
 export class ApiClientCore {
   private csrfToken: string | null = null
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", (event) => {
+        if (event.key === CSRF_STORAGE_KEY) {
+          this.csrfToken = event.newValue
+        }
+      })
+    }
+  }
+
   private async apiErrorFromResponse(response: Response): Promise<ApiError> {
     const requestId = response.headers.get("X-Request-ID") ?? undefined
 
@@ -120,7 +130,38 @@ export class ApiClientCore {
     return this.csrfToken !== null && this.csrfToken !== ""
   }
 
-  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  async refreshCsrfToken(force = false): Promise<string> {
+    this.ensureCsrfTokenLoaded()
+    if (!force && this.hasCsrfToken()) {
+      return this.csrfToken as string
+    }
+
+    const response = await fetch(`${API_BASE}/auth/sessions/current`, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    })
+    if (!response.ok) {
+      await this.throwApiError(response)
+    }
+
+    const result = await response.json() as { csrf_token?: string }
+    if (!result.csrf_token) {
+      throw new Error("CSRF_TOKEN_REFRESH_FAILED")
+    }
+    this.setCsrfToken(result.csrf_token)
+    return result.csrf_token
+  }
+
+  private isCsrfFailure(error: ApiError, method: string): boolean {
+    if (error.status !== 403 || !["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      return false
+    }
+
+    const text = `${error.error.code} ${error.error.message}`.toLowerCase()
+    return text.includes("csrf")
+  }
+
+  async request<T>(endpoint: string, options: RequestInit = {}, allowCsrfRetry = true): Promise<T> {
     this.ensureCsrfTokenLoaded()
 
     const method = options.method || "GET"
@@ -139,7 +180,16 @@ export class ApiClientCore {
       if (response.status === 401) {
         this.setCsrfToken(null)
       }
-      await this.throwApiError(response)
+      const error = await this.apiErrorFromResponse(response)
+      if (allowCsrfRetry && this.isCsrfFailure(error, method)) {
+        try {
+          await this.refreshCsrfToken(true)
+          return this.request<T>(endpoint, options, false)
+        } catch {
+          // Preserve the original write failure if token recovery also fails.
+        }
+      }
+      throw error
     }
 
     if (response.status === 204) {
@@ -168,7 +218,7 @@ export class ApiClientCore {
     return response.blob()
   }
 
-  async requestFormData<T>(endpoint: string, formData: FormData, options: RequestInit = {}): Promise<T> {
+  async requestFormData<T>(endpoint: string, formData: FormData, options: RequestInit = {}, allowCsrfRetry = true): Promise<T> {
     this.ensureCsrfTokenLoaded()
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -183,7 +233,16 @@ export class ApiClientCore {
       if (response.status === 401) {
         this.setCsrfToken(null)
       }
-      await this.throwApiError(response)
+      const error = await this.apiErrorFromResponse(response)
+      if (allowCsrfRetry && this.isCsrfFailure(error, options.method || "POST")) {
+        try {
+          await this.refreshCsrfToken(true)
+          return this.requestFormData<T>(endpoint, formData, options, false)
+        } catch {
+          // Preserve the original write failure if token recovery also fails.
+        }
+      }
+      throw error
     }
 
     return response.json()
