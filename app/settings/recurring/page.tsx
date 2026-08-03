@@ -54,7 +54,7 @@ import {
   type RecurringSeriesEntry,
 } from "./_lib/recurring-series"
 
-type RecurringFilter = "all" | "upcoming" | "logged" | "changes"
+type RecurringFilter = "all" | "upcoming" | "logged" | "changes" | "paused"
 type DetailTrayMode = "details" | "schedule_change"
 
 function formatRecurringCommandError(error: unknown, fallback: string): string {
@@ -527,13 +527,14 @@ export default function RecurringSettingsPage() {
               </div>
             </Card>
 
-            <div className="lg:hidden">
+            <div className="mb-3 lg:mb-4">
               <FormChipRail
                 items={[
                   { value: "all", label: "All" },
                   { value: "upcoming", label: "Upcoming" },
                   { value: "logged", label: "Logged" },
                   { value: "changes", label: "Changes" },
+                  { value: "paused", label: "Paused" },
                 ]}
                 value={mobileFilter}
                 onValueChange={(value) => setMobileFilter(value as RecurringFilter)}
@@ -831,6 +832,8 @@ function matchesRecurringFilter(entry: RecurringSeriesEntry, filter: RecurringFi
       return entry.occurrenceStatus === "logged"
     case "changes":
       return entry.seriesState === "has_scheduled_change"
+    case "paused":
+      return !entry.currentItem.is_active
   }
 }
 
@@ -851,6 +854,11 @@ function getFilteredEmptyState(filter: RecurringFilter): { title: string; descri
       return {
         title: "No scheduled changes yet",
         description: "None of this month's commitments have a future scheduled version yet.",
+      }
+    case "paused":
+      return {
+        title: "No paused commitments",
+        description: "Paused commitments will appear here when you temporarily stop a recurring item.",
       }
   }
 }
