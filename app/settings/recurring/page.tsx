@@ -470,7 +470,14 @@ export default function RecurringSettingsPage() {
           </p>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 sm:mt-4">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button type="button" variant="outline" size="sm" className="shrink-0 rounded-xl" onClick={() => void loadData()} disabled={isLoading}>
+              {isLoading ? "Retrying..." : "Retry"}
+            </Button>
+          </div>
+        ) : null}
 
         <div className="mt-3 grid gap-3 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
           <div className="space-y-3 lg:space-y-4">
