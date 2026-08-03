@@ -125,5 +125,15 @@ export async function createEncryptedRecurringExpense(authority: EncryptedFinanc
 export async function deleteEncryptedRecurringExpense(authority: EncryptedFinancialAuthority, id: string): Promise<void> {
   const current = recurringRecord(authority, id)
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  const currentRule = recurringRuleFromRaw(current.data, getCurrentMonthKey())
+  const hasFutureVersion = authority.getState().recurringRules.some((raw) => {
+    const rule = recurringRuleFromRaw(raw, getCurrentMonthKey())
+    return rule.seriesId === currentRule.seriesId
+      && rule.id !== currentRule.id
+      && rule.startsMonth > currentRule.startsMonth
+      && rule.isActive
+      && !rule.isDeleted
+  })
+  if (hasFutureVersion) throw new FinancialDomainError("RECURRING_SCHEDULE_MUST_BE_CANCELED")
   await authority.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: current.envelope.record_id, family: current.family, data: current.data }] })
 }

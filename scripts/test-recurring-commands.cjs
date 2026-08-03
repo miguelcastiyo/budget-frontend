@@ -76,6 +76,15 @@ const currentData = {
   await commands.cancelEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", scheduledRecord.sourceId)
   assert(scheduled.records.get("rule_1").data.ends_month === null && scheduled.records.size === 1, "cancel restores the current version and removes the future version")
 
+  const protectedDelete = createAuthority([record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledRecord])
+  let deleteConflict = null
+  try {
+    await commands.deleteEncryptedRecurringExpense(protectedDelete.authority, "rule_1")
+  } catch (error) {
+    deleteConflict = error
+  }
+  assert(deleteConflict?.code === "RECURRING_SCHEDULE_MUST_BE_CANCELED", "delete blocks a current version with a future schedule")
+
   const deleted = createAuthority([record("rule_1", currentData)])
   await commands.deleteEncryptedRecurringExpense(deleted.authority, "rule_1")
   assert(!deleted.records.has("rule_1"), "delete persists a tombstone")

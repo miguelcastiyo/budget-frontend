@@ -80,6 +80,8 @@ function formatRecurringCommandError(error: unknown, fallback: string): string {
       return "A future change is already scheduled. Edit or cancel it before scheduling another change."
     case "RECURRING_SCHEDULE_ALREADY_MATERIALIZED":
       return "This scheduled change has already been posted and can no longer be canceled."
+    case "RECURRING_SCHEDULE_MUST_BE_CANCELED":
+      return "Cancel the future scheduled change before deleting this recurring expense."
     case "RECURRING_VERSION_CONFLICT":
       return "That change would overlap the recurring timeline. Edit or cancel the future version first."
     default:
@@ -751,6 +753,10 @@ export default function RecurringSettingsPage() {
           if (detailItem) setCancelScheduledChange({ currentId: detailItem.id, scheduledId: scheduled.id })
         }}
         onDelete={(item) => {
+          if (detailEntry?.nextScheduledItem) {
+            setError(`Cancel the change scheduled for ${formatAddedMonth(detailEntry.nextScheduledItem.starts_month)} before deleting this recurring expense.`)
+            return
+          }
           setDetailId(null)
           setDeleteId(item.id)
         }}
