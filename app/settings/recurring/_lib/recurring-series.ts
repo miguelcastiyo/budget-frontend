@@ -187,6 +187,10 @@ export function getSeriesStateLabel(state: CommitmentSeriesState): string {
 }
 
 export function formatCommitmentRowSubtitle(rule: RecurringExpense, status: CommitmentOccurrenceStatus): string {
+  if (!rule.is_active) {
+    return `Paused · ${rule.tag.name}`
+  }
+
   return `Due ${formatDateValue(rule.projected_date_for_month, { month: "short", day: "numeric" })} · ${rule.tag.name} · ${getOccurrenceStatusLabel(status)}`
 }
 

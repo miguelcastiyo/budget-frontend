@@ -193,7 +193,7 @@ export default function RecurringSettingsPage() {
 
   const tagOptions = useMemo(() => tags, [tags])
   const activeItemsCount = useMemo(
-    () => seriesEntries.length,
+    () => seriesEntries.filter((entry) => entry.currentItem.is_active).length,
     [seriesEntries]
   )
   const loggedCount = useMemo(
@@ -201,7 +201,7 @@ export default function RecurringSettingsPage() {
     [seriesEntries]
   )
   const upcomingCount = useMemo(
-    () => seriesEntries.filter((entry) => entry.occurrenceStatus === "upcoming").length,
+    () => seriesEntries.filter((entry) => entry.currentItem.is_active && entry.occurrenceStatus === "upcoming").length,
     [seriesEntries]
   )
   const largestCommitment = useMemo(
@@ -219,7 +219,7 @@ export default function RecurringSettingsPage() {
   )
   const upcomingItems = useMemo(
     () => seriesEntries
-      .filter((entry) => entry.occurrenceStatus === "upcoming")
+      .filter((entry) => entry.currentItem.is_active && entry.occurrenceStatus === "upcoming")
       .map((entry) => entry.currentItem)
       .sort((first, second) => first.projected_date_for_month.localeCompare(second.projected_date_for_month))
       .slice(0, 5),
@@ -809,7 +809,7 @@ function matchesRecurringFilter(entry: RecurringSeriesEntry, filter: RecurringFi
     case "all":
       return true
     case "upcoming":
-      return entry.occurrenceStatus === "upcoming"
+      return entry.currentItem.is_active && entry.occurrenceStatus === "upcoming"
     case "logged":
       return entry.occurrenceStatus === "logged"
     case "changes":
