@@ -48,6 +48,7 @@ import {
   buildRecurringSeriesEntries,
   formatCommitmentRowSubtitle,
   getOccurrenceStatusLabel,
+  getNextScheduledVersion,
   type CommitmentOccurrenceStatus,
   type RecurringSeriesEntry,
 } from "./_lib/recurring-series"
@@ -86,6 +87,9 @@ export default function RecurringSettingsPage() {
   )
   const detailEntry = seriesEntries.find((entry) => entry.currentItem.id === detailId) ?? null
   const detailItem = detailEntry?.currentItem ?? null
+  const editingSeriesEntry = seriesEntries.find((entry) => entry.currentItem.id === editingId) ?? null
+  const editingScheduledItem = editingSeriesEntry ? getNextScheduledVersion(editingSeriesEntry.seriesItems, month) : null
+  const editingBlockedByScheduledChange = editingScheduledItem !== null
   const hasEditingChanges = Boolean(
     editingForm &&
     editingItem &&
@@ -278,6 +282,10 @@ export default function RecurringSettingsPage() {
     setError(null)
 
     try {
+      if (editingBlockedByScheduledChange) {
+        setError(`A change is already scheduled for ${formatAddedMonth(editingScheduledItem.starts_month)}. Edit or cancel that scheduled version first.`)
+        return
+      }
       await authority.updateRecurringExpense(editingId, {
         expense: editingForm.expense.trim(),
         amount: formatRecurringAmount(editingForm.amount),
@@ -688,7 +696,12 @@ export default function RecurringSettingsPage() {
             tags={tagOptions}
             cards={cards}
             isMutating={isMutating}
-            canSave={hasEditingChanges}
+            canSave={hasEditingChanges && !editingBlockedByScheduledChange}
+            notice={editingScheduledItem ? (
+              <>
+                A change is already scheduled for {formatAddedMonth(editingScheduledItem.starts_month)}. Edit or cancel that scheduled version first.
+              </>
+            ) : undefined}
             saveLabel="Save changes"
             onChange={setEditingForm}
             onCreateTag={handleCreateTag}

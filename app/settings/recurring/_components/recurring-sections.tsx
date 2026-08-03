@@ -176,6 +176,7 @@ interface RecurringFormProps {
   cards: CardType[]
   isMutating: boolean
   canSave?: boolean
+  notice?: ReactNode
   saveLabel: string
   onChange: (next: RecurringFormState) => void
   onCreateTag: (name: string, iconKey: string) => Promise<Tag>
@@ -199,6 +200,7 @@ export function RecurringForm({
   cards,
   isMutating,
   canSave = true,
+  notice,
   saveLabel,
   onChange,
   onCreateTag,
@@ -304,6 +306,11 @@ export function RecurringForm({
   return (
     <div className="flex min-h-full flex-col">
       <div className="min-w-0 max-w-full flex-1 space-y-4 overflow-x-hidden px-5 pb-[calc(8.5rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-28 sm:pt-4">
+        {notice ? (
+          <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            {notice}
+          </div>
+        ) : null}
         <FormSection title="Expense">
           <div>
             <AmountInput
