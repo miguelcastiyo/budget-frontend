@@ -121,3 +121,9 @@ export async function createEncryptedRecurringExpense(authority: EncryptedFinanc
   validate(authority, data)
   await authority.createSource("recurring_series", "recurring_series_v1", id, data)
 }
+
+export async function deleteEncryptedRecurringExpense(authority: EncryptedFinancialAuthority, id: string): Promise<void> {
+  const current = recurringRecord(authority, id)
+  if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  await authority.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: current.envelope.record_id, family: current.family, data: current.data }] })
+}

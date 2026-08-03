@@ -21,6 +21,7 @@
     "test:phase2-security": "node scripts/check-phase2-security.cjs",
     "test:client-fixture-loader": "node scripts/test-client-fixture-loader.cjs",
     "test:financial-domain": "node scripts/test-financial-domain-foundations.cjs",
+    "test:recurring-commands": "node scripts/test-recurring-commands.cjs",
     "test:client-parity": "node scripts/client-parity-runner.cjs",
     "test:encrypted-only-boundary": "node scripts/test-encrypted-only-financial-boundary.mjs",
     "test:interaction:headed": "playwright test --headed",

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dialog"
 import { ApiError } from "@/lib/api/client"
+import { FinancialDomainError } from "@/lib/domain/financial/errors"
 import { sortCards } from "@/lib/cards"
 import { getCurrentMonthKey, getNextMonthKey } from "@/lib/date-filters"
 import type {
@@ -55,6 +56,36 @@ import {
 
 type RecurringFilter = "all" | "upcoming" | "logged" | "changes"
 type DetailTrayMode = "details" | "schedule_change"
+
+function formatRecurringCommandError(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return formatApiErrorMessage(error)
+  }
+
+  if (error instanceof Error && error.message === "ENCRYPTED_RECORD_NOT_FOUND") {
+    return "This recurring expense is no longer available. Refresh and try again."
+  }
+
+  if (!(error instanceof FinancialDomainError)) {
+    return fallback
+  }
+
+  const detail = error.details.map((entry) => entry.message).filter(Boolean).join(" ")
+  switch (error.code) {
+    case "VALIDATION_FAILED":
+      return detail || error.message || "Check the recurring expense details and try again."
+    case "RECURRING_EFFECTIVE_MONTH_ALREADY_MATERIALIZED":
+      return "That month already has a posted recurring transaction. Choose a later month for the change."
+    case "RECURRING_CHANGE_ALREADY_SCHEDULED":
+      return "A future change is already scheduled. Edit or cancel it before scheduling another change."
+    case "RECURRING_SCHEDULE_ALREADY_MATERIALIZED":
+      return "This scheduled change has already been posted and can no longer be canceled."
+    case "RECURRING_VERSION_CONFLICT":
+      return "That change would overlap the recurring timeline. Edit or cancel the future version first."
+    default:
+      return error.message && error.message !== error.code ? error.message : fallback
+  }
+}
 
 export default function RecurringSettingsPage() {
   const router = useRouter()
@@ -241,11 +272,7 @@ export default function RecurringSettingsPage() {
       setNewForm(emptyForm(month, tagOptions[0]?.id ?? ""))
       await loadData()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(formatApiErrorMessage(err))
-      } else {
-        setError("Unable to create recurring expense")
-      }
+      setError(formatRecurringCommandError(err, "Unable to create recurring expense"))
     } finally {
       setIsMutating(false)
     }
@@ -302,11 +329,7 @@ export default function RecurringSettingsPage() {
       setEditingForm(null)
       await loadData()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(formatApiErrorMessage(err))
-      } else {
-        setError("Unable to update recurring expense")
-      }
+      setError(formatRecurringCommandError(err, "Unable to update recurring expense"))
     } finally {
       setIsMutating(false)
     }
@@ -330,11 +353,7 @@ export default function RecurringSettingsPage() {
       }
       await loadData()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(formatApiErrorMessage(err))
-      } else {
-        setError("Unable to delete recurring expense")
-      }
+      setError(formatRecurringCommandError(err, "Unable to delete recurring expense"))
     } finally {
       setIsMutating(false)
     }
@@ -350,13 +369,7 @@ export default function RecurringSettingsPage() {
       setDetailTrayMode("details")
       await loadData()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(formatApiErrorMessage(err))
-      } else if (err instanceof Error && err.message === "RECURRING_SCHEDULE_ALREADY_MATERIALIZED") {
-        setError("This scheduled change has already been posted and cannot be canceled.")
-      } else {
-        setError("Unable to cancel scheduled change")
-      }
+      setError(formatRecurringCommandError(err, "Unable to cancel scheduled change"))
     } finally {
       setIsMutating(false)
     }
@@ -420,11 +433,7 @@ export default function RecurringSettingsPage() {
       setDetailTrayMode("details")
       await loadData()
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(formatApiErrorMessage(err))
-      } else {
-        setError("Unable to schedule recurring change")
-      }
+      setError(formatRecurringCommandError(err, "Unable to schedule recurring change"))
     } finally {
       setIsMutating(false)
     }
