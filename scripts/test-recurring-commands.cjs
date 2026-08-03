@@ -91,6 +91,18 @@ const currentData = {
   }
   assert(noOpError?.code === "RECURRING_NO_OP_CHANGE", "no-op schedule returns its domain error code")
 
+  const postedScheduled = createAuthority(
+    [record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledRecord],
+    [{ recurring_expense_id: scheduledRecord.sourceId, occurrence_month: "2026-09-01", transaction_id: "txn_scheduled" }],
+  )
+  let postedEditError = null
+  try {
+    await commands.updateEncryptedRecurringExpense(postedScheduled.authority, scheduledRecord.sourceId, { amount: "1350.00" })
+  } catch (error) {
+    postedEditError = error
+  }
+  assert(postedEditError?.code === "RECURRING_VERSION_ALREADY_MATERIALIZED", "posted scheduled version cannot be edited into another timeline version")
+
   await commands.cancelEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", scheduledRecord.sourceId)
   assert(scheduled.records.get("rule_1").data.ends_month === null && scheduled.records.size === 1, "cancel restores the current version and removes the future version")
 

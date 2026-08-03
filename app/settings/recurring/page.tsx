@@ -80,6 +80,8 @@ function formatRecurringCommandError(error: unknown, fallback: string): string {
       return "Choose a future month for the scheduled change. Past months cannot be rescheduled."
     case "RECURRING_NO_OP_CHANGE":
       return "Change the amount or billing schedule before scheduling an update."
+    case "RECURRING_VERSION_ALREADY_MATERIALIZED":
+      return "This scheduled version has already been posted and is now part of your history. Schedule a new future change from the current version instead."
     case "RECURRING_CHANGE_ALREADY_SCHEDULED":
       return "A future change is already scheduled. Edit or cancel it before scheduling another change."
     case "RECURRING_SCHEDULE_ALREADY_MATERIALIZED":

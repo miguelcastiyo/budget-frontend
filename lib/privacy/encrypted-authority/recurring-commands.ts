@@ -47,6 +47,15 @@ export async function updateEncryptedRecurringExpense(authority: EncryptedFinanc
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
 
   const currentRule = recurringRuleFromRaw(current.data, getCurrentMonthKey())
+  const hasPriorVersion = authority.getState().recurringRules.some((raw) => {
+    const rule = recurringRuleFromRaw(raw, getCurrentMonthKey())
+    return rule.seriesId === currentRule.seriesId && rule.id !== currentRule.id && rule.startsMonth < currentRule.startsMonth && !rule.isDeleted
+  })
+  const hasPostedOccurrence = authority.getState().recurringOccurrences.some((occurrence) =>
+    sameRecurringReference(String(occurrence.recurring_expense_id ?? ""), currentRule.id)
+    && Boolean(occurrence.transaction_id)
+  )
+  if (hasPriorVersion && hasPostedOccurrence) throw new FinancialDomainError("RECURRING_VERSION_ALREADY_MATERIALIZED")
   const currentMonth = getCurrentMonthKey()
   const hasHistoricalOccurrence = authority.getState().recurringOccurrences.some((occurrence) => sameRecurringReference(String(occurrence.recurring_expense_id ?? ""), currentRule.id) && String(occurrence.occurrence_month ?? "").slice(0, 7) < currentMonth)
   const requestedStart = String(input.starts_month ?? currentRule.startsMonth).slice(0, 7)
