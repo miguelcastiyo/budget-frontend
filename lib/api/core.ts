@@ -115,6 +115,11 @@ export class ApiClientCore {
     this.writeCsrfToken(token)
   }
 
+  hasCsrfToken(): boolean {
+    this.ensureCsrfTokenLoaded()
+    return this.csrfToken !== null && this.csrfToken !== ""
+  }
+
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     this.ensureCsrfTokenLoaded()
 

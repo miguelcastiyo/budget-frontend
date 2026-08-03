@@ -5,9 +5,6 @@ import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient, GLOBAL_AUTH_ERROR_EVENT } from "@/lib/api/client"
 import type { AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
-import { isPublicPath } from "@/lib/auth-routes"
-
-const CSRF_STORAGE_KEY = "budget.csrf_token"
 
 interface AuthContextValue {
   profile: Profile | null
@@ -75,6 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apiClient.getProfile(),
         apiClient.getSetupStatus(),
       ])
+      if (!apiClient.hasCsrfToken()) {
+        await apiClient.refreshCsrfToken()
+      }
       setProfile(me)
       setSetupStatus(nextSetupStatus)
     } catch (error) {
@@ -103,27 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const hasStoredSessionHint = useCallback(() => {
-    if (typeof window === "undefined") {
-      return false
-    }
-
-    return Boolean(window.localStorage.getItem(CSRF_STORAGE_KEY))
-  }, [])
-
   useEffect(() => {
     let active = true
 
     const bootstrap = async () => {
-      if (isPublicPath(pathname) && !hasStoredSessionHint()) {
-        if (active) {
-          setProfile(null)
-          setSetupStatus(null)
-          setIsLoading(false)
-        }
-        return
-      }
-
       try {
         await refreshProfile()
       } catch {
@@ -143,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false
     }
-  }, [hasStoredSessionHint, pathname, refreshProfile])
+  }, [pathname, refreshProfile])
 
   useEffect(() => {
     const theme = profile?.user_preferences?.appearance?.theme

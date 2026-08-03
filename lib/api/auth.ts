@@ -18,6 +18,12 @@ import { getBudgetDeviceId } from "../auth/device-id"
 
 export function createAuthApi(core: ApiClientCore) {
   return {
+    async refreshCsrfToken(): Promise<string> {
+      const result = await core.request<{ csrf_token: string }>("/auth/sessions/current")
+      core.setCsrfToken(result.csrf_token)
+      return result.csrf_token
+    },
+
     async signInWithPassword(data: PasswordSignInRequest): Promise<AuthSessionResponse> {
       const result = await core.request<AuthSessionResponse>("/auth/sessions/password", {
         method: "POST",
