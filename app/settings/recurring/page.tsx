@@ -76,6 +76,8 @@ function formatRecurringCommandError(error: unknown, fallback: string): string {
       return detail || error.message || "Check the recurring expense details and try again."
     case "RECURRING_EFFECTIVE_MONTH_ALREADY_MATERIALIZED":
       return "That month already has a posted recurring transaction. Choose a later month for the change."
+    case "RECURRING_EFFECTIVE_MONTH_IN_PAST":
+      return "Choose a future month for the scheduled change. Past months cannot be rescheduled."
     case "RECURRING_CHANGE_ALREADY_SCHEDULED":
       return "A future change is already scheduled. Edit or cancel it before scheduling another change."
     case "RECURRING_SCHEDULE_ALREADY_MATERIALIZED":
@@ -404,6 +406,11 @@ export default function RecurringSettingsPage() {
         setError("Enter a billing day from 1 to 31")
         return
       }
+    }
+
+    if (scheduleChangeEffectiveMonth <= getCurrentMonthKey()) {
+      setError("Choose a future month for the scheduled change. Past months cannot be rescheduled.")
+      return
     }
 
     setIsMutating(true)

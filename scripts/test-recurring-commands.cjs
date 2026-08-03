@@ -73,6 +73,15 @@ const currentData = {
   }
   assert(duplicateError?.code === "RECURRING_CHANGE_ALREADY_SCHEDULED", "duplicate schedule returns its domain error code")
 
+  const historicalSchedule = createAuthority([record("rule_1", currentData)])
+  let historicalError = null
+  try {
+    await commands.scheduleEncryptedRecurringExpenseChange(historicalSchedule.authority, "rule_1", { effective_month: "2026-07", amount: "1300.00" })
+  } catch (error) {
+    historicalError = error
+  }
+  assert(historicalError?.code === "RECURRING_EFFECTIVE_MONTH_IN_PAST", "backdated schedule returns its domain error code")
+
   await commands.cancelEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", scheduledRecord.sourceId)
   assert(scheduled.records.get("rule_1").data.ends_month === null && scheduled.records.size === 1, "cancel restores the current version and removes the future version")
 

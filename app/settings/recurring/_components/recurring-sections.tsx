@@ -14,7 +14,7 @@ import { ResponsiveDialog } from "@/components/ui/responsive-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ApiError } from "@/lib/api/client"
-import { getCurrentMonthKey, parseMonthKey } from "@/lib/date-filters"
+import { getCurrentMonthKey, getNextMonthKey, parseMonthKey } from "@/lib/date-filters"
 import type { Card as CardType, RecurringBillingType, RecurringExpense, Tag } from "@/lib/api/types"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
@@ -50,6 +50,7 @@ interface MonthPickerProps {
   className?: string
   allowClear?: boolean
   disabled?: boolean
+  minMonth?: string
 }
 
 export function MonthPicker({
@@ -60,6 +61,7 @@ export function MonthPicker({
   className,
   allowClear = false,
   disabled = false,
+  minMonth,
 }: MonthPickerProps) {
   const selectedMonth = parseMonthKey(value)
   const displayLabel = selectedMonth ? format(selectedMonth, "MMMM yyyy") : placeholder
@@ -114,19 +116,21 @@ export function MonthPicker({
               const monthValue = monthValueFromParts(visibleYear, monthOption.index)
               const isSelected = value === monthValue
               const isCurrent = currentMonthValue === monthValue
+              const isBeforeMinimum = minMonth != null && monthValue < minMonth
 
               return (
                 <button
                   key={monthValue}
                   type="button"
                   aria-pressed={isSelected}
+                  disabled={isBeforeMinimum}
                   onClick={() => {
                     onChange(monthValue)
                     setOpen(false)
                   }}
                   className={cn(
                     "h-11 rounded-xl border text-sm font-medium transition-colors",
-                    isSelected ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border/60 bg-muted/20 text-foreground hover:bg-muted/60",
+                    isSelected ? "border-primary bg-primary text-primary-foreground shadow-sm" : isBeforeMinimum ? "cursor-default border-border/40 bg-muted/10 text-muted-foreground/40" : "border-border/60 bg-muted/20 text-foreground hover:bg-muted/60",
                     isCurrent && !isSelected && "border-primary/40"
                   )}
                 >
@@ -760,12 +764,13 @@ export function RecurringDetailDialog({
 
           <div className="space-y-2">
             <Label htmlFor="schedule-change-month" className="text-sm font-medium">Effective month</Label>
-            <MonthPicker
+        <MonthPicker
               id="schedule-change-month"
               value={scheduleChangeEffectiveMonth}
               onChange={onScheduleChangeEffectiveMonthChange}
               placeholder="Select month"
               className="w-full"
+              minMonth={getNextMonthKey(getCurrentMonthKey())}
             />
           </div>
 

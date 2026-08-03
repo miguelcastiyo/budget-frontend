@@ -70,6 +70,7 @@ export async function scheduleEncryptedRecurringExpenseChange(authority: Encrypt
   const current = recurringRecord(authority, id)
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
   const effectiveMonth = String(input.effective_month).slice(0, 7)
+  if (effectiveMonth <= getCurrentMonthKey()) throw new FinancialDomainError("RECURRING_EFFECTIVE_MONTH_IN_PAST")
   const sourceRule = recurringRuleFromRaw(current.data, getCurrentMonthKey())
   const hasScheduledChange = authority.getState().recurringRules.some((raw) => {
     const rule = recurringRuleFromRaw(raw, getCurrentMonthKey())
