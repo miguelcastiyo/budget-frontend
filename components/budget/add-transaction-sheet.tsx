@@ -66,6 +66,7 @@ interface AddTransactionSheetProps {
   mode?: "create" | "edit"
   transaction?: Transaction | null
 }
+type RecurringEditScope = "transaction" | "future"
 
 export function AddTransactionSheet({
   open,
@@ -85,6 +86,7 @@ export function AddTransactionSheet({
   const [cardId, setCardId] = useState("")
   const [notes, setNotes] = useState("")
   const [makeRecurring, setMakeRecurring] = useState(false)
+  const [recurringEditScope, setRecurringEditScope] = useState<RecurringEditScope>("transaction")
   const [recurringBillingType, setRecurringBillingType] = useState<RecurringBillingType>("day_of_month")
   const [recurringBillingDay, setRecurringBillingDay] = useState("1")
 
@@ -221,6 +223,7 @@ export function AddTransactionSheet({
       setNewCardName("")
       setShowMoreDetails(Boolean(transaction.card || transaction.context || transaction.is_split || transaction.recurring_expense_id != null))
       setMakeRecurring(false)
+      setRecurringEditScope("transaction")
       setRecurringBillingType("day_of_month")
       setRecurringBillingDay(String(parseTransactionDate(transaction.date).getDate()))
       recurringScheduleTouchedRef.current = false
@@ -313,6 +316,7 @@ export function AddTransactionSheet({
     setNewCardName("")
     setShowMoreDetails(false)
     setMakeRecurring(false)
+    setRecurringEditScope("transaction")
     setSuggestions([])
     appliedSuggestionExpenseRef.current = null
     recurringScheduleTouchedRef.current = false
@@ -447,6 +451,9 @@ export function AddTransactionSheet({
   const hasEditChanges = !isEditMode || !baselineTransactionPayload
     ? true
     : JSON.stringify(normalizedTransactionPayload) !== JSON.stringify(baselineTransactionPayload) || (makeRecurring && !transactionAlreadyRecurring)
+  const hasRecurringTemplateChanges = !isEditMode || !transaction
+    ? false
+    : normalizedExpense !== transaction.expense.trim() || normalizedAmount !== Number.parseFloat(transaction.amount).toFixed(2) || category !== transaction.category || tagId !== transaction.tag.id || (cardId || undefined) !== (transaction.card?.id || undefined)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -460,6 +467,11 @@ export function AddTransactionSheet({
 
     if (!tagId) {
       setError("Please select a tag")
+      return
+    }
+
+    if (isEditMode && transactionAlreadyRecurring && recurringEditScope === "future" && !hasRecurringTemplateChanges) {
+      setError("Change the amount, description, category, tag, or card before applying to future transactions.")
       return
     }
 
@@ -485,7 +497,9 @@ export function AddTransactionSheet({
           card_id: cardId || undefined,
           context_id: contextId || null,
         }
-        const updated = await financialAuthority.updateTransaction(transaction, payload)
+        const updated = recurringEditScope === "future"
+          ? await financialAuthority.updateRecurringTransaction(transaction, payload)
+          : await financialAuthority.updateTransaction(transaction, payload)
 
         if (makeRecurring && !transactionAlreadyRecurring) {
           const startsMonth = format(date, "yyyy-MM")
@@ -568,7 +582,14 @@ export function AddTransactionSheet({
         }
         setError(fieldError && err.error.details?.length === 1 ? null : err.error.message)
       } else {
-        setError(isEditMode ? "Unable to update transaction" : "Unable to create transaction")
+        const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code) : ""
+        const recurringMessages: Record<string, string> = {
+          RECURRING_SOURCE_NOT_FOUND: "This transaction is no longer linked to a recurring commitment. Refresh and try again.",
+          RECURRING_PROPAGATION_CONFLICT: "The recurring timeline has changed. Edit the future version from Settings → Recurring first.",
+          RECURRING_FUTURE_VERSION_ALREADY_MATERIALIZED: "That future version has already posted. It can no longer be changed as a future version.",
+          RECURRING_NO_TEMPLATE_CHANGES: "Change the amount, description, category, tag, or card before applying to future transactions.",
+        }
+        setError(recurringMessages[code] ?? (isEditMode ? "Unable to update transaction" : "Unable to create transaction"))
       }
     } finally {
       setIsSubmitting(false)
@@ -631,7 +652,7 @@ export function AddTransactionSheet({
   const moreDetailsSummary = "Optional transaction details"
   const submitButtonLabel = (() => {
     if (isSubmitting) {
-      return isEditMode ? "Saving..." : "Adding..."
+      return recurringEditScope === "future" ? "Applying..." : isEditMode ? "Saving..." : "Adding..."
     }
 
     if (!isEditMode && !normalizedAmount) {
@@ -642,7 +663,7 @@ export function AddTransactionSheet({
       return "Choose tag"
     }
 
-    return isEditMode ? "Save Changes" : "Add Transaction"
+    return isEditMode ? (recurringEditScope === "future" ? "Save and apply to future" : "Save Changes") : "Add Transaction"
   })()
   const swipeDismiss = useSwipeDismiss({
     open,
@@ -1074,11 +1095,25 @@ export function AddTransactionSheet({
                       )}
 
                       {isEditMode && transactionAlreadyRecurring && (
-                        <div className="rounded-xl border border-border/60 bg-muted/30 p-3">
-                          <p className="text-sm font-medium">Already recurring</p>
-                          <p className="text-xs text-muted-foreground">
-                            This transaction is already linked to a recurring expense. Update the recurring rule from Settings.
-                          </p>
+                        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-3">
+                          <div>
+                            <p className="text-sm font-medium">Apply changes to</p>
+                            <p className="text-xs text-muted-foreground">Past transactions stay unchanged.</p>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {([ ["transaction", "This transaction only"], ["future", "This and future recurring transactions"] ] as const).map(([value, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setRecurringEditScope(value)}
+                                className={cn("rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors", recurringEditScope === value ? "border-primary bg-primary/10 text-foreground" : "border-border/60 bg-background text-muted-foreground hover:text-foreground")}
+                                aria-pressed={recurringEditScope === value}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          {recurringEditScope === "future" && <p className="text-xs text-muted-foreground">Description, amount, category, tag, and card will apply from next month. Date, notes, and split status stay on this transaction.</p>}
                         </div>
                       )}
 

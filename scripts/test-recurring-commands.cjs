@@ -17,13 +17,14 @@ global.window = { isSecureContext: true, crypto: webcrypto }
 
 const commands = require("../lib/privacy/encrypted-authority/recurring-commands.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
-const record = (id, data) => ({ envelope: { record_id: id }, family: "recurring_series", sourceId: id, data: { id, ...data } })
+const record = (id, data, family = "recurring_series") => ({ id, envelope: { record_id: id }, family, sourceId: id, data: { id, ...data } })
 
 const createAuthority = (initialRecords = [], recurringOccurrences = []) => {
   const records = new Map(initialRecords.map((item) => [item.envelope.record_id, item]))
+  let commitCount = 0
   const authority = {
     store: { get: (id) => records.get(id), values: () => [...records.values()] },
-    getState: () => ({ recurringRules: [...records.values()].map((item) => item.data), recurringOccurrences, tags: [{ id: "tag_1", isDeleted: false }], cards: [] }),
+    getState: () => ({ recurringRules: [...records.values()].filter((item) => item.family === "recurring_series").map((item) => item.data), recurringOccurrences, transactions: [], tags: [{ id: "tag_1", isDeleted: false }], cards: [], fundLedgerEntries: [] }),
     createSource: async (family, schemaVersion, id, data) => records.set(id, { envelope: { record_id: id }, family, schemaVersion, sourceId: id, data }),
     update: async (id, data) => {
       const current = records.get(id)
@@ -31,16 +32,17 @@ const createAuthority = (initialRecords = [], recurringOccurrences = []) => {
       records.set(id, { ...current, data })
     },
     commitSourceDiff: async ({ creates, updates, tombstones }) => {
+      commitCount += 1
       for (const update of updates) {
         const current = records.get(update.id)
-        assert(current, `record ${update.id} exists for commit update`)
+        assert(current, `record ${update.id} exists for commit update (${JSON.stringify([...records.keys()])})`)
         records.set(update.id, { ...current, data: update.data })
       }
       for (const create of creates) records.set(create.id, { envelope: { record_id: create.id }, family: create.family, sourceId: create.id, data: create.data })
       for (const tombstone of tombstones) records.delete(tombstone.id)
     },
   }
-  return { authority, records }
+  return { authority, records, getCommitCount: () => commitCount }
 }
 
 const currentData = {
@@ -118,6 +120,29 @@ const currentData = {
   const deleted = createAuthority([record("rule_1", currentData)])
   await commands.deleteEncryptedRecurringExpense(deleted.authority, "rule_1")
   assert(!deleted.records.has("rule_1"), "delete persists a tombstone")
+
+  const postedTransaction = record("txn_1", { date: "2026-08-15", expense: "Rent", amount_cents: 120000, category: "needs", tag_id: "tag_1", card_id: null, recurring_expense_id: "rule_1", notes: "August note", is_split: true }, "transaction")
+  const propagated = createAuthority([record("rule_1", currentData), postedTransaction])
+  await commands.updateEncryptedRecurringTransaction(propagated.authority, postedTransaction, { ...postedTransaction.data, expense: "Rent and utilities", amount_cents: 125000, notes: "Changed note", date: "2026-08-20", is_split: false })
+  const futureVersion = [...propagated.records.values()].find((item) => item.family === "recurring_series" && item.sourceId !== "rule_1")
+  assert(futureVersion && futureVersion.data.starts_month === "2026-09" && futureVersion.data.amount_cents === 125000 && futureVersion.data.expense === "Rent and utilities", "propagation creates the next future template")
+  assert(propagated.records.get("txn_1").data.notes === "Changed note" && propagated.records.get("txn_1").data.date === "2026-08-20" && propagated.records.get("txn_1").data.is_split === false, "propagation keeps occurrence-only edits on the transaction")
+  assert(propagated.getCommitCount() === 1, "propagation commits transaction and recurring change in one batch")
+
+  const scheduledExisting = record("rule_2", { ...currentData, id: "rule_2", series_id: "series_1", starts_month: "2026-09", amount_cents: 130000 })
+  const existing = createAuthority([record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledExisting, postedTransaction])
+  await commands.updateEncryptedRecurringTransaction(existing.authority, postedTransaction, { ...postedTransaction.data, tag_id: "tag_2" })
+  assert(existing.records.size === 3 && existing.records.get("rule_2").data.tag_id === "tag_2", "propagation updates an existing future version without duplicating it")
+
+  const materialized = createAuthority([record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledExisting, postedTransaction], [{ recurring_expense_id: "rule_2", occurrence_month: "2026-09-15", transaction_id: "txn_2" }])
+  let materializedError = null
+  try { await commands.updateEncryptedRecurringTransaction(materialized.authority, postedTransaction, { ...postedTransaction.data, tag_id: "tag_2" }) } catch (error) { materializedError = error }
+  assert(materializedError?.code === "RECURRING_FUTURE_VERSION_ALREADY_MATERIALIZED" && materialized.getCommitCount() === 0, "materialized future versions are protected before any commit")
+
+  const noTemplateChange = createAuthority([record("rule_1", currentData), postedTransaction])
+  let noTemplateError = null
+  try { await commands.updateEncryptedRecurringTransaction(noTemplateChange.authority, postedTransaction, { ...postedTransaction.data, notes: "Only occurrence note" }) } catch (error) { noTemplateError = error }
+  assert(noTemplateError?.code === "RECURRING_NO_TEMPLATE_CHANGES" && noTemplateChange.getCommitCount() === 0, "propagation rejects occurrence-only changes")
 
   console.log("Encrypted recurring command tests passed")
 })().catch((error) => {

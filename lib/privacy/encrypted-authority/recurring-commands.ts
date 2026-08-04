@@ -5,6 +5,7 @@ import { createEncryptedRecordId } from "../encrypted-records/crypto"
 import type { EncryptedFinancialAuthority } from "./authority"
 import { validateRecurringRule } from "@/lib/domain/financial/recurring-validation"
 import { FinancialDomainError } from "@/lib/domain/financial/errors"
+import { transactionFundDiff, transactionFundState, type SourceRecord } from "@/lib/domain/financial/transaction-fund-diff"
 
 function recurringRecord(authority: EncryptedFinancialAuthority, id: string) {
   return authority.store.get(id) ?? authority.store.values().find((record) => record.family === "recurring_series" && (record.sourceId === id || String(record.data.id ?? "") === id))
@@ -40,6 +41,47 @@ function assertEffectiveMonthAvailable(authority: EncryptedFinancialAuthority, r
     return source != null && String(source.series_id ?? source.seriesId ?? source.id ?? source.source_id) === rule.seriesId
   })
   if (conflict) throw new FinancialDomainError("RECURRING_EFFECTIVE_MONTH_ALREADY_MATERIALIZED")
+}
+
+function nextMonth(month: string): string {
+  const [year, monthNumber] = month.slice(0, 7).split("-").map(Number)
+  const date = new Date(Date.UTC(year, monthNumber, 1))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`
+}
+
+function sameValue(left: unknown, right: unknown): boolean { return JSON.stringify(left ?? null) === JSON.stringify(right ?? null) }
+
+export async function updateEncryptedRecurringTransaction(authority: EncryptedFinancialAuthority, transactionRecord: SourceRecord, nextTransactionData: Record<string, unknown>): Promise<void> {
+  const recurringId = String(transactionRecord.data.recurring_expense_id ?? "")
+  const currentRecurring = recurringId ? recurringRecord(authority, recurringId) : undefined
+  if (!currentRecurring) throw new FinancialDomainError("RECURRING_SOURCE_NOT_FOUND")
+  const currentRule = recurringRuleFromRaw(currentRecurring.data, getCurrentMonthKey())
+  const occurrenceMonth = String(transactionRecord.data.date ?? transactionRecord.data.transaction_date ?? "").slice(0, 7)
+  const futureRules = authority.getState().recurringRules.map((raw) => ({ raw, rule: recurringRuleFromRaw(raw, getCurrentMonthKey()) })).filter(({ rule }) => rule.seriesId === currentRule.seriesId && rule.id !== currentRule.id && rule.startsMonth > occurrenceMonth && !rule.isDeleted && rule.isActive).sort((a, b) => a.rule.startsMonth.localeCompare(b.rule.startsMonth) || a.rule.id.localeCompare(b.rule.id))
+  const future = futureRules[0]
+  if (future && authority.getState().recurringOccurrences.some((occurrence) => sameRecurringReference(String(occurrence.recurring_expense_id ?? ""), future.rule.id) && Boolean(occurrence.transaction_id))) throw new FinancialDomainError("RECURRING_FUTURE_VERSION_ALREADY_MATERIALIZED")
+  const templateFields: Array<[string, string]> = [["expense", "expense"], ["amount_cents", "amount_cents"], ["category", "category"], ["tag_id", "tag_id"], ["card_id", "card_id"]]
+  const changed = templateFields.filter(([, key]) => !sameValue(transactionRecord.data[key], nextTransactionData[key]))
+  if (changed.length === 0) throw new FinancialDomainError("RECURRING_NO_TEMPLATE_CHANGES")
+  const patch = Object.fromEntries(changed.map(([ruleKey, transactionKey]) => [ruleKey, nextTransactionData[transactionKey] ?? null]))
+  const transactionDiff = transactionFundDiff(transactionFundState(transactionRecord), transactionFundState({ ...transactionRecord, data: nextTransactionData }))
+  const updates: SourceRecord[] = [...transactionDiff.updates]
+  const creates: SourceRecord[] = [...transactionDiff.creates]
+  if (future) {
+    const futureRecord = recurringRecord(authority, future.rule.id)
+    if (!futureRecord) throw new FinancialDomainError("RECURRING_PROPAGATION_CONFLICT")
+    updates.push({ id: futureRecord.envelope.record_id, family: futureRecord.family, data: { ...futureRecord.data, ...patch } })
+  } else {
+    const effectiveMonth = nextMonth(occurrenceMonth)
+    if (currentRule.endsMonth && currentRule.endsMonth < effectiveMonth) throw new FinancialDomainError("RECURRING_PROPAGATION_CONFLICT")
+    const nextId = createEncryptedRecordId()
+    const prior = { ...currentRecurring.data, ends_month: previousMonth(effectiveMonth) }
+    const next = { ...currentRecurring.data, ...patch, id: nextId, series_id: currentRecurring.data.series_id ?? currentRecurring.data.id, starts_month: effectiveMonth, ends_month: null }
+    validateScheduledVersion(authority, currentRecurring, prior, next)
+    updates.push({ id: currentRecurring.envelope.record_id, family: currentRecurring.family, data: prior })
+    creates.push({ id: nextId, family: "recurring_series", data: next })
+  }
+  await authority.commitSourceDiff({ creates, updates, tombstones: transactionDiff.tombstones })
 }
 
 export async function updateEncryptedRecurringExpense(authority: EncryptedFinancialAuthority, id: string, input: Record<string, unknown>): Promise<void> {
