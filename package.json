@@ -14,8 +14,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs",
+    "test:fast": "node scripts/test-fast.cjs",
     "test:value-helpers": "node scripts/test-value-helpers.cjs",
     "test:interaction": "playwright test",
+    "test:browser": "npm run test:interaction",
     "test:vault-crypto": "playwright test tests/e2e/vault-crypto.spec.ts",
     "test:encrypted-records": "playwright test tests/e2e/encrypted-records.spec.ts",
     "test:migration-browser": "playwright test -c playwright.migration.config.ts",
@@ -29,7 +31,7 @@
     "test:client-parity": "node scripts/client-parity-runner.cjs",
     "test:encrypted-only-boundary": "node scripts/test-encrypted-only-financial-boundary.mjs",
     "test:interaction:headed": "playwright test --headed",
-    "test": "npm run typecheck && npm run test:budget-helpers"
+    "test": "npm run test:fast"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "1.1.15",

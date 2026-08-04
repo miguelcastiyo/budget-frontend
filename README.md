@@ -45,3 +45,18 @@ Node 25 can be tested after the local Node 25 install is repaired, but it is not
 ```bash
 BUDGET_NODE_BIN=/path/to/node BUDGET_ALLOW_NODE_MISMATCH=1 scripts/dev-local.sh
 ```
+
+## Validation commands
+
+`npm test` runs the fail-fast deterministic frontend suite, including typecheck, domain, authority, encrypted-boundary, security, fixture, and helper checks.
+
+Use the following commands for broader validation:
+
+- `npm run lint` — ESLint checks.
+- `npm run build` — production build.
+- `npm run test:browser` — Playwright browser suite using the standard configuration.
+- `npm run test:vault-crypto` — focused Vault and Quick Unlock browser checks.
+- `npm run test:encrypted-records` — encrypted-record browser checks.
+- `npm run test:migration-browser` — migration-specific browser configuration.
+
+Individual fast checks remain available as `npm run test:<name>` commands for targeted debugging.

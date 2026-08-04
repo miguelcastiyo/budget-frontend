@@ -27,7 +27,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Fast deterministic tests
         run: npm test
 
       - name: Build
