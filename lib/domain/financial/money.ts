@@ -13,6 +13,18 @@ export function parseMoneyCents(value: string | number): MoneyCents {
   return negative ? -cents : cents
 }
 
+/** Strict form/input parser. Returns null instead of throwing for UI fields. */
+export function tryParseMoneyCents(value: string | number | null | undefined): MoneyCents | null {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null
+  try { return parseMoneyCents(value) } catch { return null }
+}
+
+/** Permissive parser for display-only API and legacy values. */
+export function parseDisplayMoney(value: string | number | null | undefined): number {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value ?? "").replace(/[$,]/g, ""))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export function formatMoneyCents(cents: MoneyCents): string {
   if (!Number.isSafeInteger(cents)) throw new Error("VALIDATION_FAILED")
   const negative = cents < 0

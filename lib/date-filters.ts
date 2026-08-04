@@ -181,6 +181,17 @@ export function formatDateTimeValue(
   return parsed ? parsed.toLocaleString(DEFAULT_LOCALE, options) : fallback
 }
 
+export function formatRelativeDateValue(value: string, now = new Date()): string {
+  const date = parseDateValue(value)
+  if (!date) return value
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const candidate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const dayDelta = Math.round((today.getTime() - candidate.getTime()) / 86400000)
+  if (dayDelta === 0) return "Today"
+  if (dayDelta === 1) return "Yesterday"
+  return formatDateValue(value, { weekday: "short", month: "short", day: "numeric" })
+}
+
 export function getPresetDateRange(preset: Preset | "all"): Partial<DateRangeFilter> {
   if (preset === "all") {
     return {}

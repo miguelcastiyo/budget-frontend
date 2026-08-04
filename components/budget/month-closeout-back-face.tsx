@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { formatMonthValue } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
+import { parseDisplayMoney } from "@/lib/domain/financial/money"
 import type { MonthCloseoutResponse, MonthOverviewResponse } from "@/lib/api/types"
 
 interface MonthCloseoutBackFaceProps {
@@ -80,8 +81,7 @@ export function getMonthCardAriaLabel({
 }
 
 function parseAmount(value: string | null | undefined): number {
-  const amount = Number.parseFloat(value ?? "")
-  return Number.isFinite(amount) ? amount : 0
+  return parseDisplayMoney(value)
 }
 
 function renderActionLabel(closeout: MonthCloseoutResponse | null, month: string): string {

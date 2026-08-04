@@ -1,10 +1,10 @@
 import type { FundDetail, FundEntry, FundListItem } from "@/lib/api/types"
 import type { FundGroup, FundPresentationState } from "./fund-types"
-import { parseMoneyCents } from "@/lib/domain/financial/money"
+import { parseDisplayMoney } from "@/lib/domain/financial/money"
 import { getMonthDateRange, getCurrentMonthKey, toIsoDate } from "@/lib/date-filters"
 
-export function parseAmount(value: string | null | undefined): number { const amount = Number.parseFloat(value ?? ""); return Number.isFinite(amount) ? amount : 0 }
-export function moneyToCents(value: string | number | null | undefined): number { try { return parseMoneyCents(String(value ?? "0").replace(/[$,]/g, "")) } catch { return 0 } }
+export function parseAmount(value: string | null | undefined): number { return parseDisplayMoney(value) }
+export function moneyToCents(value: string | number | null | undefined): number { return Math.round(parseDisplayMoney(value) * 100) }
 export function numberLabel(value: number, singular: string, plural?: string): string { return String(value) + " " + (value === 1 ? singular : plural ?? singular + "s") }
 export function stateCountLabel(value: number, singular: string, plural?: string): string | null { return value > 0 ? numberLabel(value, singular, plural) : null }
 export function getFundPresentationState(fund: FundListItem): FundPresentationState { if (fund.goal_amount === null) return "open_ended"; const balance = moneyToCents(fund.current_balance); const goal = moneyToCents(fund.goal_amount); return balance <= 0 ? "not_started" : balance >= goal ? "goal_reached" : "in_progress" }

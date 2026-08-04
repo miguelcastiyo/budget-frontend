@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/formatters"
+import { parseDisplayMoney } from "@/lib/domain/financial/money"
 import type {
   MonthCloseoutAllocation,
   MonthCloseoutAllocationType,
@@ -23,12 +24,7 @@ export interface CloseoutReceiptRow {
 }
 
 export function parseMoneyToCents(value: string | number | null | undefined): number {
-  const amount = typeof value === "number" ? value : Number.parseFloat(value ?? "")
-  if (!Number.isFinite(amount)) {
-    return 0
-  }
-
-  return Math.round(amount * 100)
+  return Math.round(parseDisplayMoney(value) * 100)
 }
 
 export function formatCents(cents: number): string {

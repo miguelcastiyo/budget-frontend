@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs",
+    "test:value-helpers": "node scripts/test-value-helpers.cjs",
     "test:interaction": "playwright test",
     "test:vault-crypto": "playwright test tests/e2e/vault-crypto.spec.ts",
     "test:encrypted-records": "playwright test tests/e2e/encrypted-records.spec.ts",

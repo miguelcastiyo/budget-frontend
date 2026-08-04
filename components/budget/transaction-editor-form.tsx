@@ -46,6 +46,7 @@ import { CATEGORY_CONFIG, hasRecurringSchedule, normalizeAmount, submitLabel } f
 import { useTransactionEditor } from "./use-transaction-editor"
 import { TransactionDetailsSection } from "./transaction-details-section"
 import { TransactionCategoryPicker } from "./transaction-category-picker"
+import { canonicalIsoDate, canonicalMoney, canonicalNullableId, canonicalText, equalCanonicalSnapshots } from "@/lib/form-state/canonical-snapshot"
 
 import type { AddTransactionSheetProps } from "./transaction-editor-types"
 export function TransactionEditorForm({
@@ -366,36 +367,39 @@ export function TransactionEditorForm({
   const normalizedDate = format(date, "yyyy-MM-dd")
   const normalizedExpense = expense.trim()
   const normalizedAmount = normalizeAmount(amount)
-  const normalizedTransactionPayload = {
-    date: normalizedDate,
-    expense: normalizedExpense,
-    amount: normalizedAmount,
+  const normalizedTransactionSnapshot = {
+    date: canonicalIsoDate(normalizedDate),
+    expense: canonicalText(normalizedExpense),
+    amount: canonicalMoney(normalizedAmount),
     category,
     is_split: isSplit,
     notes: normalizeTransactionNotesForSubmit(notes),
-    tag_id: tagId,
-    card_id: cardId || undefined,
-    context_id: contextId || null,
+    tag_id: canonicalNullableId(tagId),
+    card_id: canonicalNullableId(cardId),
+    context_id: canonicalNullableId(contextId),
   }
-  const baselineTransactionPayload = isEditMode && transaction
+  const baselineTransactionSnapshot = isEditMode && transaction
     ? {
-      date: format(parseTransactionDate(transaction.date), "yyyy-MM-dd"),
-      expense: transaction.expense.trim(),
-      amount: Number.parseFloat(transaction.amount).toFixed(2),
+      date: canonicalIsoDate(transaction.date),
+      expense: canonicalText(transaction.expense),
+      amount: canonicalMoney(transaction.amount),
       category: transaction.category,
       is_split: transaction.is_split,
-      notes: transaction.notes,
-      tag_id: transaction.tag.id,
-      card_id: transaction.card?.id || undefined,
-      context_id: transaction.context?.id || null,
+      notes: normalizeTransactionNotesForSubmit(transaction.notes ?? ""),
+      tag_id: canonicalNullableId(transaction.tag.id),
+      card_id: canonicalNullableId(transaction.card?.id),
+      context_id: canonicalNullableId(transaction.context?.id),
     }
     : null
-  const hasEditChanges = !isEditMode || !baselineTransactionPayload
+  const hasEditChanges = !isEditMode || !baselineTransactionSnapshot
     ? true
-    : JSON.stringify(normalizedTransactionPayload) !== JSON.stringify(baselineTransactionPayload) || (makeRecurring && !transactionAlreadyRecurring)
+    : !equalCanonicalSnapshots(normalizedTransactionSnapshot, baselineTransactionSnapshot) || (makeRecurring && !transactionAlreadyRecurring)
   const hasRecurringTemplateChanges = !isEditMode || !transaction
     ? false
-    : normalizedExpense !== transaction.expense.trim() || normalizedAmount !== Number.parseFloat(transaction.amount).toFixed(2) || category !== transaction.category || tagId !== transaction.tag.id || (cardId || undefined) !== (transaction.card?.id || undefined)
+    : !equalCanonicalSnapshots(
+      { expense: canonicalText(expense), amount: canonicalMoney(amount), category, tag_id: canonicalNullableId(tagId), card_id: canonicalNullableId(cardId) },
+      { expense: canonicalText(transaction.expense), amount: canonicalMoney(transaction.amount), category: transaction.category, tag_id: canonicalNullableId(transaction.tag.id), card_id: canonicalNullableId(transaction.card?.id) }
+    )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,5 +1,7 @@
+import { parseDisplayMoney } from "./domain/financial/money"
+
 export function formatCurrency(amount: string | number): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  const num = parseDisplayMoney(amount)
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -8,7 +10,7 @@ export function formatCurrency(amount: string | number): string {
 
 /** Compact money for glanceable planning copy; preserves cents when they matter. */
 export function formatSavingsCurrency(amount: string | number): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  const num = parseDisplayMoney(amount)
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",

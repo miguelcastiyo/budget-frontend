@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
+import { canonicalText } from "@/lib/form-state/canonical-snapshot"
 
 interface ProfileEditDialogProps {
   open: boolean
@@ -48,7 +49,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     setSuccess(null)
   }, [open, profile])
 
-  const hasProfileChanges = displayName.trim() !== (profile?.display_name.trim() ?? "")
+  const hasProfileChanges = canonicalText(displayName) !== canonicalText(profile?.display_name)
 
   useEffect(() => {
     if (!open) {

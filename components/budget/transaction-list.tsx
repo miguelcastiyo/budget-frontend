@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
-import { formatDateValue, parseDateValue } from "@/lib/date-filters"
+import { formatRelativeDateValue } from "@/lib/date-filters"
 import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { TransactionPresenceIndicators } from "@/components/budget/transaction-presence-indicators"
 import { cn } from "@/lib/utils"
@@ -31,29 +31,6 @@ interface TransactionListProps {
   emptyDescription?: string
   emptyActionLabel?: string
   onEmptyAction?: () => void
-}
-
-function formatDate(dateStr: string): string {
-  const date = parseDateValue(dateStr)
-  if (!date) {
-    return dateStr
-  }
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  
-  if (date.toDateString() === today.toDateString()) {
-    return "Today"
-  }
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday"
-  }
-  
-  return formatDateValue(dateStr, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  })
 }
 
 // Group transactions by date
@@ -194,7 +171,7 @@ export function TransactionList({
             <div key={date}>
               <div className={cn("px-4 bg-secondary/40", compact ? "py-1" : "py-2")}>
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  {formatDate(date)}
+                  {formatRelativeDateValue(date)}
                 </span>
               </div>
               <div className="divide-y divide-border/50">

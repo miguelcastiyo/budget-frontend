@@ -18,6 +18,7 @@ import {
   getNextMonthKey,
 } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
+import { parseDisplayMoney } from "@/lib/domain/financial/money"
 import {
   buildClosedSummary,
   buildFooterState,
@@ -87,8 +88,7 @@ const SURPLUS_TYPES: MonthCloseoutAllocationType[] = [
 ]
 
 function parseAmount(value: string | null | undefined): number {
-  const amount = Number.parseFloat(value ?? "")
-  return Number.isFinite(amount) ? amount : 0
+  return parseDisplayMoney(value)
 }
 
 function getResultAmount(resultType: MonthCloseoutResultType, source: MonthCloseoutComputed | MonthCloseoutSaved | null): number {
