@@ -23,6 +23,7 @@
     "test:financial-domain": "node scripts/test-financial-domain-foundations.cjs",
     "test:recurring-commands": "node scripts/test-recurring-commands.cjs",
     "test:authority-operations": "node scripts/test-authority-operations.cjs",
+    "test:fund-presentation": "node scripts/test-fund-presentation.cjs",
     "test:client-parity": "node scripts/client-parity-runner.cjs",
     "test:encrypted-only-boundary": "node scripts/test-encrypted-only-financial-boundary.mjs",
     "test:interaction:headed": "playwright test --headed",
