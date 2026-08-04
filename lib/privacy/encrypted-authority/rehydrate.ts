@@ -1,16 +1,18 @@
 import type { FinancialState, BudgetSettingsRecord, TaxonomyRecord, TransactionRecord } from "../../domain/financial/types"
 import { parseMoneyCents } from "../../domain/financial/money"
 import type { DecryptedFinancialRecord } from "./record-store"
+import type { RecordDataByFamily } from "../encrypted-records/record-types"
+import { canonicalRecordFamily } from "../encrypted-records/adapters"
 
 export interface RehydratedFinancialState extends FinancialState {
-  recurringRules: Record<string, unknown>[]
-  recurringOccurrences: Record<string, unknown>[]
-  funds: Record<string, unknown>[]
-  fundLedgerEntries: Record<string, unknown>[]
-  savingsPlans: Record<string, unknown>[]
-  closeouts: Record<string, unknown>[]
-  closeoutAllocations: Record<string, unknown>[]
-  importRuns: Record<string, unknown>[]
+  recurringRules: RecordDataByFamily["recurring_series"][]
+  recurringOccurrences: RecordDataByFamily["recurring_occurrence"][]
+  funds: RecordDataByFamily["fund"][]
+  fundLedgerEntries: RecordDataByFamily["fund_ledger_entry"][]
+  savingsPlans: Array<RecordDataByFamily["savings_plan"] | RecordDataByFamily["savings_plan_allocation"]>
+  closeouts: RecordDataByFamily["month_closeout"][]
+  closeoutAllocations: RecordDataByFamily["closeout_allocation"][]
+  importRuns: RecordDataByFamily["import_run"][]
 }
 
 function stringValue(value: unknown, fallback = ""): string { return typeof value === "string" ? value : fallback }
@@ -46,30 +48,6 @@ function sameRecordReference(left: unknown, right: unknown): boolean {
   return firstTail === secondTail || (Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second))
 }
 
-// Records staged by an earlier Phase 5 client may retain their source
-// collection name in the encrypted payload. The envelope identity is still
-// authoritative, but accepting these stable historical aliases lets an
-// existing account unlock after the client has been upgraded.
-function canonicalFamily(family: string): string {
-  return ({
-    tags: "taxonomy_tag",
-    cards: "taxonomy_card",
-    contexts: "taxonomy_context",
-    funds: "fund",
-    fund_entries: "fund_ledger_entry",
-    fund_entry: "fund_ledger_entry",
-    monthly_savings_allocations: "savings_plan_allocation",
-    monthly_savings_allocation: "savings_plan_allocation",
-    recurring_expenses: "recurring_series",
-    recurring_expense_occurrences: "recurring_occurrence",
-    budget_settings_versions: "budget_version",
-    transactions: "transaction",
-    monthly_closeouts: "month_closeout",
-    monthly_closeout_allocations: "closeout_allocation",
-    csv_import_runs: "import_run",
-  } as Record<string, string>)[family] ?? family
-}
-
 function taxonomy(record: DecryptedFinancialRecord): TaxonomyRecord {
   const d = record.data
   return { id: record.sourceId || stringValue(d.id), userId: stringValue(d.user_id), name: stringValue(d.name), iconKey: nullableString(d.icon_key), isFavorite: boolValue(d.is_favorite), isDeleted: boolValue(d.is_deleted) || d.deleted_at != null, createdSequence: numberValue(d.created_sequence ?? d.id) }
@@ -100,14 +78,13 @@ function budget(record: DecryptedFinancialRecord): BudgetSettingsRecord {
 export function rehydrateFinancialState(records: Iterable<DecryptedFinancialRecord>): RehydratedFinancialState {
   const state: RehydratedFinancialState = { transactions: [], tags: [], contexts: [], cards: [], budgets: [], recurringRules: [], recurringOccurrences: [], funds: [], fundLedgerEntries: [], savingsPlans: [], closeouts: [], closeoutAllocations: [], importRuns: [] }
   for (const record of records) {
-    const family = canonicalFamily(record.family)
+    const family = canonicalRecordFamily(record.family)
     try {
       switch (family) {
         case "transaction": state.transactions.push(transaction(record)); break
         case "taxonomy_tag": state.tags.push(taxonomy(record)); break
         case "taxonomy_context": state.contexts.push(taxonomy(record)); break
         case "taxonomy_card": state.cards.push(taxonomy(record)); break
-        case "budget_settings":
         case "budget_version": state.budgets.push(budget(record)); break
         case "recurring_series": state.recurringRules.push({ ...record.data, id: record.data.id ?? record.sourceId, source_id: record.sourceId }); break
         case "recurring_occurrence": state.recurringOccurrences.push({ ...record.data, id: record.data.id ?? record.sourceId }); break
