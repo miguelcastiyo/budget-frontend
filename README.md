@@ -57,6 +57,5 @@ Use the following commands for broader validation:
 - `npm run test:browser` — Playwright browser suite using the standard configuration.
 - `npm run test:vault-crypto` — focused Vault and Quick Unlock browser checks.
 - `npm run test:encrypted-records` — encrypted-record browser checks.
-- `npm run test:migration-browser` — migration-specific browser configuration.
 
 Individual fast checks remain available as `npm run test:<name>` commands for targeted debugging.

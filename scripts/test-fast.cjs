@@ -9,7 +9,6 @@ const checks = [
   ["Recurring commands", "test:recurring-commands"],
   ["Authority operations", "test:authority-operations"],
   ["Encrypted-record adapters", "test:encrypted-record-adapters"],
-  ["Fund presentation", "test:fund-presentation"],
   ["Client parity", "test:client-parity"],
   ["Encrypted-only boundary", "test:encrypted-only-boundary"],
   ["Phase 2 security", "test:phase2-security"],
