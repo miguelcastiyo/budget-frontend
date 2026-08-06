@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { ArrowLeft, Monitor } from "lucide-react"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Button } from "@/components/ui/button"
@@ -12,6 +11,7 @@ import { ResponsiveConfirmDialog } from "@/components/ui/responsive-confirm-dial
 import { ApiError, apiClient } from "@/lib/api/client"
 import type { DeviceSession } from "@/lib/api/devices"
 import { useAuth } from "@/components/auth/auth-provider"
+import { RecentAuthDialog } from "@/components/auth/recent-auth-dialog"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { clearBudgetDeviceId } from "@/lib/auth/device-id"
 
@@ -40,7 +40,7 @@ export default function VaultDevicesPage() {
   const [busy, setBusy] = useState(false)
   const auth = useAuth()
   const authority = useFinancialAuthority()
-  const router = useRouter()
+  const [reauthOpen, setReauthOpen] = useState(false)
   const pendingDevice = removeId ? devices.find((device) => device.id === removeId) ?? null : null
 
   const load = () => {
@@ -54,8 +54,8 @@ export default function VaultDevicesPage() {
 
   useEffect(load, [])
 
-  const remove = async () => {
-    if (!removeId) return
+  const remove = async (isRetry = false): Promise<boolean> => {
+    if (!removeId || busy) return false
     setBusy(true)
     setError(null)
     try {
@@ -67,16 +67,22 @@ export default function VaultDevicesPage() {
         clearBudgetDeviceId()
         await auth.signOut()
       }
+      return true
     } catch (error) {
-      if (error instanceof ApiError && error.error.code === "RECENT_AUTH_REQUIRED") {
-        await auth.signOut().catch(() => undefined)
-        router.push(`/sign-in?returnTo=${encodeURIComponent("/settings/vault/devices")}`)
-        return
+      if (error instanceof ApiError && error.error.code === "RECENT_AUTH_REQUIRED" && !isRetry) {
+        setReauthOpen(true)
+        return false
       }
       setError(error instanceof ApiError ? error.error.message : "We couldn't remove that device. Try again.")
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  const retryAfterReauthentication = async () => {
+    const removed = await remove(true)
+    if (!removed) throw new Error("We couldn't remove that device. Try again.")
   }
 
   const confirmationDescription = pendingDevice?.is_current
@@ -147,6 +153,13 @@ export default function VaultDevicesPage() {
         confirmDisabled={busy}
         closeDisabled={busy}
         onConfirm={() => void remove()}
+      />
+      <RecentAuthDialog
+        open={reauthOpen}
+        onOpenChange={setReauthOpen}
+        onSuccess={retryAfterReauthentication}
+        title="Confirm before removing"
+        description="Device access changes require a recent account sign-in. Your Vault will remain protected."
       />
       <BottomNav />
     </div>

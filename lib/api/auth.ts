@@ -12,6 +12,7 @@ import type {
   PasswordResetRequest,
   PasswordResetRequestedResponse,
   PasswordSignInRequest,
+  ReauthenticationRequest,
 } from "./types"
 import type { ApiClientCore } from "./core"
 import { getBudgetDeviceId } from "../auth/device-id"
@@ -35,6 +36,15 @@ export function createAuthApi(core: ApiClientCore) {
       const result = await core.request<AuthSessionResponse>("/auth/sessions/google", {
         method: "POST",
         body: JSON.stringify(data), headers: { "X-Budget-Device-ID": getBudgetDeviceId() },
+      })
+      core.setCsrfToken(result.session.csrf_token)
+      return result
+    },
+
+    async reauthenticate(data: ReauthenticationRequest): Promise<AuthSessionResponse> {
+      const result = await core.request<AuthSessionResponse>("/auth/sessions/reauth", {
+        method: "POST",
+        body: JSON.stringify(data),
       })
       core.setCsrfToken(result.session.csrf_token)
       return result

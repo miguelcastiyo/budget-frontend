@@ -138,6 +138,10 @@ export interface GoogleSignInRequest {
   client_type: "web" | "native"
 }
 
+export type ReauthenticationRequest =
+  | { method: "password"; password: string }
+  | { method: "google"; google_id_token: string }
+
 export interface PasswordResetRequest {
   email: string
 }
