@@ -28,7 +28,6 @@ async function mockTransactionsApi(page: Page, transactionTotal = 0) {
           email: "test@example.com",
           display_name: "Test User",
           avatar_url: null,
-          auth_provider: "password",
           role: "user",
           onboarding_complete: true,
           user_preferences: { appearance: { theme: "light" }, onboarding: { dismissed: true } },

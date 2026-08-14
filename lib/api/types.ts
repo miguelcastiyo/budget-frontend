@@ -2,7 +2,6 @@
 
 export type Category = "needs" | "wants" | "savings"
 
-export type AuthProvider = "password" | "google"
 export type AuthMethodType = "password" | "google"
 export type UserRole = "owner" | "admin" | "member"
 
@@ -49,7 +48,6 @@ export interface Profile {
   email: string
   display_name: string
   avatar_url: string | null
-  auth_provider: AuthProvider
   role: UserRole
   email_verified: boolean
   created_at: string
@@ -78,7 +76,6 @@ export interface AuthUser {
   email: string
   display_name: string
   avatar_url: string | null
-  auth_provider: AuthProvider
   role: UserRole
   onboarding_complete: boolean
   user_preferences: UserPreferences
