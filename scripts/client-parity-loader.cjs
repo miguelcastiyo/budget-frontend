@@ -1,7 +1,13 @@
 const fs = require("node:fs")
 const path = require("node:path")
 
-const fixtureRoot = path.resolve(__dirname, "../../budget-backend/tests/fixtures/privacy-parity")
+const fixtureRoot = process.env.BUDGET_BACKEND_FIXTURE_ROOT
+  ? path.resolve(process.env.BUDGET_BACKEND_FIXTURE_ROOT)
+  : path.resolve(__dirname, "../../budget-backend/tests/fixtures/privacy-parity")
+
+if (!fs.existsSync(path.join(fixtureRoot, "manifest.json"))) {
+  throw new Error(`Canonical privacy-parity fixtures are unavailable at ${fixtureRoot}. Set BUDGET_BACKEND_FIXTURE_ROOT to budget-backend/tests/fixtures/privacy-parity.`)
+}
 
 function loadCanonicalCorpus() {
   const manifest = JSON.parse(fs.readFileSync(path.join(fixtureRoot, "manifest.json"), "utf8"))

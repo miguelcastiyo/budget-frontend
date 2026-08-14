@@ -15,6 +15,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Check out canonical parity fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: miguelcastiyo/budget-backend
+          path: budget-backend
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,6 +34,8 @@ jobs:
         run: npm run lint
 
       - name: Fast deterministic tests
+        env:
+          BUDGET_BACKEND_FIXTURE_ROOT: ${{ github.workspace }}/budget-backend/tests/fixtures/privacy-parity
         run: npm test
 
       - name: Build
