@@ -18,6 +18,7 @@ const { createEncryptedTransaction, updateEncryptedTransaction } = require("../l
 const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
 const { createEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
 const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
+const { commitEncryptedCsvImport, getEncryptedDataRuns, planEncryptedCsvImport, rollbackEncryptedCsvImport } = require("../lib/privacy/encrypted-authority/import-operations.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
 
 function makeRecord(id, family, data) {
@@ -35,6 +36,7 @@ function makeAuthority(initialRecords = []) {
       contexts: [...records.values()].filter((record) => record.family === "taxonomy_context").map((record) => ({ id: record.sourceId, name: record.data.name, iconKey: record.data.icon_key, isDeleted: record.data.is_deleted === true })),
       funds: [...records.values()].filter((record) => record.family === "fund").map((record) => record.data),
       fundLedgerEntries: [...records.values()].filter((record) => record.family === "fund_ledger_entry").map((record) => record.data),
+      importRuns: [...records.values()].filter((record) => record.family === "import_run").map((record) => record.data),
     }),
     createSource: async (family, schemaVersion, id, data) => { records.set(id, makeRecord(id, family, data)); return records.get(id) },
     update: async (id, data) => { const current = records.get(id); records.set(id, { ...current, data }); return records.get(id) },
@@ -82,6 +84,13 @@ function makeAuthority(initialRecords = []) {
   const funds = await getEncryptedFunds(deps(created.authority), { status: "active" })
   const entries = await getEncryptedFundEntries(deps(created.authority), "fund_1")
   assert(funds.items.length === 1 && entries.items[0]?.id === entry.id, "fund operations preserve fund and ledger lookups")
+
+  const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Home" }], { year: 2026, tagValueMap: {} })
+  const committedImport = await commitEncryptedCsvImport(created.authority, importPlan, "august.csv")
+  assert(created.records.has(committedImport.batchId), "import operation creates an import run alongside its transactions")
+  assert(getEncryptedDataRuns(created.authority, 10)[0]?.source_filename === "august.csv", "import operation projects encrypted run activity")
+  await rollbackEncryptedCsvImport(created.authority, committedImport.batchId)
+  assert(created.records.get(committedImport.batchId)?.data.status === "rolled_back" && ![...created.records.values()].some((record) => record.family === "transaction" && record.data.import_run_id === committedImport.batchId), "import rollback operation tombstones imported transactions and marks the run")
 
   console.log("Encrypted authority operation tests passed")
 })().catch((error) => { console.error(error); process.exitCode = 1 })
