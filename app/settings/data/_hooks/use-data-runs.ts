@@ -17,7 +17,7 @@ export function useDataRuns(limit = 50) {
     setRunsError(null)
 
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const encryptedAuthority = authority.authority
         const runs = encryptedAuthority?.getState().importRuns ?? []
         setDataRuns(runs.slice(0, limit).map((item) => {

@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { apiClient } from "@/lib/api/client"
-import { setFinancialAuthorityMode, type FinancialAuthorityMode } from "@/lib/privacy/encrypted-authority/routing"
 import { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority"
 import { VaultManager } from "@/lib/privacy/vault-manager"
 import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret, type VaultInitializationPayload } from "@/lib/privacy/vault-crypto"
@@ -20,7 +19,7 @@ import { getEncryptedSavingsPlan, replaceEncryptedSavingsPlan } from "@/lib/priv
 import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
 
 interface FinancialAuthorityContextValue {
-  mode: FinancialAuthorityMode
+  isVaultSetupRequired: boolean
   isLoading: boolean
   refresh: () => Promise<void>
   authority: EncryptedFinancialAuthority | null
@@ -67,13 +66,11 @@ interface FinancialAuthorityContextValue {
 
 const FinancialAuthorityContext = createContext<FinancialAuthorityContextValue | undefined>(undefined)
 
-function unavailableFinancialOperation(mode: FinancialAuthorityMode): never {
-  throw new Error(mode === "encrypted" ? "ENCRYPTED_AUTHORITY_LOCKED" : "ENCRYPTED_AUTHORITY_REQUIRED")
-}
+function unavailableFinancialOperation(): never { throw new Error("ENCRYPTED_AUTHORITY_LOCKED") }
 
 export function FinancialAuthorityProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
-  const [mode, setMode] = useState<FinancialAuthorityMode>("setup")
+  const [isVaultSetupRequired, setIsVaultSetupRequired] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [authority, setAuthority] = useState<EncryptedFinancialAuthority | null>(null)
   const [quickUnlockStatus, setQuickUnlockStatus] = useState<"unknown" | "not_enrolled" | "enrolled">("unknown")
@@ -82,26 +79,24 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
-      setMode("setup")
+      setIsVaultSetupRequired(false)
       setAuthority(null)
       setQuickUnlockStatus("unknown")
       vaultManager.lock()
-      setFinancialAuthorityMode("setup")
       return
     }
     setIsLoading(true)
     try {
       const status = await apiClient.getPrivacyStatus()
-      const nextMode: FinancialAuthorityMode = status.financial_privacy_state === "encrypted" ? "encrypted" : "setup"
-      setMode(nextMode)
-      if (nextMode !== "encrypted") {
+      const setupRequired = status.financial_privacy_state !== "encrypted"
+      setIsVaultSetupRequired(setupRequired)
+      if (setupRequired) {
         setAuthority(null)
         setQuickUnlockStatus("unknown")
         vaultManager.lock()
       } else {
         try { setQuickUnlockStatus((await apiClient.getQuickUnlockStatus()).status) } catch { setQuickUnlockStatus("unknown") }
       }
-      setFinancialAuthorityMode(nextMode)
     } finally {
       setIsLoading(false)
     }
@@ -131,9 +126,9 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const lock = useCallback(() => { vaultManager.lock(); setAuthority(null) }, [vaultManager])
 
   const unlockWithQuickUnlock = useCallback(async () => {
-    if (mode !== "encrypted" || !capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
+    if (isVaultSetupRequired || !capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
     await installAuthority(await unlockWithQuickUnlockClient(apiClient))
-  }, [capability.supported, installAuthority, mode])
+  }, [capability.supported, installAuthority, isVaultSetupRequired])
 
   const enrollQuickUnlock = useCallback(async () => {
     const runtimeKey = vaultManager.getRuntimeKey()
@@ -180,7 +175,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   }, [authority, vaultManager])
 
   const operationDeps = useMemo<EncryptedOperationDependencies | null>(() => authority ? { authority, isAuthenticated } : null, [authority, isAuthenticated])
-  const runEncrypted = useCallback(<T,>(operation: (deps: EncryptedOperationDependencies) => T): T => operationDeps ? operation(operationDeps) : unavailableFinancialOperation(mode), [mode, operationDeps])
+  const runEncrypted = useCallback(<T,>(operation: (deps: EncryptedOperationDependencies) => T): T => operationDeps ? operation(operationDeps) : unavailableFinancialOperation(), [operationDeps])
   const recurring = useMemo(() => operationDeps ? createRecurringOperations(operationDeps) : null, [operationDeps])
 
   const transactionOperations = useMemo(() => ({
@@ -222,7 +217,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   }), [runEncrypted])
 
   const value = useMemo<FinancialAuthorityContextValue>(() => ({
-    mode,
+    isVaultSetupRequired,
     isLoading,
     refresh,
     authority,
@@ -240,16 +235,16 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     ...taxonomyOperations,
     ...fundOperations,
     ...derivedOperations,
-    createRecurringExpense: (input) => recurring ? recurring.create(input) : unavailableFinancialOperation(mode),
-    updateRecurringExpense: (id, input) => recurring ? recurring.update(id, input) : unavailableFinancialOperation(mode),
-    deleteRecurringExpense: (id) => recurring ? recurring.delete(id) : unavailableFinancialOperation(mode),
-    scheduleRecurringExpenseChange: (id, input) => recurring ? recurring.schedule(id, input) : unavailableFinancialOperation(mode),
-    cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(mode),
+    createRecurringExpense: (input) => recurring ? recurring.create(input) : unavailableFinancialOperation(),
+    updateRecurringExpense: (id, input) => recurring ? recurring.update(id, input) : unavailableFinancialOperation(),
+    deleteRecurringExpense: (id) => recurring ? recurring.delete(id) : unavailableFinancialOperation(),
+    scheduleRecurringExpenseChange: (id, input) => recurring ? recurring.schedule(id, input) : unavailableFinancialOperation(),
+    cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, isLoading, lock, mode, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
-  useEffect(() => { void refresh(); return () => { vaultManager.lock(); setFinancialAuthorityMode("setup") } }, [refresh, vaultManager])
+  useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 
   return <FinancialAuthorityContext.Provider value={value}>{children}</FinancialAuthorityContext.Provider>
 }

@@ -104,7 +104,7 @@ export function TransactionEditorForm({
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const references = taxonomyFromState(state)
@@ -113,7 +113,7 @@ export function TransactionEditorForm({
         setCards(sortCards(references.cards))
         return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -247,7 +247,7 @@ export function TransactionEditorForm({
     }, 300)
 
     return () => window.clearTimeout(timeoutId)
-  }, [expense, financialAuthority.mode, isEditMode, open])
+  }, [expense, financialAuthority.authority, isEditMode, open])
 
   const resetForm = () => {
     const now = new Date()

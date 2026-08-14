@@ -63,7 +63,7 @@ export default function CardsSettingsPage() {
   useEffect(() => {
     const loadCards = async () => {
       try {
-        if (financialAuthority.mode === "encrypted") {
+        if (financialAuthority.authority) {
           if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
           const state = financialAuthority.authority.getState()
           setCards(sortCards(taxonomyFromState({ ...state, cards: state.cards.filter((item) => !item.isDeleted) }).cards))
@@ -98,7 +98,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const updated = await updateEncryptedCard(financialAuthority.authority, editingId, { name: editingName.trim() })
       setCards((previous) => upsertUpdatedCard(previous, updated))
       setEditingId(null)
@@ -129,7 +129,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const created = await createEncryptedCard(financialAuthority.authority, name)
       setCards((previous) => sortCards([...previous, created]))
       setNewCardName("")
@@ -154,7 +154,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       await deleteEncryptedCard(financialAuthority.authority, deleteCardId)
       setCards((previous) => previous.filter((card) => card.id !== deleteCardId))
       setDeleteCardId(null)
@@ -174,7 +174,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const updated = await updateEncryptedCard(financialAuthority.authority, card.id, { is_favorite: !card.is_favorite })
       setCards((previous) => upsertUpdatedCard(previous, updated))
     } catch (err) {

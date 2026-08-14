@@ -43,7 +43,7 @@ export default function ContextsSettingsPage() {
   const EditIcon = editIcon
 
   useEffect(() => {
-    const loadContexts = financialAuthority.mode === "encrypted"
+    const loadContexts = financialAuthority.authority
       ? Promise.resolve().then(() => { if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const state = financialAuthority.authority.getState(); return { items: taxonomyFromState({ ...state, contexts: state.contexts.filter((item) => !item.isDeleted) }).contexts } })
       : Promise.reject(new Error("ENCRYPTED_AUTHORITY_REQUIRED"))
     loadContexts
@@ -78,7 +78,7 @@ export default function ContextsSettingsPage() {
     setError(null)
     try {
       const payload = { name: editingName.trim(), icon_key: editingIconKey || null }
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const updated = await updateEncryptedContext(financialAuthority.authority, editingId, payload)
       setContexts((current) => current.map((item) => item.id === editingId ? updated : item))
       cancelEdit()
@@ -95,7 +95,7 @@ export default function ContextsSettingsPage() {
     setError(null)
     try {
       const payload = { name: newName.trim(), icon_key: newIconKey || null }
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const created = await createEncryptedContext(financialAuthority.authority, payload)
       setContexts((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)))
       resetNew()
@@ -111,7 +111,7 @@ export default function ContextsSettingsPage() {
     setIsMutating(true)
     setError(null)
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       await deleteEncryptedContext(financialAuthority.authority, deleteId)
       setContexts((current) => current.filter((item) => item.id !== deleteId))
       setDeleteId(null)

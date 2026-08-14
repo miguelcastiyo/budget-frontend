@@ -65,7 +65,7 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const overviewRequest = authority.mode === "encrypted" && authority.authority
+      const overviewRequest = authority.authority
         ? materializeEncryptedRecurring(authority.authority, currentMonth).then((result) => {
           setRecurringWarning(result.status === "failed" ? "Recurring items could not be fully posted. Overview is showing the last committed state." : null)
           return authority.getMonthOverview(currentMonth)

@@ -38,7 +38,7 @@ export function useRecurringData(month: string) {
       if (authority.isLoading) {
         return
       }
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         // Materialization is a write-side convenience for the selected/current
         // month. It must not prevent already-decrypted recurring rules from
@@ -55,7 +55,7 @@ export function useRecurringData(month: string) {
         setCards((state?.cards ?? []).map((item) => ({ id: item.id, name: item.name, is_favorite: item.isFavorite })))
         return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)

@@ -78,7 +78,7 @@ export default function TagsSettingsPage() {
   useEffect(() => {
     const loadTags = async () => {
       try {
-        if (financialAuthority.mode === "encrypted") {
+        if (financialAuthority.authority) {
           if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
           const state = financialAuthority.authority.getState()
           setTags(taxonomyFromState({ ...state, tags: state.tags.filter((tag) => !tag.isDeleted) }).tags)
@@ -118,7 +118,7 @@ export default function TagsSettingsPage() {
         name: editingName.trim(),
         icon_key: editingIconKey || null,
       }
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const updated = await updateEncryptedTag(financialAuthority.authority, editingId, payload)
       setTags((previous) => previous.map((tag) => (tag.id === editingId ? updated : tag)))
       setEditingId(null)
@@ -161,7 +161,7 @@ export default function TagsSettingsPage() {
         name,
         icon_key: newTagIconKey || null,
       }
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const created = await createEncryptedTag(financialAuthority.authority, payload)
       setTags((previous) => [...previous, created])
       setNewTagName("")
@@ -187,7 +187,7 @@ export default function TagsSettingsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode !== "encrypted") throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       await deleteEncryptedTag(financialAuthority.authority, deleteTagId)
       setTags((previous) => previous.filter((tag) => tag.id !== deleteTagId))
       setDeleteTagId(null)

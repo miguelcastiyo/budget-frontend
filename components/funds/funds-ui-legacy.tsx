@@ -424,7 +424,7 @@ export function FundsOverviewPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const loadData = useCallback(async () => {
-    if (financialAuthority.isLoading || (financialAuthority.mode === "encrypted" && !financialAuthority.authority)) {
+    if (financialAuthority.isLoading || !financialAuthority.authority) {
       return
     }
     setIsLoading(true)
@@ -437,7 +437,7 @@ export function FundsOverviewPage() {
           ? null
           : financialAuthority.getFunds({ status: "active" })
 
-      if (financialAuthority.mode !== "encrypted" || !financialAuthority.authority) {
+      if (!financialAuthority.authority) {
         throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
       }
       const [fundsResult, activeMetricsResult, summaryResult] = await Promise.allSettled([
@@ -893,7 +893,7 @@ export function FundDetailPage() {
     if (!fundId) {
       return
     }
-    if (financialAuthority.isLoading || (financialAuthority.mode === "encrypted" && !financialAuthority.authority)) {
+    if (financialAuthority.isLoading || !financialAuthority.authority) {
       return
     }
 
@@ -901,7 +901,7 @@ export function FundDetailPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const [fundResponse, entriesResponse] = await Promise.all([financialAuthority.getFund(fundId), financialAuthority.getFundEntries(fundId)])
         setFund(fundResponse); setEntries(entriesResponse.items); return
       }
@@ -1282,7 +1282,7 @@ export function FundDialog({
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const encryptedAuthority = financialAuthority.authority
         if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         if (mode === "create") {
@@ -1577,7 +1577,7 @@ export function FundEntryDialog({
     if (!open || mode !== "create" || intent === "use") {
       return
     }
-    if (financialAuthority.mode === "encrypted") {
+    if (financialAuthority.authority) {
       setTags([])
       setCards([])
       setTransactions([])
@@ -1849,7 +1849,7 @@ async function handleArchiveRestore(
 ) {
   try {
     setError(null)
-    if (financialAuthority?.mode === "encrypted") {
+    if (financialAuthority?.authority) {
       const encryptedAuthority = financialAuthority.authority
       if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       const current = encryptedAuthority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fund.id)

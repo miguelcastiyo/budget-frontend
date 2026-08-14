@@ -222,7 +222,7 @@ export default function TransactionsPage() {
       return
     }
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const references = taxonomyFromState(state)
@@ -232,7 +232,7 @@ export default function TransactionsPage() {
         setContexts(references.contexts)
         return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     }
@@ -246,7 +246,7 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         // Transactions must be self-sufficient: opening Settings > Recurring
         // first must not be required for a due recurring occurrence to appear.
@@ -267,7 +267,7 @@ export default function TransactionsPage() {
         const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
         setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     } finally {
@@ -284,13 +284,13 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
         setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       setError(transactionError(err, "Unable to load more transactions"))
     } finally {
@@ -318,7 +318,7 @@ export default function TransactionsPage() {
   // search, loaded pagination depth, and the user's current scroll context.
   const revalidateLoadedTransactions = useCallback(async (loadedPageCount: number) => {
     try {
-      if (financialAuthority.mode === "encrypted") {
+      if (financialAuthority.authority) {
         const state = financialAuthority.authority?.getState()
         if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const pageOptions = { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" as "date_asc" | "date_desc" }
@@ -331,7 +331,7 @@ export default function TransactionsPage() {
         setSummary(firstResponse.summary)
         return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       setError(transactionError(err, "Unable to refresh transactions"))
     }

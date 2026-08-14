@@ -169,7 +169,7 @@ export default function DataSettingsPage() {
 
     setIsPreviewing(true)
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const parsed = parseCsvText(await file.text())
         const lower = new Map(parsed.headers.map((header) => [header.toLowerCase(), header]))
         const suggestedMapping: CsvImportMapping = {}
@@ -312,7 +312,7 @@ export default function DataSettingsPage() {
     setCommitResult(null)
 
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const plan = await buildEncryptedPlan()
         setValidationResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV validated locally", mode: "dry_run", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: 0, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("review")
@@ -339,7 +339,7 @@ export default function DataSettingsPage() {
     setImportError(null)
 
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const plan = await buildEncryptedPlan()
         const taxonomyCreates = plan.taxonomyCreates.map((item) => ({ id: item.id, family: item.family, data: { id: item.id, name: item.name, ...(item.family === "taxonomy_tag" ? { icon_key: null } : item.family === "taxonomy_card" ? { is_favorite: false } : { icon_key: null }), is_deleted: false } }))
         const batchId = plan.accepted[0]?.id.split(":").slice(0, -1).join(":") ?? `csv_${createEncryptedRecordId()}`
@@ -389,7 +389,7 @@ export default function DataSettingsPage() {
     setIsExporting(true)
 
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const state = authority.authority?.getState()
         const records = (state?.transactions ?? []).filter((record) => (!filters.date_from || record.date >= filters.date_from) && (!filters.date_to || record.date <= filters.date_to))
         const csv = exportEncryptedTransactions(records, { createdAt: "", updatedAt: "", tagName: (id) => state?.tags.find((tag) => tag.id === id)?.name ?? null, cardName: (id) => state?.cards.find((card) => card.id === id)?.name ?? null, contextName: (id) => state?.contexts.find((context) => context.id === id)?.name ?? null })
@@ -430,7 +430,7 @@ export default function DataSettingsPage() {
     setRollbackError(null)
 
     try {
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         const imported = authority.authority.store.values().filter((record) => record.family === "transaction" && (String(record.data.import_run_id ?? record.data.csv_import_run_id ?? "") === importRunId || record.sourceId === importRunId || record.sourceId.startsWith(`${importRunId}:`)))
         const run = authority.authority.store.values().find((record) => record.family === "import_run" && (String(record.data.id ?? "") === importRunId || record.sourceId === importRunId || record.envelope.record_id === importRunId))
@@ -452,7 +452,7 @@ export default function DataSettingsPage() {
   }
 
   const handleRepairImport = async () => {
-    if (!repairTarget || authority.mode !== "encrypted" || !authority.authority) return
+    if (!repairTarget || !authority.authority) return
     setRepairingImportId(repairTarget.id)
     setRepairError(null)
     try {
@@ -530,7 +530,7 @@ export default function DataSettingsPage() {
     return planCsvImport(rows, state.transactions, { year: Number(dateYear) || currentImportYear(), userId: "authority-user", batchId: `csv_${createEncryptedRecordId()}`, tags: state.tags.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), cards: state.cards.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), contexts: state.contexts.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })), tagValueMap })
   }
   const amountProfile = profileForHeader(importPreview, importMapping.amount ?? "")
-  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (authority.mode === "encrypted" || tagSetupComplete) && !hasDuplicateMapping)
+  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (Boolean(authority.authority) || tagSetupComplete) && !hasDuplicateMapping)
   const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
   const currentImportStepIndex = useMemo(() => importStepIndex(importStep), [importStep])
 
@@ -856,7 +856,7 @@ export default function DataSettingsPage() {
                       <h3 className="text-sm font-semibold">Map columns</h3>
                       <p className="text-xs text-muted-foreground">Match CSV columns to Budget fields. {pluralize(importPreview.headers.length, "column")} detected.</p>
                     </div>
-                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} includeContext={authority.mode === "encrypted"} />
+                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} includeContext={Boolean(authority.authority)} />
                     {!requiredMappingComplete && (
                       <p className="text-xs text-destructive">Map every required field before continuing.</p>
                     )}

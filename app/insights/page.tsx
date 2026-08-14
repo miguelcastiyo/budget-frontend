@@ -332,8 +332,8 @@ export default function InsightsPage() {
   const resolveAllTimeRange = useCallback(async (): Promise<InsightRange> => {
     const today = toIsoDate(new Date())
 
-    if (authority.mode !== "encrypted" || !authority.authority) {
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+    if (!authority.authority) {
+      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     }
     const oldestTransactionPage = { items: authority.authority.getState().transactions.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(0, 1).map((item) => ({ date: item.date })) }
 

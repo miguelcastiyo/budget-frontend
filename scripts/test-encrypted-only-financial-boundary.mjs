@@ -33,7 +33,7 @@ for (const file of scanRoots.flatMap(filesUnder)) {
 
 const provider = fs.readFileSync(path.join(root, "components/privacy/financial-authority-provider.tsx"), "utf8")
 if (legacyPattern.test(provider)) violations.push("components/privacy/financial-authority-provider.tsx")
-for (const marker of ["ENCRYPTED_AUTHORITY_LOCKED", "ENCRYPTED_AUTHORITY_REQUIRED", "EncryptedFinancialAuthority"]) {
+for (const marker of ["ENCRYPTED_AUTHORITY_LOCKED", "isVaultSetupRequired", "EncryptedFinancialAuthority"]) {
   if (!provider.includes(marker)) throw new Error(`financial authority provider is missing ${marker}`)
 }
 

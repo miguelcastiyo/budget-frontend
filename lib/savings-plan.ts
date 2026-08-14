@@ -51,7 +51,7 @@ export function useReplaceSavingsPlan(month: string) {
       if (authority.isLoading) {
         throw new Error("ENCRYPTED_AUTHORITY_LOADING")
       }
-      if (authority.mode === "encrypted") {
+      if (authority.authority) {
         const encryptedAuthority = authority.authority
         if (!encryptedAuthority) {
           throw new Error("ENCRYPTED_AUTHORITY_LOCKED")

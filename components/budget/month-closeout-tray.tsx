@@ -355,7 +355,7 @@ export function MonthCloseoutTray({
         allocations: buildPayloadAllocations(allocations),
       }
 
-      const response = authority.mode === "encrypted"
+      const response = authority.authority
         ? await commitEncryptedCloseout(authority.authority!, month, payload)
         : mode === "edit"
           ? await authority.updateMonthCloseout(month, payload)
@@ -383,7 +383,7 @@ export function MonthCloseoutTray({
     setError(null)
 
     try {
-      const response = authority.mode === "encrypted"
+      const response = authority.authority
         ? await reopenEncryptedCloseout(authority.authority!, month)
         : await authority.reopenMonth(month)
       onSaved(response)

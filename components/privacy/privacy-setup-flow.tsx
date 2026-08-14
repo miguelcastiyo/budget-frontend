@@ -38,7 +38,7 @@ export function PrivacySetupFlow() {
   const [error, setError] = useState<string | null>(null)
   const [requiresRecentAuth, setRequiresRecentAuth] = useState(false)
 
-  if (authority.mode === "encrypted") return null
+  if (!authority.isVaultSetupRequired) return null
 
   const begin = () => { setError(null); setStep("passphrase") }
 

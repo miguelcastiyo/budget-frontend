@@ -166,8 +166,8 @@ export default function BudgetSettingsPage() {
       setIncomeForm(defaultIncomeFormState)
       setAllocationForm(defaultBudgetAllocationFormState)
       setLoadedPayloadKey(null)
-      if (financialAuthority.mode !== "encrypted" || !financialAuthority.authority) {
-        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) {
+        throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       }
       const [budgetResult, versionsResult] = await Promise.allSettled([getEncryptedBudgetResolution(financialAuthority.authority.getState(), selectedMonth), getEncryptedBudgetVersions(financialAuthority.authority.getState())])
 
@@ -286,8 +286,8 @@ export default function BudgetSettingsPage() {
         effective_month: selectedMonth,
         ...budgetSettingsPayload(incomeForm, allocationForm),
       }
-      if (financialAuthority.mode !== "encrypted" || !financialAuthority.authority) {
-        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (!financialAuthority.authority) {
+        throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       }
       const response = await updateEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
 
