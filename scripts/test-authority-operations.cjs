@@ -15,8 +15,9 @@ require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileMo
 global.window = { isSecureContext: true, crypto: webcrypto }
 
 const { createEncryptedTransaction, updateEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
-const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
+const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
 const { createEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
+const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
 
 function makeRecord(id, family, data) {
@@ -36,6 +37,7 @@ function makeAuthority(initialRecords = []) {
       fundLedgerEntries: [...records.values()].filter((record) => record.family === "fund_ledger_entry").map((record) => record.data),
     }),
     createSource: async (family, schemaVersion, id, data) => { records.set(id, makeRecord(id, family, data)); return records.get(id) },
+    update: async (id, data) => { const current = records.get(id); records.set(id, { ...current, data }); return records.get(id) },
     commitSourceDiff: async ({ creates, updates, tombstones }) => {
       for (const record of updates) records.set(record.id, { ...records.get(record.id), data: record.data })
       for (const record of creates) records.set(record.id, makeRecord(record.id, record.family, record.data))
@@ -57,6 +59,19 @@ function makeAuthority(initialRecords = []) {
   const context = await createEncryptedContext(deps(created.authority), { name: "Work", icon_key: "briefcase" })
   assert(tag.name === "Travel" && card.name === "Visa" && context.name === "Work", "taxonomy operations return created references")
   assert(getEncryptedContexts(deps(created.authority)).items.some((item) => item.name === "Work"), "taxonomy adapter reads encrypted contexts")
+  const updatedTag = await updateEncryptedTag(created.authority, tag.id, { name: "Trips", icon_key: "plane" })
+  const updatedCard = await updateEncryptedCard(created.authority, card.id, { is_favorite: true })
+  const updatedContext = await updateEncryptedContext(created.authority, context.id, { name: "Office", icon_key: "briefcase" })
+  assert(updatedTag.name === "Trips" && updatedCard.is_favorite && updatedContext.name === "Office", "taxonomy update operations resolve source records")
+  await deleteEncryptedTag(created.authority, tag.id)
+  await deleteEncryptedCard(created.authority, card.id)
+  await deleteEncryptedContext(created.authority, context.id)
+  assert(!created.records.has(tag.id) && !created.records.has(card.id) && !created.records.has(context.id), "taxonomy delete operations tombstone resolved records")
+  await saveEncryptedBudget(created.authority, "2026-08", { effective_month: "2026-08", monthly_income_cents: 500000 })
+  const budget = [...created.records.values()].find((record) => record.family === "budget_version")
+  await saveEncryptedBudget(created.authority, "2026-08", { ...budget.data, monthly_income_cents: 600000 })
+  const savedBudget = [...created.records.values()].find((record) => record.family === "budget_version")
+  assert([...created.records.values()].filter((record) => record.family === "budget_version").length === 1 && savedBudget.data.monthly_income_cents === 600000, "budget operation updates its existing month record")
 
   const transaction = await createEncryptedTransaction(deps(created.authority), { date: "2026-08-01", expense: "Coffee", amount: "5.25", category: "wants", is_split: false, tag_id: tag.id, card_id: card.id, context_id: context.id })
   assert(transaction.amount === "5.25" && transaction.tag.id === tag.id, "transaction operation maps encrypted data to UI data")

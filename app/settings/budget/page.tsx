@@ -23,7 +23,7 @@ import { formatMonthLabel, getCurrentMonthKey, isFutureMonth, parseMonthKey } fr
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { saveEncryptedBudget } from "@/lib/privacy/encrypted-authority/budget-operations"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
 import type { RehydratedFinancialState } from "@/lib/privacy/encrypted-authority/rehydrate"
@@ -90,13 +90,6 @@ function getEncryptedBudgetVersions(state: RehydratedFinancialState | undefined)
   return { items }
 }
 
-async function updateEncryptedBudget(authority: ReturnType<typeof useFinancialAuthority>["authority"], month: string, payload: Record<string, unknown>): Promise<BudgetSettings> {
-  if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-  const existing = authority.store.values().find((record) => record.family === "budget_version" && String(record.data.effective_month ?? "").startsWith(month))
-  if (existing) await authority.update(existing.envelope.record_id, { ...existing.data, ...payload })
-  else await authority.createSource("budget_version", "budget_version_v1", createEncryptedRecordId(), payload)
-  return payload as unknown as BudgetSettings
-}
 
 export default function BudgetSettingsPage() {
   const financialAuthority = useFinancialAuthority()
@@ -289,7 +282,8 @@ export default function BudgetSettingsPage() {
       if (!financialAuthority.authority) {
         throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
       }
-      const response = await updateEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
+      await saveEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
+      const response = payload as BudgetSettings
 
       hydrateForm(response)
       setBudgetResolution({

@@ -21,39 +21,12 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { createEncryptedTag, deleteEncryptedTag, updateEncryptedTag } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
 function tagCountLabel(count: number) {
   return `${count} ${count === 1 ? "tag" : "tags"}`
 }
 
-const sameTagId = (left: string, right: string) => left === right || left.split(":").pop() === right.split(":").pop()
-
-async function createEncryptedTag(authority: ReturnType<typeof useFinancialAuthority>["authority"], payload: { name: string; icon_key: string | null }): Promise<Tag> {
-  if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-  const id = createEncryptedRecordId()
-  await authority.createSource("taxonomy_tag", "taxonomy_tag_v1", id, { id, name: payload.name, icon_key: payload.icon_key, is_deleted: false })
-  return { id, name: payload.name, icon_key: payload.icon_key }
-}
-
-async function updateEncryptedTag(authority: ReturnType<typeof useFinancialAuthority>["authority"], tagId: string, payload: { name: string; icon_key: string | null }): Promise<Tag> {
-  if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-  const record = authority.store.values().find((item) => item.family === "taxonomy_tag" && (sameTagId(item.sourceId, tagId) || sameTagId(String(item.data.id ?? ""), tagId)))
-  if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-  await authority.update(record.envelope.record_id, { ...record.data, ...payload })
-  return { id: tagId, ...payload }
-}
-
-async function deleteEncryptedTag(authority: ReturnType<typeof useFinancialAuthority>["authority"], tagId: string): Promise<void> {
-  if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-  const record = authority.store.values().find((item) => item.family === "taxonomy_tag" && (sameTagId(item.sourceId, tagId) || sameTagId(String(item.data.id ?? ""), tagId)))
-  if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-  await authority.commitSourceDiff({
-    creates: [],
-    updates: [],
-    tombstones: [{ id: record.envelope.record_id, family: record.family, data: record.data }],
-  })
-}
 
 export default function TagsSettingsPage() {
   const financialAuthority = useFinancialAuthority()
@@ -162,7 +135,7 @@ export default function TagsSettingsPage() {
         icon_key: newTagIconKey || null,
       }
       if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedTag(financialAuthority.authority, payload)
+      const created = await createEncryptedTag({ authority: financialAuthority.authority, isAuthenticated: true }, payload)
       setTags((previous) => [...previous, created])
       setNewTagName("")
       setNewTagIconKey("")

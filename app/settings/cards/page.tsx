@@ -19,16 +19,12 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { createEncryptedCard, deleteEncryptedCard, updateEncryptedCard } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
 function cardCountLabel(count: number) {
   return `${count} ${count === 1 ? "card" : "cards"}`
 }
 
-const sameCardId = (left: string, right: string) => left === right || left.split(":").pop() === right.split(":").pop()
-async function createEncryptedCard(authority: ReturnType<typeof useFinancialAuthority>["authority"], name: string): Promise<CardType> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const id = createEncryptedRecordId(); await authority.createSource("taxonomy_card", "taxonomy_card_v1", id, { id, name, is_favorite: false, is_deleted: false }); return { id, name, is_favorite: false } }
-async function updateEncryptedCard(authority: ReturnType<typeof useFinancialAuthority>["authority"], cardId: string, data: { name?: string; is_favorite?: boolean }): Promise<CardType> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const record = authority.store.values().find((item) => item.family === "taxonomy_card" && (sameCardId(item.sourceId, cardId) || sameCardId(String(item.data.id ?? ""), cardId))); if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); if (data.is_favorite) for (const other of authority.store.values().filter((item) => item.family === "taxonomy_card" && item.envelope.record_id !== record.envelope.record_id && item.data.is_favorite === true)) await authority.update(other.envelope.record_id, { ...other.data, is_favorite: false }); await authority.update(record.envelope.record_id, { ...record.data, ...data }); return { id: cardId, name: String(data.name ?? record.data.name ?? ""), is_favorite: data.is_favorite ?? record.data.is_favorite === true } }
-async function deleteEncryptedCard(authority: ReturnType<typeof useFinancialAuthority>["authority"], cardId: string): Promise<void> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const record = authority.store.values().find((item) => item.family === "taxonomy_card" && (sameCardId(item.sourceId, cardId) || sameCardId(String(item.data.id ?? ""), cardId))); if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); await authority.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: record.envelope.record_id, family: record.family, data: record.data }] }) }
 
 function upsertUpdatedCard(cards: CardType[], updated: CardType): CardType[] {
   const next = cards.map((card) => {
@@ -130,7 +126,7 @@ export default function CardsSettingsPage() {
 
     try {
       if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedCard(financialAuthority.authority, name)
+      const created = await createEncryptedCard({ authority: financialAuthority.authority, isAuthenticated: true }, { name })
       setCards((previous) => sortCards([...previous, created]))
       setNewCardName("")
       setShowNewCard(false)

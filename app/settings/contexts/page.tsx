@@ -16,12 +16,8 @@ import { CONTEXT_ICON_OPTIONS, getContextIcon, getContextIconByKey } from "@/lib
 import type { Context } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
+import { createEncryptedContext, deleteEncryptedContext, updateEncryptedContext } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
-const sameContextId = (left: string, right: string) => left === right || left.split(":").pop() === right.split(":").pop()
-async function createEncryptedContext(authority: ReturnType<typeof useFinancialAuthority>["authority"], payload: { name: string; icon_key: string | null }): Promise<Context> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const id = createEncryptedRecordId(); await authority.createSource("taxonomy_context", "taxonomy_context_v1", id, { id, name: payload.name, icon_key: payload.icon_key, is_deleted: false }); return { id, ...payload } }
-async function updateEncryptedContext(authority: ReturnType<typeof useFinancialAuthority>["authority"], contextId: string, payload: { name: string; icon_key: string | null }): Promise<Context> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const record = authority.store.values().find((item) => item.family === "taxonomy_context" && (sameContextId(item.sourceId, contextId) || sameContextId(String(item.data.id ?? ""), contextId))); if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); await authority.commitSourceDiff({ creates: [], updates: [{ id: record.envelope.record_id, family: record.family, data: { ...record.data, ...payload } }], tombstones: [] }); return { id: contextId, ...payload } }
-async function deleteEncryptedContext(authority: ReturnType<typeof useFinancialAuthority>["authority"], contextId: string): Promise<void> { if (!authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const record = authority.store.values().find((item) => item.family === "taxonomy_context" && (sameContextId(item.sourceId, contextId) || sameContextId(String(item.data.id ?? ""), contextId))); if (!record) throw new Error("ENCRYPTED_RECORD_NOT_FOUND"); await authority.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: record.envelope.record_id, family: record.family, data: record.data }] }) }
 
 export default function ContextsSettingsPage() {
   const financialAuthority = useFinancialAuthority()
@@ -96,7 +92,7 @@ export default function ContextsSettingsPage() {
     try {
       const payload = { name: newName.trim(), icon_key: newIconKey || null }
       if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedContext(financialAuthority.authority, payload)
+      const created = await createEncryptedContext({ authority: financialAuthority.authority, isAuthenticated: true }, payload)
       setContexts((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)))
       resetNew()
     } catch (err) {
