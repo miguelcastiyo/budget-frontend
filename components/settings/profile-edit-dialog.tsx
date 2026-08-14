@@ -18,7 +18,7 @@ interface ProfileEditDialogProps {
 }
 
 export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps) {
-  const { profile, setProfile } = useAuth()
+  const { profile, authMethods, refreshProfile, setProfile } = useAuth()
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [newEmail, setNewEmail] = useState("")
@@ -35,7 +35,9 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const hasGoogleClientId = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
-  const canEditEmail = profile?.auth_provider === "password"
+  const hasPasswordMethod = authMethods.some((method) => method.type === "password")
+  const hasGoogleMethod = authMethods.some((method) => method.type === "google")
+  const canEditEmail = hasPasswordMethod
   const canSwitchToGoogle = canEditEmail && emailQualifiesForGoogle(email)
 
   useEffect(() => {
@@ -96,6 +98,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     try {
       const updated = await apiClient.updateProfile({ display_name: displayName.trim() })
       setProfile(updated)
+      await refreshProfile()
       setEmail(updated.email)
       setSuccess("Profile updated")
     } catch (err) {
@@ -316,7 +319,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary/50 px-3 py-3.5">
           <Mail className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm">Signed in with {profile?.auth_provider === "google" ? "Google" : "Email"}</span>
+          <span className="text-sm">Signed in with {hasGoogleMethod ? "Google" : "Email"}</span>
           {profile?.email_verified && (
             <span className="ml-auto flex items-center gap-1 text-sm text-success">
               <Check className="h-4 w-4" />

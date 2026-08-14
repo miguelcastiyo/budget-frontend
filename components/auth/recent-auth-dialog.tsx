@@ -28,7 +28,8 @@ export function RecentAuthDialog({
   onFallback,
   fallbackLabel = "Sign out and sign in again",
 }: RecentAuthDialogProps) {
-  const { profile } = useAuth()
+  const { authMethods } = useAuth()
+  const hasPasswordMethod = authMethods.some((method) => method.type === "password")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -102,7 +103,7 @@ export function RecentAuthDialog({
       bodyClassName="px-4 py-5 sm:px-6"
     >
       <div className="space-y-5">
-        {profile?.auth_provider === "password" ? (
+        {hasPasswordMethod ? (
           <form className="space-y-4" onSubmit={submitPassword}>
             <div className="space-y-2">
               <Label htmlFor="recent-auth-password">Account password</Label>

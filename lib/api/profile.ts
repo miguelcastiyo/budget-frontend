@@ -1,5 +1,6 @@
 import type { ApiClientCore } from "./core"
 import type {
+  AuthMethodsResponse,
   ConvertAccountToGoogleRequest,
   EmailChangeRequestedResponse,
   EmailChangeVerifiedResponse,
@@ -18,6 +19,10 @@ export function createProfileApi(core: ApiClientCore) {
   return {
     async getProfile(): Promise<Profile> {
       return core.request<Profile>("/me")
+    },
+
+    async getAuthMethods(): Promise<AuthMethodsResponse> {
+      return core.request<AuthMethodsResponse>("/me/auth-methods")
     },
 
     async updateProfile(data: UpdateProfileRequest): Promise<Profile> {

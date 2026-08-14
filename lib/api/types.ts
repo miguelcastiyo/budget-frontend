@@ -3,6 +3,7 @@
 export type Category = "needs" | "wants" | "savings"
 
 export type AuthProvider = "password" | "google"
+export type AuthMethodType = "password" | "google"
 export type UserRole = "owner" | "admin" | "member"
 
 export type AllocationMode = "percent" | "amount"
@@ -54,6 +55,17 @@ export interface Profile {
   created_at: string
   onboarding_complete: boolean
   user_preferences: UserPreferences
+}
+
+export interface AuthMethod {
+  type: AuthMethodType
+  provider_email: string | null
+  connected_at: string | null
+  last_used_at: string | null
+}
+
+export interface AuthMethodsResponse {
+  methods: AuthMethod[]
 }
 
 export interface UpdateProfileRequest {

@@ -4,10 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient, GLOBAL_AUTH_ERROR_EVENT } from "@/lib/api/client"
-import type { AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
+import type { AuthMethod, AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
 
 interface AuthContextValue {
   profile: Profile | null
+  authMethods: AuthMethod[]
   setupStatus: SetupStatus | null
   isAuthenticated: boolean
   needsOnboarding: boolean
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { setTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [authMethods, setAuthMethods] = useState<AuthMethod[]>([])
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -68,19 +70,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     try {
-      const [me, nextSetupStatus] = await Promise.all([
+      const [me, nextSetupStatus, authMethodInventory] = await Promise.all([
         apiClient.getProfile(),
         apiClient.getSetupStatus(),
+        apiClient.getAuthMethods(),
       ])
       if (!apiClient.hasCsrfToken()) {
         await apiClient.refreshCsrfToken()
       }
       setProfile(me)
       setSetupStatus(nextSetupStatus)
+      setAuthMethods(authMethodInventory.methods)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setProfile(null)
         setSetupStatus(null)
+        setAuthMethods([])
         return
       }
 
@@ -140,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleGlobalAuthError = () => {
       setProfile(null)
       setSetupStatus(null)
+      setAuthMethods([])
     }
 
     window.addEventListener(GLOBAL_AUTH_ERROR_EVENT, handleGlobalAuthError)
@@ -156,11 +162,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setProfile(null)
       setSetupStatus(null)
+      setAuthMethods([])
     }
   }, [])
 
   const value = useMemo<AuthContextValue>(() => ({
     profile,
+    authMethods,
     setupStatus,
     isAuthenticated: !!profile,
     needsOnboarding: !!profile && !!setupStatus && !setupStatus.budget_profile_complete,
@@ -171,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSetupStatus,
     setAuthenticatedUser,
     signOut,
-  }), [profile, setupStatus, isLoading, refreshProfile, refreshSetupStatus, setAuthenticatedUser, signOut])
+  }), [profile, authMethods, setupStatus, isLoading, refreshProfile, refreshSetupStatus, setAuthenticatedUser, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
