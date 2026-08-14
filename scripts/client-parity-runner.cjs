@@ -2,7 +2,7 @@ const fs = require("node:fs")
 const Module = require("node:module")
 const path = require("node:path")
 const ts = require("typescript")
-const { loadCanonicalCorpus } = require("./client-parity-loader.cjs")
+const { loadCanonicalCorpus, loadHighPriorityInvariantIds } = require("./client-parity-loader.cjs")
 
 const root = path.resolve(__dirname, "..")
 const originalResolve = Module._resolveFilename
@@ -26,13 +26,7 @@ const phase4bGroups = new Set(["FIX-REC-001", "FIX-REC-002", "FIX-REC-003", "FIX
 const phase4cGroups = new Set(["FIX-FUND-001", "FIX-FUND-002", "FIX-FUND-003", "FIX-SAV-001", "FIX-SAV-002", "FIX-CLOSE-001", "FIX-CLOSE-002"])
 const phase4dGroups = new Set(["FIX-CSV-001", "FIX-CSV-002", "FIX-CROSS-001"])
 const clone = (value) => JSON.parse(JSON.stringify(value))
-const invariantCandidates = [
-  path.resolve(root, "../docs/financial-domain-invariants.md"),
-  path.resolve(root, "../docs-internal/architecture/privacy-program/financial-domain-invariants.md"),
-]
-const invariantPath = invariantCandidates.find((candidate) => fs.existsSync(candidate))
-if (!invariantPath) throw new Error("Unable to locate the tracked financial-domain invariants document")
-const highPriorityInvariantIds = new Set([...fs.readFileSync(invariantPath, "utf8").matchAll(/^\| (INV-[A-Z0-9-]+) \|.*\| high \|/gm)].map((match) => match[1]))
+const highPriorityInvariantIds = loadHighPriorityInvariantIds()
 const normalize = (value) => {
   if (Array.isArray(value)) return value.map(normalize)
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalize(value[key])]))
