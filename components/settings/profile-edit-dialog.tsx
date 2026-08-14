@@ -31,6 +31,10 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const [isRequestingCode, setIsRequestingCode] = useState(false)
   const [isVerifyingCode, setIsVerifyingCode] = useState(false)
   const [isConvertingToGoogle, setIsConvertingToGoogle] = useState(false)
+  const [password, setPassword] = useState("")
+  const [passwordConfirmation, setPasswordConfirmation] = useState("")
+  const [showPasswordMethodForm, setShowPasswordMethodForm] = useState(false)
+  const [isUpdatingMethod, setIsUpdatingMethod] = useState(false)
   const [googleButtonWidth, setGoogleButtonWidth] = useState(320)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -38,7 +42,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const hasPasswordMethod = authMethods.some((method) => method.type === "password")
   const hasGoogleMethod = authMethods.some((method) => method.type === "google")
   const canEditEmail = hasPasswordMethod
-  const canSwitchToGoogle = canEditEmail && emailQualifiesForGoogle(email)
+  const canSwitchToGoogle = !hasGoogleMethod
 
   useEffect(() => {
     if (!profile || !open) {
@@ -186,23 +190,40 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     setSuccess(null)
 
     try {
-      const updated = await apiClient.convertAccountToGoogle({
+      await apiClient.connectGoogleAuthMethod({
         google_id_token: credentialResponse.credential,
       })
-
-      setProfile(updated)
-      setEmail(updated.email)
+      await refreshProfile()
       setShowGoogleConvert(false)
-      setSuccess("Account now uses Google sign-in.")
+      setSuccess("Google sign-in connected. Your password sign-in remains available.")
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
       } else {
-        setError("Unable to switch this account to Google sign-in")
+        setError("Unable to connect this Google account")
       }
     } finally {
       setIsConvertingToGoogle(false)
     }
+  }
+
+  const savePasswordMethod = async () => {
+    if (password !== passwordConfirmation) { setError("Passwords do not match."); return }
+    setIsUpdatingMethod(true); setError(null)
+    try {
+      if (hasPasswordMethod) await apiClient.changePasswordAuthMethod({ password })
+      else await apiClient.addPasswordAuthMethod({ password })
+      await refreshProfile(); setPassword(""); setPasswordConfirmation(""); setShowPasswordMethodForm(false); setSuccess(hasPasswordMethod ? "Password changed." : "Password sign-in added.")
+    } catch (err) { setError(err instanceof ApiError ? err.error.message : "Unable to update password sign-in") } finally { setIsUpdatingMethod(false) }
+  }
+
+  const removeMethod = async (method: "google" | "password") => {
+    if (!window.confirm(`Remove ${method} sign-in? Your Budget account and data will not be deleted.`)) return
+    setIsUpdatingMethod(true); setError(null)
+    try {
+      if (method === "google") await apiClient.removeGoogleAuthMethod(); else await apiClient.removePasswordAuthMethod()
+      await refreshProfile(); setSuccess(`${method === "google" ? "Google" : "Password"} sign-in removed.`)
+    } catch (err) { setError(err instanceof ApiError ? err.error.message : "Unable to remove sign-in method"); await refreshProfile() } finally { setIsUpdatingMethod(false) }
   }
 
   return (
@@ -331,9 +352,9 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         {canSwitchToGoogle && (
           <div className="space-y-3 rounded-2xl border border-border/70 bg-background p-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium">Switch this account to Google</p>
+              <p className="text-sm font-medium">Connect Google sign-in</p>
               <p className="text-sm text-muted-foreground">
-                Use the same email already on this account. Password sign-in will stop working after the switch.
+                Connect Google without replacing your password sign-in method.
               </p>
             </div>
             {!showGoogleConvert ? (
@@ -352,7 +373,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             ) : (
               <div className="space-y-3">
                 <div className="rounded-xl border border-border/70 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
-                  After this change, email/password sign-in will no longer work for this account.
+                  Your existing password sign-in will remain connected.
                 </div>
                 <div className="flex justify-center overflow-hidden rounded-xl">
                   {hasGoogleClientId ? (
@@ -383,16 +404,16 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
           </div>
         )}
 
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-background p-4">
+          <div><p className="text-sm font-medium">Sign-in methods</p><p className="text-sm text-muted-foreground">Manage how you sign in without changing your Budget account.</p></div>
+          {authMethods.map((method) => <div key={method.type} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/30 p-3"><div><p className="text-sm font-medium">{method.type === "google" ? "Google" : "Password"}</p><p className="text-xs text-muted-foreground">{method.provider_email ?? "Connected"}</p></div><div className="flex gap-2">{method.type === "password" && <Button type="button" variant="outline" disabled={isUpdatingMethod} onClick={() => setShowPasswordMethodForm(true)}>Change</Button>}<Button type="button" variant="outline" disabled={!method.can_remove || isUpdatingMethod} onClick={() => void removeMethod(method.type)}>Remove</Button></div></div>)}
+          {!hasPasswordMethod && <Button type="button" variant="outline" className="w-full" onClick={() => setShowPasswordMethodForm(true)}>Add password</Button>}
+          {showPasswordMethodForm && <div className="space-y-3"><Input type="password" placeholder="New password" value={password} onChange={(event) => setPassword(event.target.value)} /><Input type="password" placeholder="Confirm new password" value={passwordConfirmation} onChange={(event) => setPasswordConfirmation(event.target.value)} /><Button type="button" className="w-full" disabled={!password || !passwordConfirmation || isUpdatingMethod} onClick={() => void savePasswordMethod()}>{isUpdatingMethod ? "Saving..." : "Save password"}</Button></div>}
+          {authMethods.length > 0 && authMethods.every((method) => !method.can_remove) && <p className="text-xs text-muted-foreground">This is your only sign-in method. Add another method before removing it.</p>}
+        </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
       </div>
     </ResponsiveDialog>
   )
-}
-
-function emailQualifiesForGoogle(email: string): boolean {
-  const normalized = email.trim().toLowerCase()
-  const domain = normalized.split("@")[1] ?? ""
-
-  return domain === "gmail.com" || domain === "googlemail.com"
 }

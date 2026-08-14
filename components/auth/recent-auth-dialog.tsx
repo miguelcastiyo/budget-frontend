@@ -103,7 +103,7 @@ export function RecentAuthDialog({
       bodyClassName="px-4 py-5 sm:px-6"
     >
       <div className="space-y-5">
-        {hasPasswordMethod ? (
+        {hasPasswordMethod && (
           <form className="space-y-4" onSubmit={submitPassword}>
             <div className="space-y-2">
               <Label htmlFor="recent-auth-password">Account password</Label>
@@ -121,7 +121,8 @@ export function RecentAuthDialog({
               {busy ? "Verifying…" : "Continue"}
             </Button>
           </form>
-        ) : googleClientIdConfigured ? (
+        )}
+        {authMethods.some((method) => method.type === "google") && googleClientIdConfigured ? (
           <div className="space-y-3">
             <div className="flex justify-center">
               <GoogleLogin
@@ -136,7 +137,7 @@ export function RecentAuthDialog({
             </div>
             <p className="text-center text-xs text-muted-foreground">Use the same Google account as this Budget account.</p>
           </div>
-        ) : (
+        ) : !hasPasswordMethod && (
           <p className="text-sm text-destructive">Google sign-in is not available on this device. Sign in again from the main sign-in screen.</p>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

@@ -60,11 +60,15 @@ export interface AuthMethod {
   provider_email: string | null
   connected_at: string | null
   last_used_at: string | null
+  can_remove: boolean
 }
 
 export interface AuthMethodsResponse {
   methods: AuthMethod[]
 }
+
+export interface GoogleAuthMethodRequest { google_id_token: string }
+export interface PasswordAuthMethodRequest { password: string }
 
 export interface UpdateProfileRequest {
   display_name: string
@@ -1184,8 +1188,4 @@ export interface VerifyEmailChangeRequest {
 export interface EmailChangeVerifiedResponse {
   email: string
   email_verified: boolean
-}
-
-export interface ConvertAccountToGoogleRequest {
-  google_id_token: string
 }

@@ -1,10 +1,11 @@
 import type { ApiClientCore } from "./core"
 import type {
   AuthMethodsResponse,
-  ConvertAccountToGoogleRequest,
   EmailChangeRequestedResponse,
   EmailChangeVerifiedResponse,
   Profile,
+  GoogleAuthMethodRequest,
+  PasswordAuthMethodRequest,
   RequestEmailChangeRequest,
   SetupStatus,
   UpdateOnboardingStateRequest,
@@ -64,11 +65,16 @@ export function createProfileApi(core: ApiClientCore) {
       })
     },
 
-    async convertAccountToGoogle(data: ConvertAccountToGoogleRequest): Promise<Profile> {
-      return core.request<Profile>("/me/auth/convert-google", {
+    async connectGoogleAuthMethod(data: GoogleAuthMethodRequest): Promise<AuthMethodsResponse> {
+      return core.request<AuthMethodsResponse>("/me/auth-methods/google", {
         method: "POST",
         body: JSON.stringify(data),
       })
     },
+
+    async removeGoogleAuthMethod(): Promise<AuthMethodsResponse> { return core.request<AuthMethodsResponse>("/me/auth-methods/google", { method: "DELETE" }) },
+    async addPasswordAuthMethod(data: PasswordAuthMethodRequest): Promise<AuthMethodsResponse> { return core.request<AuthMethodsResponse>("/me/auth-methods/password", { method: "POST", body: JSON.stringify(data) }) },
+    async changePasswordAuthMethod(data: PasswordAuthMethodRequest): Promise<AuthMethodsResponse> { return core.request<AuthMethodsResponse>("/me/auth-methods/password", { method: "PATCH", body: JSON.stringify(data) }) },
+    async removePasswordAuthMethod(): Promise<AuthMethodsResponse> { return core.request<AuthMethodsResponse>("/me/auth-methods/password", { method: "DELETE" }) },
   }
 }
