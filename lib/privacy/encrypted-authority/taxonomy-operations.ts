@@ -9,6 +9,16 @@ export function getEncryptedContexts(deps: EncryptedOperationDependencies): { it
   return { items: authority.getState().contexts.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey })) }
 }
 
+export function getEncryptedTags(deps: EncryptedOperationDependencies): Tag[] {
+  const authority = requireEncryptedAuthority(deps)
+  return authority.getState().tags.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey }))
+}
+
+export function getEncryptedCards(deps: EncryptedOperationDependencies): Card[] {
+  const authority = requireEncryptedAuthority(deps)
+  return authority.getState().cards.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name, is_favorite: item.isFavorite }))
+}
+
 export async function createEncryptedTag(deps: EncryptedOperationDependencies, input: { name: string; icon_key?: string | null }): Promise<Tag> {
   const authority = requireEncryptedAuthority(deps)
   const id = createEncryptedRecordId()

@@ -5,7 +5,6 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import type { Card, RecurringExpensesResponse, Tag } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { materializeEncryptedRecurring } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 
 function materializationErrorMessage(code: string): string {
   switch (code) {
@@ -39,20 +38,18 @@ export function useRecurringData(month: string) {
         return
       }
       if (authority.authority) {
-        if (!authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         // Materialization is a write-side convenience for the selected/current
         // month. It must not prevent already-decrypted recurring rules from
         // being displayed if a stale occurrence or migrated record needs a
         // later retry.
-        const materialization = await materializeEncryptedRecurring(authority.authority, month)
+        const materialization = await authority.materializeRecurring(month)
         if (materialization.status === "failed") {
           setError(materializationErrorMessage(materialization.code))
         }
         const recurringResponse = await authority.getRecurringExpenses(month) as RecurringExpensesResponse
-        const state = authority.authority?.getState()
         setData(recurringResponse)
-        setTags((state?.tags ?? []).map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey })))
-        setCards((state?.cards ?? []).map((item) => ({ id: item.id, name: item.name, is_favorite: item.isFavorite })))
+        setTags(await authority.getTags())
+        setCards(await authority.getCards())
         return
       }
       throw new Error("ENCRYPTED_AUTHORITY_LOCKED")

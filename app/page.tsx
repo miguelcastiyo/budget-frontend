@@ -25,7 +25,6 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { materializeEncryptedRecurring } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
 
@@ -65,12 +64,10 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const overviewRequest = authority.authority
-        ? materializeEncryptedRecurring(authority.authority, currentMonth).then((result) => {
+      const overviewRequest = authority.materializeRecurring(currentMonth).then((result) => {
           setRecurringWarning(result.status === "failed" ? "Recurring items could not be fully posted. Overview is showing the last committed state." : null)
           return authority.getMonthOverview(currentMonth)
         })
-        : authority.getMonthOverview(currentMonth)
       const [overviewResult, closeoutResult] = await Promise.allSettled([
         overviewRequest,
         authority.getMonthCloseout(currentMonth),

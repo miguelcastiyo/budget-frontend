@@ -8,14 +8,14 @@ import { VaultManager } from "@/lib/privacy/vault-manager"
 import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret, type VaultInitializationPayload } from "@/lib/privacy/vault-crypto"
 import type { Card, Context, CreateTransactionRequest, CreateFundEntryRequest, FundCloseoutSummaryResponse, FundDetail, FundEntriesPage, FundEntry, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
 import { encryptedCloseout, encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
-import { commitEncryptedCloseout, reopenEncryptedCloseout } from "@/lib/privacy/encrypted-authority/closeout-mutation"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
-import { createEncryptedCard, createEncryptedContext, createEncryptedTag, getEncryptedContexts } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
+import { createEncryptedCard, createEncryptedContext, createEncryptedTag, getEncryptedCards, getEncryptedContexts, getEncryptedTags } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 import { createEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFund, getEncryptedFundEntries, getEncryptedFunds, updateEncryptedFundEntry } from "@/lib/privacy/encrypted-authority/fund-operations"
 import { createRecurringOperations } from "@/lib/privacy/encrypted-authority/recurring-operations"
 import { closeEncryptedMonth, getEncryptedMonthCloseout, reopenEncryptedMonth, updateEncryptedMonthCloseout } from "@/lib/privacy/encrypted-authority/closeout-operations"
 import { getEncryptedSavingsPlan, replaceEncryptedSavingsPlan } from "@/lib/privacy/encrypted-authority/savings-plan-operations"
+import { materializeEncryptedRecurring, type RecurringMaterializationResult } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
 
 interface FinancialAuthorityContextValue {
@@ -39,6 +39,8 @@ interface FinancialAuthorityContextValue {
   deleteTransaction: (current: Transaction) => Promise<void>
   getTransactionSuggestions: (query: string, limit?: number) => Promise<TransactionSuggestionsResponse>
   getContexts: () => Promise<{ items: Context[] }>
+  getTags: () => Promise<Tag[]>
+  getCards: () => Promise<Card[]>
   createTag: (input: { name: string; icon_key?: string | null }) => Promise<Tag>
   createCard: (input: { name: string }) => Promise<Card>
   createContext: (input: { name: string; icon_key?: string | null }) => Promise<Context>
@@ -51,6 +53,7 @@ interface FinancialAuthorityContextValue {
   getMonthOverview: (month: string) => Promise<any>
   getInsightsMetrics: (from: string, to: string) => Promise<any>
   getRecurringExpenses: (month: string) => Promise<any>
+  materializeRecurring: (month: string) => Promise<RecurringMaterializationResult>
   getSavingsPlan: (month: string) => Promise<any>
   createRecurringExpense: (input: Record<string, unknown>) => Promise<void>
   updateRecurringExpense: (id: string, input: Record<string, unknown>) => Promise<void>
@@ -188,6 +191,8 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
 
   const taxonomyOperations = useMemo(() => ({
     getContexts: async () => runEncrypted((deps) => getEncryptedContexts(deps)),
+    getTags: async () => runEncrypted((deps) => getEncryptedTags(deps)),
+    getCards: async () => runEncrypted((deps) => getEncryptedCards(deps)),
     createTag: (input: { name: string; icon_key?: string | null }) => runEncrypted((deps) => createEncryptedTag(deps, input)),
     createCard: (input: { name: string }) => runEncrypted((deps) => createEncryptedCard(deps, input)),
     createContext: (input: { name: string; icon_key?: string | null }) => runEncrypted((deps) => createEncryptedContext(deps, input)),
@@ -206,6 +211,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     getMonthOverview: (month: string) => runEncrypted((deps) => encryptedMonthOverview(requireEncryptedAuthority(deps).getState(), month)),
     getInsightsMetrics: (from: string, to: string) => runEncrypted((deps) => encryptedInsights(requireEncryptedAuthority(deps).getState(), from, to)),
     getRecurringExpenses: (month: string) => runEncrypted((deps) => encryptedRecurring(requireEncryptedAuthority(deps).getState(), month)),
+    materializeRecurring: (month: string) => runEncrypted((deps) => materializeEncryptedRecurring(requireEncryptedAuthority(deps), month)),
     getSavingsPlan: (month: string) => runEncrypted((deps) => getEncryptedSavingsPlan(deps, month)),
   }), [runEncrypted])
 

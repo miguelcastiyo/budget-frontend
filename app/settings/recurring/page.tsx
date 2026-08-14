@@ -195,7 +195,7 @@ export default function RecurringSettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [authority.authority, detailEntry, detailItem, setError])
+  }, [detailEntry, detailItem, setError])
 
   const tagOptions = useMemo(() => tags, [tags])
   const activeItemsCount = useMemo(

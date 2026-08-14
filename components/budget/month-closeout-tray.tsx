@@ -46,7 +46,6 @@ import type {
   MonthCloseoutSaved,
 } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { commitEncryptedCloseout, reopenEncryptedCloseout } from "@/lib/privacy/encrypted-authority/closeout-mutation"
 
 export type MonthCloseoutTrayMode = "close" | "view" | "edit" | "review"
 
@@ -355,9 +354,7 @@ export function MonthCloseoutTray({
         allocations: buildPayloadAllocations(allocations),
       }
 
-      const response = authority.authority
-        ? await commitEncryptedCloseout(authority.authority!, month, payload)
-        : mode === "edit"
+      const response = mode === "edit"
           ? await authority.updateMonthCloseout(month, payload)
           : await authority.closeMonth(month, payload)
 
@@ -383,9 +380,7 @@ export function MonthCloseoutTray({
     setError(null)
 
     try {
-      const response = authority.authority
-        ? await reopenEncryptedCloseout(authority.authority!, month)
-        : await authority.reopenMonth(month)
+      const response = await authority.reopenMonth(month)
       onSaved(response)
       setShowReopenConfirm(false)
       onOpenChange(false)
