@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CredentialResponse, GoogleLogin } from "@react-oauth/google"
+import { useTheme } from "next-themes"
 import { AlertCircle, ArrowRight, LockKeyhole } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Button } from "@/components/ui/button"
@@ -24,7 +25,7 @@ function AuthScreenShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="auth-light min-h-[100svh] overflow-x-hidden bg-background text-foreground">
+    <div className="min-h-[100svh] overflow-x-hidden bg-background text-foreground">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(111,128,100,0.08),transparent_28%),linear-gradient(to_bottom,rgba(184,141,74,0.035),transparent_30%)]" />
 
       <main className="mx-auto flex min-h-[100svh] max-w-6xl flex-col items-center justify-start px-4 pt-auth-safe-top pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sm:px-5 sm:pb-10 lg:px-8 lg:pb-16">
@@ -118,6 +119,7 @@ function inviteErrorCopy(errorState: InviteErrorState, fallback: string | null) 
 function SignInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { resolvedTheme } = useTheme()
   const { setAuthenticatedUser, setSetupStatus } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -137,6 +139,7 @@ function SignInPageContent() {
   const invitedEmail = invitePreview?.email ?? ""
   const invitePrimaryAuthProvider = invitePreview?.preferred_auth_provider ?? "password"
   const isGooglePrimaryInvitePath = invitePrimaryAuthProvider === "google"
+  const googleButtonTheme = resolvedTheme === "dark" ? "filled_black" : "outline"
 
   useEffect(() => {
     const updateGoogleButtonWidth = () => {
@@ -325,7 +328,7 @@ function SignInPageContent() {
               setInviteError("generic")
               setError("Google sign-in was canceled or failed.")
             }}
-            theme="outline"
+            theme={googleButtonTheme}
             text="signup_with"
             shape="pill"
             size="large"
@@ -562,7 +565,7 @@ function SignInPageContent() {
             <GoogleLogin
               onSuccess={(credentialResponse) => void handleGoogleSignIn(credentialResponse)}
               onError={() => setError("Google sign-in was canceled or failed.")}
-              theme="outline"
+              theme={googleButtonTheme}
               text="continue_with"
               shape="pill"
               size="large"
