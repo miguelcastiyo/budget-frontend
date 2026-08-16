@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api/client"
 import { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority"
 import { VaultManager } from "@/lib/privacy/vault-manager"
 import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret, type VaultInitializationPayload } from "@/lib/privacy/vault-crypto"
-import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
+import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, CsvImportResponse, DataRunItem, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
 import { encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
@@ -16,6 +16,8 @@ import { createRecurringOperations } from "@/lib/privacy/encrypted-authority/rec
 import { closeEncryptedMonth, getEncryptedMonthCloseout, reopenEncryptedMonth, updateEncryptedMonthCloseout } from "@/lib/privacy/encrypted-authority/closeout-operations"
 import { getEncryptedBudgetResolution, getEncryptedBudgetVersions, saveEncryptedBudget } from "@/lib/privacy/encrypted-authority/budget-operations"
 import { getEncryptedSavingsPlan, replaceEncryptedSavingsPlan } from "@/lib/privacy/encrypted-authority/savings-plan-operations"
+import { commitEncryptedCsvImport, exportEncryptedTransactionsCsv, getEncryptedDataRuns, getEncryptedImportTags, planEncryptedCsvImport, repairEncryptedCsvImportLineage, rollbackEncryptedCsvImport, type EncryptedCsvImportOptions } from "@/lib/privacy/encrypted-authority/import-operations"
+import type { CsvImportPlan, CsvRow } from "@/lib/domain/financial/csv"
 import { materializeEncryptedRecurring, type RecurringMaterializationResult } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 import { tagQuickPicksFromState, taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
 import { getLocalDateKey } from "@/lib/date-filters"
@@ -24,6 +26,7 @@ import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, un
 interface FinancialAuthorityContextValue {
   isVaultSetupRequired: boolean
   isLoading: boolean
+  isUnlocked: boolean
   refresh: () => Promise<void>
   authority: EncryptedFinancialAuthority | null
   unlock: (passphrase: string) => Promise<void>
@@ -63,6 +66,13 @@ interface FinancialAuthorityContextValue {
   getFund: (fundId: string) => Promise<FundDetail>
   getFundEntries: (fundId: string) => Promise<FundEntriesPage>
   getFundCloseoutSummary: (year: number) => Promise<any>
+  getImportTags: () => Promise<Tag[]>
+  planCsvImport: (rows: CsvRow[], options: EncryptedCsvImportOptions) => Promise<CsvImportPlan>
+  commitCsvImport: (plan: CsvImportPlan, sourceFilename: string) => Promise<{ batchId: string }>
+  rollbackCsvImport: (importRunId: string) => Promise<void>
+  repairCsvImportLineage: (importRunId: string) => Promise<void>
+  getDataRuns: (limit: number) => Promise<DataRunItem[]>
+  exportTransactionsCsv: (filters: { date_from?: string; date_to?: string }) => Promise<string>
   createFund: (input: CreateFundRequest) => Promise<FundListItem>
   updateFund: (fundId: string, input: UpdateFundRequest) => Promise<FundListItem>
   setFundStatus: (fundId: string, status: "active" | "archived") => Promise<void>
@@ -254,6 +264,16 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     getFundCloseoutSummary: (year: number) => runEncrypted((deps) => encryptedFundCloseoutSummary(deps.authority.getState(), year)),
   }), [runEncrypted])
 
+  const importOperations = useMemo(() => ({
+    getImportTags: async () => runEncrypted((deps) => getEncryptedImportTags(deps.authority)),
+    planCsvImport: async (rows: CsvRow[], options: EncryptedCsvImportOptions) => runEncrypted((deps) => planEncryptedCsvImport(deps.authority, rows, options)),
+    commitCsvImport: (plan: CsvImportPlan, sourceFilename: string) => runEncrypted((deps) => commitEncryptedCsvImport(deps.authority, plan, sourceFilename)),
+    rollbackCsvImport: (importRunId: string) => runEncrypted((deps) => rollbackEncryptedCsvImport(deps.authority, importRunId)),
+    repairCsvImportLineage: (importRunId: string) => runEncrypted((deps) => repairEncryptedCsvImportLineage(deps.authority, importRunId)),
+    getDataRuns: async (limit: number) => runEncrypted((deps) => getEncryptedDataRuns(deps.authority, limit)),
+    exportTransactionsCsv: async (filters: { date_from?: string; date_to?: string }) => runEncrypted((deps) => exportEncryptedTransactionsCsv(deps.authority, filters)),
+  }), [runEncrypted])
+
   const budgetOperations = useMemo(() => ({
     getBudgetResolution: async (month: string) => runEncrypted((deps) => getEncryptedBudgetResolution(deps.authority, month)),
     getBudgetVersions: async () => runEncrypted((deps) => getEncryptedBudgetVersions(deps.authority)),
@@ -278,6 +298,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const value = useMemo<FinancialAuthorityContextValue>(() => ({
     isVaultSetupRequired,
     isLoading,
+    isUnlocked: Boolean(authority),
     refresh,
     authority,
     unlock,
@@ -293,6 +314,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     ...transactionOperations,
     ...taxonomyOperations,
     ...fundOperations,
+    ...importOperations,
     ...budgetOperations,
     ...derivedOperations,
     createRecurringExpense: (input) => recurring ? recurring.create(input) : unavailableFinancialOperation(),
@@ -302,7 +324,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, budgetOperations, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, budgetOperations, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
   useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 

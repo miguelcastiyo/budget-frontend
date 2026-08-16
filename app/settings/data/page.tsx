@@ -30,7 +30,6 @@ import {
 } from "./_components/data-settings-sections"
 import { useDataRuns } from "./_hooks/use-data-runs"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { commitEncryptedCsvImport, exportEncryptedTransactionsCsv, getEncryptedImportTags, planEncryptedCsvImport, repairEncryptedCsvImportLineage, rollbackEncryptedCsvImport } from "@/lib/privacy/encrypted-authority/import-operations"
 import {
   bestCategorySource,
   createEmptyImportState,
@@ -166,7 +165,7 @@ export default function DataSettingsPage() {
 
     setIsPreviewing(true)
     try {
-      if (authority.authority) {
+      if (authority.isUnlocked) {
         const parsed = parseCsvText(await file.text())
         const lower = new Map(parsed.headers.map((header) => [header.toLowerCase(), header]))
         const suggestedMapping: CsvImportMapping = {}
@@ -175,7 +174,7 @@ export default function DataSettingsPage() {
           if (header) suggestedMapping[field] = header
         }
         const preview: CsvImportPreviewResponse = { mode: "preview", headers: parsed.headers, sample_rows: parsed.rows.slice(0, 5), column_profiles: parsed.headers.map((header) => ({ header, blank_count: parsed.rows.filter((item) => !item[header]?.trim()).length, unique_values_truncated: false, unique_values: [...new Set(parsed.rows.map((item) => item[header] ?? ""))].filter(Boolean).slice(0, 100).map((value) => ({ value, count: parsed.rows.filter((item) => item[header] === value).length })) })), date_profiles: [], suggested_mapping: suggestedMapping, total_rows: parsed.rows.length, limits: { max_bytes: 10_000_000, max_rows: 100_000, max_returned_errors: 100 } }
-        const tagsResponse = getEncryptedImportTags(authority.authority)
+        const tagsResponse = await authority.getImportTags()
         setImportPreview(preview); setExistingTags(tagsResponse); setImportMapping(suggestedMapping); setDateYear(String(currentImportYear())); setCategoryMode(suggestedMapping.category ? "exact_column" : "default"); setCategorySourceHeader(suggestedMapping.category ?? ""); setCategoryValueMap({}); setTagValueMap({}); setImportStep("map")
         return
       }
@@ -309,7 +308,7 @@ export default function DataSettingsPage() {
     setCommitResult(null)
 
     try {
-      if (authority.authority) {
+      if (authority.isUnlocked) {
         const plan = await buildEncryptedPlan()
         setValidationResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV validated locally", mode: "dry_run", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: 0, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("review")
@@ -336,9 +335,9 @@ export default function DataSettingsPage() {
     setImportError(null)
 
     try {
-      if (authority.authority) {
+      if (authority.isUnlocked) {
         const plan = await buildEncryptedPlan()
-        await commitEncryptedCsvImport(authority.authority, plan, importFile.name)
+        await authority.commitCsvImport(plan, importFile.name)
         setCommitResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV imported into encrypted authority", mode: "commit", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("done")
         await loadDataRuns()
@@ -382,8 +381,8 @@ export default function DataSettingsPage() {
     setIsExporting(true)
 
     try {
-      if (authority.authority) {
-        const csv = exportEncryptedTransactionsCsv(authority.authority, filters)
+      if (authority.isUnlocked) {
+        const csv = await authority.exportTransactionsCsv(filters)
         const blob = new Blob([csv], { type: "text/csv" })
         const url = URL.createObjectURL(blob)
         const anchor = document.createElement("a")
@@ -421,8 +420,8 @@ export default function DataSettingsPage() {
     setRollbackError(null)
 
     try {
-      if (authority.authority) {
-        await rollbackEncryptedCsvImport(authority.authority, importRunId)
+      if (authority.isUnlocked) {
+        await authority.rollbackCsvImport(importRunId)
       } else {
         throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
       }
@@ -440,11 +439,11 @@ export default function DataSettingsPage() {
   }
 
   const handleRepairImport = async () => {
-    if (!repairTarget || !authority.authority) return
+    if (!repairTarget || !authority.isUnlocked) return
     setRepairingImportId(repairTarget.id)
     setRepairError(null)
     try {
-      await repairEncryptedCsvImportLineage(authority.authority, repairTarget.id)
+      await authority.repairCsvImportLineage(repairTarget.id)
       setRepairTarget(null)
       await loadDataRuns()
     } catch (err) {
@@ -485,14 +484,14 @@ export default function DataSettingsPage() {
   const tagValues = tagProfile?.unique_values ?? []
   const tagSetupComplete = tagValues.length > 0 && tagValues.every((item) => Boolean(tagValueMap[item.value]))
   const buildEncryptedPlan = async () => {
-    if (!importFile || !authority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+    if (!importFile || !authority.isUnlocked) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     const parsed = parseCsvText(await importFile.text())
     const contextHeader = effectiveImportMapping.context ?? parsed.headers.find((header) => header.trim().toLowerCase() === "context")
     const rows = parsed.rows.map((item, index) => ({ row: index + 2, date: item[effectiveImportMapping.date ?? ""] ?? "", expense: item[effectiveImportMapping.expense ?? ""] ?? "", amount: item[effectiveImportMapping.amount ?? ""] ?? "", externalCategory: item[effectiveImportMapping.category ?? categorySourceHeader] ?? defaultCategory, tag: item[effectiveImportMapping.tag ?? ""] ?? "", card: item[effectiveImportMapping.card ?? ""] ?? "", context: contextHeader ? item[contextHeader] ?? "" : "", notes: item[effectiveImportMapping.notes ?? ""] ?? "", isSplit: (item[effectiveImportMapping.is_split ?? ""] ?? "").toLowerCase() === "true" }))
-    return planEncryptedCsvImport(authority.authority, rows, { year: Number(dateYear) || currentImportYear(), tagValueMap })
+    return authority.planCsvImport(rows, { year: Number(dateYear) || currentImportYear(), tagValueMap })
   }
   const amountProfile = profileForHeader(importPreview, importMapping.amount ?? "")
-  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (Boolean(authority.authority) || tagSetupComplete) && !hasDuplicateMapping)
+  const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (authority.isUnlocked || tagSetupComplete) && !hasDuplicateMapping)
   const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
   const currentImportStepIndex = useMemo(() => importStepIndex(importStep), [importStep])
 
@@ -818,7 +817,7 @@ export default function DataSettingsPage() {
                       <h3 className="text-sm font-semibold">Map columns</h3>
                       <p className="text-xs text-muted-foreground">Match CSV columns to Budget fields. {pluralize(importPreview.headers.length, "column")} detected.</p>
                     </div>
-                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} includeContext={Boolean(authority.authority)} />
+                    <MappingControls preview={importPreview} mapping={importMapping} onChange={handleMappingChange} includeContext={authority.isUnlocked} />
                     {!requiredMappingComplete && (
                       <p className="text-xs text-destructive">Map every required field before continuing.</p>
                     )}

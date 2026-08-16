@@ -37,7 +37,7 @@ export function useRecurringData(month: string) {
       if (authority.isLoading) {
         return
       }
-      if (authority.authority) {
+      if (authority.isUnlocked) {
         // Materialization is a write-side convenience for the selected/current
         // month. It must not prevent already-decrypted recurring rules from
         // being displayed if a stale occurrence or migrated record needs a

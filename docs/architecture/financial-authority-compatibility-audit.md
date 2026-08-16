@@ -82,9 +82,10 @@ The raw `authority` escape hatch is intentionally retained for now. Settings
 taxonomy and budget flows now use explicit provider selectors/commands, as do
 the savings-plan hook and transaction-editor taxonomy loading. Insights now
 uses an explicit oldest-transaction selector. Funds now uses explicit fund
-selectors and commands as well. Remaining consumers still use the raw member
-for data/import orchestration and Vault lifecycle/readiness. Removing it
-without migrating those boundaries would merely move the service-locator
-dependency rather than thin it.
+selectors and commands as well. Data/import now uses explicit provider
+selectors and commands for planning, commit, rollback, lineage repair,
+activity, tag lookup, and CSV export. The remaining raw member consumers are
+Vault lifecycle/readiness boundaries only; removing it without a separate Vault
+context decision would broaden this phase beyond feature responsibility.
 No independent Vault context was introduced; the lifecycle and financial
 authority still have demonstrably shared ownership.
