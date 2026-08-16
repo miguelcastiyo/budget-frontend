@@ -71,9 +71,6 @@ import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { encryptedFundCloseoutSummary } from "@/lib/privacy/encrypted-authority/derived"
-import { createEncryptedRecordId } from "@/lib/privacy/encrypted-records/crypto"
-import { parseMoneyCents } from "@/lib/domain/financial/money"
 
 type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
@@ -424,7 +421,7 @@ export function FundsOverviewPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const loadData = useCallback(async () => {
-    if (financialAuthority.isLoading || !financialAuthority.authority) {
+    if (financialAuthority.isLoading) {
       return
     }
     setIsLoading(true)
@@ -437,13 +434,10 @@ export function FundsOverviewPage() {
           ? null
           : financialAuthority.getFunds({ status: "active" })
 
-      if (!financialAuthority.authority) {
-        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
-      }
       const [fundsResult, activeMetricsResult, summaryResult] = await Promise.allSettled([
         financialAuthority.getFunds({ status: filter }),
         metricsPromise ?? Promise.resolve(null),
-        Promise.resolve(encryptedFundCloseoutSummary(financialAuthority.authority.getState(), new Date().getFullYear())),
+        financialAuthority.getFundCloseoutSummary(new Date().getFullYear()),
       ])
 
       if (fundsResult.status === "rejected") {
@@ -893,7 +887,7 @@ export function FundDetailPage() {
     if (!fundId) {
       return
     }
-    if (financialAuthority.isLoading || !financialAuthority.authority) {
+    if (financialAuthority.isLoading) {
       return
     }
 
@@ -901,11 +895,8 @@ export function FundDetailPage() {
     setError(null)
 
     try {
-      if (financialAuthority.authority) {
-        const [fundResponse, entriesResponse] = await Promise.all([financialAuthority.getFund(fundId), financialAuthority.getFundEntries(fundId)])
-        setFund(fundResponse); setEntries(entriesResponse.items); return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const [fundResponse, entriesResponse] = await Promise.all([financialAuthority.getFund(fundId), financialAuthority.getFundEntries(fundId)])
+      setFund(fundResponse); setEntries(entriesResponse.items)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -1282,25 +1273,10 @@ export function FundDialog({
     setError(null)
 
     try {
-      if (financialAuthority.authority) {
-        const encryptedAuthority = financialAuthority.authority
-        if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        if (mode === "create") {
-          const id = createEncryptedRecordId()
-          const startingBalance = values.starting_balance ? parseMoneyCents(values.starting_balance) : 0
-          const creates = [{ id, family: "fund", data: { id, name: values.name.trim(), fund_type: "goal", goal_amount_cents: goalAmount ? parseMoneyCents(goalAmount) : null, status: "active", sort_order: 0, notes: values.notes.trim() || null } }]
-          if (startingBalance > 0) {
-            const entryId = createEncryptedRecordId()
-            creates.push({ id: entryId, family: "fund_ledger_entry", data: { id: entryId, fund_id: id, entry_date: `${getCurrentMonthKey()}-01`, entry_type: "contribution", direction: "in", amount_cents: startingBalance, source_type: "starting_balance", is_voided: false, is_deleted: false } } as never)
-          }
-          await encryptedAuthority.commitSourceDiff({ creates, updates: [], tombstones: [] })
-        } else if (fund) {
-          const current = encryptedAuthority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fund.id)
-          if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-          await encryptedAuthority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data: { ...current.data, name: values.name.trim(), goal_amount_cents: goalAmount ? parseMoneyCents(goalAmount) : null, notes: values.notes.trim() || null } }], tombstones: [] })
-        }
-      } else {
-        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      if (mode === "create") {
+        await financialAuthority.createFund(payload as CreateFundRequest)
+      } else if (fund) {
+        await financialAuthority.updateFund(fund.id, payload as UpdateFundRequest)
       }
       onSaved()
     } catch (err) {
@@ -1577,18 +1553,9 @@ export function FundEntryDialog({
     if (!open || mode !== "create" || intent === "use") {
       return
     }
-    if (financialAuthority.authority) {
-      setTags([])
-      setCards([])
-      setTransactions([])
-      return
-    }
-
-    setError("ENCRYPTED_AUTHORITY_REQUIRED")
-
-    return () => {
-      // No legacy financial request is permitted for an unencrypted authority.
-    }
+    setTags([])
+    setCards([])
+    setTransactions([])
   }, [financialAuthority, open, mode, intent])
 
   const isLinkMode = values.budget_tracking === "link_existing_transaction"
@@ -1849,15 +1816,8 @@ async function handleArchiveRestore(
 ) {
   try {
     setError(null)
-    if (financialAuthority?.authority) {
-      const encryptedAuthority = financialAuthority.authority
-      if (!encryptedAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const current = encryptedAuthority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fund.id)
-      if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
-      await encryptedAuthority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data: { ...current.data, status: action === "archive" ? "archived" : "active" } }], tombstones: [] })
-    } else {
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
-    }
+    if (!financialAuthority) throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+    await financialAuthority.setFundStatus(fund.id, action === "archive" ? "archived" : "active")
     await onDone()
   } catch (err) {
     if (err instanceof ApiError) {

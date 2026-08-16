@@ -1,5 +1,6 @@
-import type { CreateFundEntryRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, UpdateFundEntryRequest } from "@/lib/api/types"
+import type { CreateFundEntryRequest, CreateFundRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, UpdateFundEntryRequest, UpdateFundRequest } from "@/lib/api/types"
 import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
+import { getCurrentMonthKey } from "@/lib/date-filters"
 import { fundVMFromState } from "@/lib/domain/financial/view-models"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
@@ -33,6 +34,50 @@ export async function createEncryptedFundEntry(deps: EncryptedOperationDependenc
     source_closeout_id: null, note: input.note ?? null, is_voided: false, is_deleted: false,
   })
   return { id, fund_id: fundId, entry_date: entryDate, entry_type: input.entry_type, direction: input.direction, amount: formatMoneyCents(amountCents), source_type: input.source_type ?? "manual", source_month: null, source_transaction_id: input.transaction_id ?? null, source_closeout_id: null, note: input.note ?? null, created_at: "", updated_at: "" }
+}
+
+function fundRecord(authority: ReturnType<typeof requireEncryptedAuthority>, fundId: string) {
+  return authority.store.values().find((record) => record.family === "fund" && String(record.data.id ?? record.sourceId) === fundId)
+}
+
+export async function createEncryptedFund(deps: EncryptedOperationDependencies, input: CreateFundRequest): Promise<FundListItem> {
+  const authority = requireEncryptedAuthority(deps)
+  const id = createEncryptedRecordId()
+  const goalAmount = input.goal_amount ? parseMoneyCents(input.goal_amount) : null
+  const creates: Array<{ id: string; family: string; data: Record<string, unknown> }> = [{
+    id,
+    family: "fund",
+    data: { id, name: input.name.trim(), fund_type: "goal", goal_amount_cents: goalAmount, target_month: input.target_month ?? null, status: "active", sort_order: 0, notes: input.notes ?? null },
+  }]
+  const startingBalance = input.starting_balance ? parseMoneyCents(input.starting_balance) : 0
+  if (startingBalance > 0) {
+    const entryId = createEncryptedRecordId()
+    creates.push({ id: entryId, family: "fund_ledger_entry", data: { id: entryId, fund_id: id, entry_date: `${getCurrentMonthKey()}-01`, entry_type: "contribution", direction: "in", amount_cents: startingBalance, source_type: "starting_balance", source_transaction_id: null, source_closeout_id: null, note: null, is_voided: false, is_deleted: false } })
+  }
+  await authority.commitSourceDiff({ creates, updates: [], tombstones: [] })
+  const result = await getEncryptedFunds(deps, { status: "all" })
+  const fund = result.items.find((item) => item.id === id)
+  if (!fund) throw new Error("ENCRYPTED_AUTHORITY_STATE_INVALID")
+  return fund
+}
+
+export async function updateEncryptedFund(deps: EncryptedOperationDependencies, fundId: string, input: UpdateFundRequest): Promise<FundListItem> {
+  const authority = requireEncryptedAuthority(deps)
+  const current = fundRecord(authority, fundId)
+  if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  const data = { ...current.data, name: input.name?.trim() || String(current.data.name ?? ""), goal_amount_cents: input.goal_amount ? parseMoneyCents(input.goal_amount) : null, target_month: input.target_month ?? null, notes: input.notes ?? null }
+  await authority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data }], tombstones: [] })
+  const result = await getEncryptedFunds(deps, { status: "all" })
+  const fund = result.items.find((item) => item.id === fundId)
+  if (!fund) throw new Error("ENCRYPTED_AUTHORITY_STATE_INVALID")
+  return fund
+}
+
+export async function setEncryptedFundStatus(deps: EncryptedOperationDependencies, fundId: string, status: "active" | "archived"): Promise<void> {
+  const authority = requireEncryptedAuthority(deps)
+  const current = fundRecord(authority, fundId)
+  if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  await authority.commitSourceDiff({ creates: [], updates: [{ id: current.envelope.record_id, family: "fund", data: { ...current.data, status } }], tombstones: [] })
 }
 
 export async function getEncryptedFunds(deps: EncryptedOperationDependencies, filters?: { status?: "active" | "archived" | "all" }): Promise<FundsListResponse> {

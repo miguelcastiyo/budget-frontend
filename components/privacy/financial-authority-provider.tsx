@@ -6,12 +6,12 @@ import { apiClient } from "@/lib/api/client"
 import { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority"
 import { VaultManager } from "@/lib/privacy/vault-manager"
 import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret, type VaultInitializationPayload } from "@/lib/privacy/vault-crypto"
-import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, FundDetail, FundEntriesPage, FundEntry, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
-import { encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
+import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
+import { encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
 import { createEncryptedCard, createEncryptedContext, createEncryptedTag, deleteEncryptedCard, deleteEncryptedContext, deleteEncryptedTag, getEncryptedCards, getEncryptedContexts, getEncryptedTags, updateEncryptedCard, updateEncryptedContext, updateEncryptedTag } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
-import { createEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFund, getEncryptedFundEntries, getEncryptedFunds, updateEncryptedFundEntry } from "@/lib/privacy/encrypted-authority/fund-operations"
+import { createEncryptedFund, createEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFund, getEncryptedFundEntries, getEncryptedFunds, setEncryptedFundStatus, updateEncryptedFund, updateEncryptedFundEntry } from "@/lib/privacy/encrypted-authority/fund-operations"
 import { createRecurringOperations } from "@/lib/privacy/encrypted-authority/recurring-operations"
 import { closeEncryptedMonth, getEncryptedMonthCloseout, reopenEncryptedMonth, updateEncryptedMonthCloseout } from "@/lib/privacy/encrypted-authority/closeout-operations"
 import { getEncryptedBudgetResolution, getEncryptedBudgetVersions, saveEncryptedBudget } from "@/lib/privacy/encrypted-authority/budget-operations"
@@ -62,6 +62,10 @@ interface FinancialAuthorityContextValue {
   deleteFundEntry: (fundId: string, entry: FundEntry) => Promise<void>
   getFund: (fundId: string) => Promise<FundDetail>
   getFundEntries: (fundId: string) => Promise<FundEntriesPage>
+  getFundCloseoutSummary: (year: number) => Promise<any>
+  createFund: (input: CreateFundRequest) => Promise<FundListItem>
+  updateFund: (fundId: string, input: UpdateFundRequest) => Promise<FundListItem>
+  setFundStatus: (fundId: string, status: "active" | "archived") => Promise<void>
   getBudgetResolution: (month: string) => Promise<any>
   getBudgetVersions: () => Promise<any>
   saveBudget: (month: string, payload: Record<string, unknown>) => Promise<void>
@@ -238,12 +242,16 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   }), [runEncrypted])
 
   const fundOperations = useMemo(() => ({
+    createFund: (input: CreateFundRequest) => runEncrypted((deps) => createEncryptedFund(deps, input)),
+    updateFund: (fundId: string, input: UpdateFundRequest) => runEncrypted((deps) => updateEncryptedFund(deps, fundId, input)),
+    setFundStatus: (fundId: string, status: "active" | "archived") => runEncrypted((deps) => setEncryptedFundStatus(deps, fundId, status)),
     createFundEntry: (fundId: string, input: CreateFundEntryRequest) => runEncrypted((deps) => createEncryptedFundEntry(deps, fundId, input)),
     getFunds: (filters?: { status?: "active" | "archived" | "all" }) => runEncrypted((deps) => getEncryptedFunds(deps, filters)),
     updateFundEntry: (fundId: string, entry: FundEntry, input: UpdateFundEntryRequest) => runEncrypted((deps) => updateEncryptedFundEntry(deps, fundId, entry, input)),
     deleteFundEntry: (fundId: string, entry: FundEntry) => runEncrypted((deps) => deleteEncryptedFundEntry(deps, fundId, entry)),
     getFund: (fundId: string) => runEncrypted((deps) => getEncryptedFund(deps, fundId)),
     getFundEntries: (fundId: string) => runEncrypted((deps) => getEncryptedFundEntries(deps, fundId)),
+    getFundCloseoutSummary: (year: number) => runEncrypted((deps) => encryptedFundCloseoutSummary(deps.authority.getState(), year)),
   }), [runEncrypted])
 
   const budgetOperations = useMemo(() => ({

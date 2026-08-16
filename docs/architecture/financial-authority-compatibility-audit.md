@@ -81,9 +81,10 @@ thinning pass removed the duplicate encrypted savings-plan mutation from
 The raw `authority` escape hatch is intentionally retained for now. Settings
 taxonomy and budget flows now use explicit provider selectors/commands, as do
 the savings-plan hook and transaction-editor taxonomy loading. Insights now
-uses an explicit oldest-transaction selector. Remaining consumers still use it
-for transaction pagination/materialization, data/import orchestration, and the
-legacy funds surface. Removing that member without migrating those consumers
-would merely move the service-locator dependency rather than thin it.
+uses an explicit oldest-transaction selector. Funds now uses explicit fund
+selectors and commands as well. Remaining consumers still use the raw member
+for data/import orchestration and Vault lifecycle/readiness. Removing it
+without migrating those boundaries would merely move the service-locator
+dependency rather than thin it.
 No independent Vault context was introduced; the lifecycle and financial
 authority still have demonstrably shared ownership.
