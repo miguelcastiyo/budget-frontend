@@ -33,7 +33,7 @@ export function updateTransaction(current: TransactionRecord, command: Partial<T
 
 export function deleteTransaction(current: TransactionRecord): TransactionRecord { return { ...current, isDeleted: true } }
 
-function recurringReferenceKey(value: string): string { return value.trim().split(":").pop() ?? value.trim() }
+function recurringReferenceKey(value: string): string { return value.trim() }
 function recurringCompleteness(record: TransactionRecord): number { return [record.tagId, record.contextId, record.cardId, record.notes].filter(Boolean).length }
 export function visibleTransactions(records: TransactionRecord[]): TransactionRecord[] {
   const visible = records.filter((record) => !record.isDeleted)
@@ -58,9 +58,7 @@ export interface TransactionFilter { from?: string; to?: string; search?: string
 function sameReference(left: string | null, right: string): boolean {
   if (left == null) return false
   if (left === right) return true
-  const leftTail = left.split(":").pop()
-  const rightTail = right.split(":").pop()
-  return leftTail === rightTail || (Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right))
+  return Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right)
 }
 
 export function filterTransactions(records: TransactionRecord[], filter: TransactionFilter): TransactionRecord[] {

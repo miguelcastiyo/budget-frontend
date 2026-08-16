@@ -14,10 +14,10 @@ const { canonicalRecordFamily, parseEncryptedRecordPayload, serializeEncryptedRe
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
 
 assert(canonicalRecordFamily("funds") === "fund", "legacy fund family alias")
-const parsed = parseEncryptedRecordPayload({ record_family: "transactions", record_schema_version: "v1", source_id: "import_1:2", data: { id: "import_1:2", amountCents: 1250, recurringExpenseId: "series:1" } })
+const parsed = parseEncryptedRecordPayload({ record_family: "transactions", record_schema_version: "transaction_v1", source_id: "import_1:2", data: { id: "import_1:2", amountCents: 1250, recurringExpenseId: "series:1" } })
 assert(parsed.record_family === "transaction" && parsed.record_schema_version === "transaction_v1", "canonical family and schema")
 assert(parsed.data.amount_cents === 1250 && parsed.data.recurring_expense_id === "series:1", "legacy field aliases")
-assert(sameEncryptedReference("series:1", "1"), "namespaced references")
+assert(!sameEncryptedReference("series:1", "1") && sameEncryptedReference("42", 42), "exact and numeric references")
 const serialized = serializeEncryptedRecord({ family: "fund", schemaVersion: "fund_v1", sourceId: "fund_1", data: { id: "fund_1", name: "Emergency" } })
 assert(serialized.record_family === "fund" && serialized.data.name === "Emergency", "canonical serialization")
 for (const payload of [null, {}, { record_family: "unknown", record_schema_version: "unknown_v1", source_id: "x", data: {} }, { record_family: "fund", record_schema_version: "fund_v2", source_id: "x", data: {} }]) {

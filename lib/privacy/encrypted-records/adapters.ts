@@ -43,8 +43,8 @@ export function canonicalRecordFamily(value: unknown): EncryptedRecordFamily {
 function canonicalSchemaVersion(family: EncryptedRecordFamily, value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") throw new Error("ENCRYPTED_RECORD_PAYLOAD_INVALID:schema_version")
   const version = value.trim()
-  if (!version.endsWith("_v1") && version !== "v1") throw new Error(`ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED:${version}`)
-  return version === "v1" ? `${family}_v1` : version
+  if (!version.endsWith("_v1")) throw new Error(`ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED:${version}`)
+  return version
 }
 
 function canonicalData(value: unknown): RecordData {
@@ -105,5 +105,5 @@ export function sameEncryptedReference(left: unknown, right: unknown): boolean {
   if (left == null || right == null) return false
   const first = String(left)
   const second = String(right)
-  return first === second || first.split(":").pop() === second.split(":").pop() || (Number.isFinite(Number(first)) && Number(first) === Number(second))
+  return first === second || (Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second))
 }

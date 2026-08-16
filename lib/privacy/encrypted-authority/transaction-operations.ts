@@ -94,7 +94,7 @@ export async function deleteEncryptedTransaction(deps: EncryptedOperationDepende
   const recordId = record.envelope.record_id
   const ledger = authority.getState().fundLedgerEntries.find((item) => {
     const source = String(item.source_transaction_id ?? "")
-    return source === current.id || source === record.sourceId || source.endsWith(`:${current.id}`) || source.endsWith(`:${record.sourceId}`)
+    return source === current.id || source === record.sourceId || (Number.isFinite(Number(source)) && Number.isFinite(Number(current.id)) && Number(source) === Number(current.id)) || (Number.isFinite(Number(source)) && Number.isFinite(Number(record.sourceId)) && Number(source) === Number(record.sourceId))
   })
   const ledgerRecord = ledger ? authority.store.values().find((item) => item.family === "fund_ledger_entry" && (String(item.data.id ?? "") === String(ledger.id) || item.sourceId === String(ledger.id))) : undefined
   const priorEntry = ledgerRecord ? { id: ledgerRecord.envelope.record_id, family: "fund_ledger_entry", data: ledgerRecord.data } : null

@@ -33,7 +33,7 @@ function stringValue(value: unknown): string { return value == null ? "" : Strin
 function numberValue(value: unknown): number { const result = Number(value); return Number.isFinite(result) ? result : 0 }
 function sameId(left: string, right: string): boolean {
   if (left === right) return true
-  return left.split(":").pop() === right.split(":").pop()
+  return Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right)
 }
 function runMatches(record: DecryptedFinancialRecord, importRunId: string): boolean {
   return record.family === "import_run" && [record.sourceId, record.envelope.record_id, stringValue(record.data.id)].some((value) => sameId(value, importRunId))

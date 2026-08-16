@@ -16,7 +16,7 @@ export function sameRecurringReference(left: unknown, right: unknown): boolean {
   const first = String(left)
   const second = String(right)
   if (first === second) return true
-  return first.split(":").pop() === second.split(":").pop()
+  return Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second)
 }
 
 function rawString(value: unknown, fallback = ""): string {

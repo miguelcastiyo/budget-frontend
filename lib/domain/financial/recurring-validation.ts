@@ -19,7 +19,7 @@ export function validateRecurringRule(rule: RecurringRule, state?: RehydratedFin
   if (rule.billingType === "day_of_month" && (!Number.isInteger(rule.billingDay) || (rule.billingDay as number) < 1 || (rule.billingDay as number) > 31)) fail("billing_day", "Billing day must be between 1 and 31")
   if (rule.billingType !== "day_of_month" && rule.billingType !== "last_day") fail("billing_type", "Billing type is invalid")
   if (state) {
-    const sameId = (left: string, right: string) => left === right || left.split(":").pop() === right.split(":").pop()
+    const sameId = (left: string, right: string) => left === right || (Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right))
     if (!rule.tagId || !state.tags.some((tag) => sameId(tag.id, rule.tagId as string) && !tag.isDeleted)) fail("tag_id", "An active tag is required")
     if (rule.cardId && !state.cards.some((card) => sameId(card.id, rule.cardId as string) && !card.isDeleted)) fail("card_id", "Card is unavailable")
     const overlaps = recurringVersionOverlaps(state.recurringRules.map((raw) => recurringRuleFromRaw(raw, rule.startsMonth)).filter((item) => item.id !== rule.id).concat(rule))

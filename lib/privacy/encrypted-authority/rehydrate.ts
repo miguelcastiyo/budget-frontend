@@ -43,9 +43,7 @@ function sameRecordReference(left: unknown, right: unknown): boolean {
   const first = String(left)
   const second = String(right)
   if (first === second) return true
-  const firstTail = first.split(":").pop()
-  const secondTail = second.split(":").pop()
-  return firstTail === secondTail || (Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second))
+  return Number.isFinite(Number(first)) && Number.isFinite(Number(second)) && Number(first) === Number(second)
 }
 
 function taxonomy(record: DecryptedFinancialRecord): TaxonomyRecord {

@@ -15,15 +15,15 @@ export function requireEncryptedAuthority(deps: EncryptedOperationDependencies):
 }
 
 export function sameReference(left: string, right: string): boolean {
-  return left.trim() === right.trim() || (left.split(":").pop() ?? left) === (right.split(":").pop() ?? right)
+  return left.trim() === right.trim() || (Number.isFinite(Number(left)) && Number.isFinite(Number(right)) && Number(left) === Number(right))
 }
 
 export function resolveRecord(authority: EncryptedFinancialAuthority, family: string, id: string): DecryptedFinancialRecord | undefined {
   return authority.store.get(id) ?? authority.store.values().find((record) => record.family === family && (
     record.sourceId === id ||
     String(record.data.id ?? "") === id ||
-    record.sourceId.endsWith(`:${id}`) ||
-    String(record.data.id ?? "").endsWith(`:${id}`)
+    (Number.isFinite(Number(record.sourceId)) && Number.isFinite(Number(id)) && Number(record.sourceId) === Number(id)) ||
+    (Number.isFinite(Number(record.data.id)) && Number.isFinite(Number(id)) && Number(record.data.id) === Number(id))
   ))
 }
 
