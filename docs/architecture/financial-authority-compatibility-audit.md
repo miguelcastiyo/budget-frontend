@@ -29,10 +29,10 @@ bootstrapping. The report contains only counts and shape names:
 It never includes record IDs, names, amounts, dates, or relationship values.
 Because the audit runs before canonicalization, family aliases are not lost.
 
-For temporary owner capture, set `NEXT_PUBLIC_ENABLE_COMPATIBILITY_AUDIT=1`,
-unlock the production vault, and open `/dev/privacy/compatibility-audit` as an
-owner. Use **Copy report** and then remove the flag and this temporary route.
-The page has no API calls and only reads the in-memory aggregate report.
+For temporary owner capture, deploy this route, unlock the production vault,
+and open `/dev/privacy/compatibility-audit` as an owner. Use **Copy report**
+and then remove this temporary route. The page has no API calls and only reads
+the in-memory aggregate report.
 
 ## Retirement rule
 
