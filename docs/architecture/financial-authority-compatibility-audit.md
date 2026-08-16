@@ -70,3 +70,20 @@ local adapter test now uses the canonical form. Canonical `*_v1` validation
 remains.
 
 No encrypted records were rewritten or migrated.
+
+## Phase 6 provider API reassessment
+
+The provider remains the single lifecycle and command boundary. A safe first
+thinning pass removed the duplicate encrypted savings-plan mutation from
+`lib/savings-plan.ts`; it now uses the provider's existing
+`replaceSavingsPlan` command. Unused provider imports were removed as well.
+
+The raw `authority` escape hatch is intentionally retained for now. Settings
+taxonomy and budget flows now use explicit provider selectors/commands, as do
+the savings-plan hook and transaction-editor taxonomy loading. Insights now
+uses an explicit oldest-transaction selector. Remaining consumers still use it
+for transaction pagination/materialization, data/import orchestration, and the
+legacy funds surface. Removing that member without migrating those consumers
+would merely move the service-locator dependency rather than thin it.
+No independent Vault context was introduced; the lifecycle and financial
+authority still have demonstrably shared ownership.

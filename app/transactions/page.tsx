@@ -26,8 +26,6 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getLocalDateKey, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
-import { materializeEncryptedRecurring } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 import type {
   Card,
   Category,
@@ -222,17 +220,11 @@ export default function TransactionsPage() {
       return
     }
     try {
-      if (financialAuthority.authority) {
-        const state = financialAuthority.authority?.getState()
-        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const references = taxonomyFromState(state)
-        setTags(references.tags)
-        setQuickPickTags(references.tags.slice(0, 5))
-        setCards(references.cards)
-        setContexts(references.contexts)
-        return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      const references = await financialAuthority.getTransactionReferences()
+      setTags(references.tags)
+      setQuickPickTags(references.quickPickTags)
+      setCards(references.cards)
+      setContexts(references.contexts)
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     }
@@ -246,14 +238,12 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.authority) {
-        if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
         // Transactions must be self-sufficient: opening Settings > Recurring
         // first must not be required for a due recurring occurrence to appear.
         // Materialization remains idempotent and only creates eligible
         // occurrences for the current/selected month.
         try {
-          const materialization = await materializeEncryptedRecurring(financialAuthority.authority, activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
+          const materialization = await financialAuthority.materializeRecurring(activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
           if (materialization.status === "failed") {
             setError({ title: "Recurring transactions could not be posted", message: "Some recurring transactions could not be materialized for this month. Existing transactions remain visible; retry to try again.", code: materialization.code })
           }
@@ -262,12 +252,8 @@ export default function TransactionsPage() {
           // best-effort occurrence write is temporarily unavailable.
           setError(transactionError(err, "Some recurring transactions could not be materialized. Existing transactions remain visible; retry to try again."))
         }
-        const state = financialAuthority.authority?.getState()
-        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
+        const response = await financialAuthority.getTransactionsPage(activeTransactionFilters, 1)
         setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     } finally {
@@ -284,13 +270,8 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
-      if (financialAuthority.authority) {
-        const state = financialAuthority.authority?.getState()
-        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const response = transactionsPageFromState(state, { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, page: currentPage + 1, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" }, getLocalDateKey(), true)
-        setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      const response = await financialAuthority.getTransactionsPage(activeTransactionFilters, currentPage + 1)
+      setTransactions((current) => [...current, ...response.items]); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary)
     } catch (err) {
       setError(transactionError(err, "Unable to load more transactions"))
     } finally {
@@ -318,20 +299,13 @@ export default function TransactionsPage() {
   // search, loaded pagination depth, and the user's current scroll context.
   const revalidateLoadedTransactions = useCallback(async (loadedPageCount: number) => {
     try {
-      if (financialAuthority.authority) {
-        const state = financialAuthority.authority?.getState()
-        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const pageOptions = { from: activeTransactionFilters.date_from, to: activeTransactionFilters.date_to, search: activeTransactionFilters.q, categories: activeTransactionFilters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined, tagIds: activeTransactionFilters.tag_ids?.split(","), contextIds: activeTransactionFilters.context_ids?.split(","), cardIds: activeTransactionFilters.card_ids?.split(","), isSplit: activeTransactionFilters.is_split === "split" ? true : activeTransactionFilters.is_split === "not_split" ? false : undefined, pageSize: TRANSACTIONS_PAGE_SIZE, sort: activeTransactionFilters.sort === "date_asc" ? "date_asc" : "date_desc" as "date_asc" | "date_desc" }
-        const responses = Array.from({ length: loadedPageCount }, (_, index) => transactionsPageFromState(state, { ...pageOptions, page: index + 1 }, getLocalDateKey(), true))
-        const firstResponse = responses[0]
-        if (!firstResponse) return
-        setTransactions(mergeTransactionPages(responses.map((response) => response.items)))
-        setCurrentPage(loadedPageCount)
-        setTotalItems(firstResponse.total_items)
-        setSummary(firstResponse.summary)
-        return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      const responses = await Promise.all(Array.from({ length: loadedPageCount }, (_, index) => financialAuthority.getTransactionsPage(activeTransactionFilters, index + 1)))
+      const firstResponse = responses[0]
+      if (!firstResponse) return
+      setTransactions(mergeTransactionPages(responses.map((response) => response.items)))
+      setCurrentPage(loadedPageCount)
+      setTotalItems(firstResponse.total_items)
+      setSummary(firstResponse.summary)
     } catch (err) {
       setError(transactionError(err, "Unable to refresh transactions"))
     }

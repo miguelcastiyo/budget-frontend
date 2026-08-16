@@ -18,8 +18,6 @@ import {
 import { ApiError, apiClient } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedCard, deleteEncryptedCard, updateEncryptedCard } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
 function cardCountLabel(count: number) {
   return `${count} ${count === 1 ? "card" : "cards"}`
@@ -59,13 +57,7 @@ export default function CardsSettingsPage() {
   useEffect(() => {
     const loadCards = async () => {
       try {
-        if (financialAuthority.authority) {
-          if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-          const state = financialAuthority.authority.getState()
-          setCards(sortCards(taxonomyFromState({ ...state, cards: state.cards.filter((item) => !item.isDeleted) }).cards))
-        } else {
-          throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
-        }
+        setCards(sortCards(await financialAuthority.getCards()))
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.error.message)
@@ -94,8 +86,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const updated = await updateEncryptedCard(financialAuthority.authority, editingId, { name: editingName.trim() })
+      const updated = await financialAuthority.updateCard(editingId, { name: editingName.trim() })
       setCards((previous) => upsertUpdatedCard(previous, updated))
       setEditingId(null)
       setEditingName("")
@@ -125,8 +116,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedCard({ authority: financialAuthority.authority, isAuthenticated: true }, { name })
+      const created = await financialAuthority.createCard({ name })
       setCards((previous) => sortCards([...previous, created]))
       setNewCardName("")
       setShowNewCard(false)
@@ -150,8 +140,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      await deleteEncryptedCard(financialAuthority.authority, deleteCardId)
+      await financialAuthority.deleteCard(deleteCardId)
       setCards((previous) => previous.filter((card) => card.id !== deleteCardId))
       setDeleteCardId(null)
     } catch (err) {
@@ -170,8 +159,7 @@ export default function CardsSettingsPage() {
     setError(null)
 
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const updated = await updateEncryptedCard(financialAuthority.authority, card.id, { is_favorite: !card.is_favorite })
+      const updated = await financialAuthority.updateCard(card.id, { is_favorite: !card.is_favorite })
       setCards((previous) => upsertUpdatedCard(previous, updated))
     } catch (err) {
       if (err instanceof ApiError) {

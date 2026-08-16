@@ -23,7 +23,6 @@ import { formatMonthLabel, getCurrentMonthKey, isFutureMonth, parseMonthKey } fr
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { saveEncryptedBudget } from "@/lib/privacy/encrypted-authority/budget-operations"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
 import type { RehydratedFinancialState } from "@/lib/privacy/encrypted-authority/rehydrate"
@@ -159,10 +158,7 @@ export default function BudgetSettingsPage() {
       setIncomeForm(defaultIncomeFormState)
       setAllocationForm(defaultBudgetAllocationFormState)
       setLoadedPayloadKey(null)
-      if (!financialAuthority.authority) {
-        throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      }
-      const [budgetResult, versionsResult] = await Promise.allSettled([getEncryptedBudgetResolution(financialAuthority.authority.getState(), selectedMonth), getEncryptedBudgetVersions(financialAuthority.authority.getState())])
+      const [budgetResult, versionsResult] = await Promise.allSettled([financialAuthority.getBudgetResolution(selectedMonth), financialAuthority.getBudgetVersions()])
 
       if (cancelled) {
         return
@@ -279,10 +275,7 @@ export default function BudgetSettingsPage() {
         effective_month: selectedMonth,
         ...budgetSettingsPayload(incomeForm, allocationForm),
       }
-      if (!financialAuthority.authority) {
-        throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      }
-      await saveEncryptedBudget(financialAuthority.authority, selectedMonth, payload)
+      await financialAuthority.saveBudget(selectedMonth, payload)
       const response = payload as BudgetSettings
 
       hydrateForm(response)
@@ -293,7 +286,7 @@ export default function BudgetSettingsPage() {
         settings: response,
       })
       try {
-        const versions = await getEncryptedBudgetVersions(financialAuthority.authority.getState())
+        const versions = await financialAuthority.getBudgetVersions()
         setBudgetVersions(versions.items)
         setVersionsError(null)
       } catch (versionsErr) {

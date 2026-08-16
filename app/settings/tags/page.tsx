@@ -20,8 +20,6 @@ import { TagIconPicker } from "@/components/settings/tag-icon-picker"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedTag, deleteEncryptedTag, updateEncryptedTag } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
 function tagCountLabel(count: number) {
   return `${count} ${count === 1 ? "tag" : "tags"}`
@@ -51,13 +49,7 @@ export default function TagsSettingsPage() {
   useEffect(() => {
     const loadTags = async () => {
       try {
-        if (financialAuthority.authority) {
-          if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-          const state = financialAuthority.authority.getState()
-          setTags(taxonomyFromState({ ...state, tags: state.tags.filter((tag) => !tag.isDeleted) }).tags)
-        } else {
-          throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
-        }
+        setTags(await financialAuthority.getTags())
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.error.message)
@@ -91,8 +83,7 @@ export default function TagsSettingsPage() {
         name: editingName.trim(),
         icon_key: editingIconKey || null,
       }
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const updated = await updateEncryptedTag(financialAuthority.authority, editingId, payload)
+      const updated = await financialAuthority.updateTag(editingId, payload)
       setTags((previous) => previous.map((tag) => (tag.id === editingId ? updated : tag)))
       setEditingId(null)
       setEditingName("")
@@ -134,8 +125,7 @@ export default function TagsSettingsPage() {
         name,
         icon_key: newTagIconKey || null,
       }
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedTag({ authority: financialAuthority.authority, isAuthenticated: true }, payload)
+      const created = await financialAuthority.createTag(payload)
       setTags((previous) => [...previous, created])
       setNewTagName("")
       setNewTagIconKey("")
@@ -160,8 +150,7 @@ export default function TagsSettingsPage() {
     setError(null)
 
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      await deleteEncryptedTag(financialAuthority.authority, deleteTagId)
+      await financialAuthority.deleteTag(deleteTagId)
       setTags((previous) => previous.filter((tag) => tag.id !== deleteTagId))
       setDeleteTagId(null)
     } catch (err) {

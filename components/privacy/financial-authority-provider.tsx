@@ -6,16 +6,19 @@ import { apiClient } from "@/lib/api/client"
 import { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority"
 import { VaultManager } from "@/lib/privacy/vault-manager"
 import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret, type VaultInitializationPayload } from "@/lib/privacy/vault-crypto"
-import type { Card, Context, CreateTransactionRequest, CreateFundEntryRequest, FundCloseoutSummaryResponse, FundDetail, FundEntriesPage, FundEntry, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
-import { encryptedCloseout, encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
+import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, FundDetail, FundEntriesPage, FundEntry, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
+import { encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
-import { createEncryptedCard, createEncryptedContext, createEncryptedTag, getEncryptedCards, getEncryptedContexts, getEncryptedTags } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
+import { createEncryptedCard, createEncryptedContext, createEncryptedTag, deleteEncryptedCard, deleteEncryptedContext, deleteEncryptedTag, getEncryptedCards, getEncryptedContexts, getEncryptedTags, updateEncryptedCard, updateEncryptedContext, updateEncryptedTag } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 import { createEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFund, getEncryptedFundEntries, getEncryptedFunds, updateEncryptedFundEntry } from "@/lib/privacy/encrypted-authority/fund-operations"
 import { createRecurringOperations } from "@/lib/privacy/encrypted-authority/recurring-operations"
 import { closeEncryptedMonth, getEncryptedMonthCloseout, reopenEncryptedMonth, updateEncryptedMonthCloseout } from "@/lib/privacy/encrypted-authority/closeout-operations"
+import { getEncryptedBudgetResolution, getEncryptedBudgetVersions, saveEncryptedBudget } from "@/lib/privacy/encrypted-authority/budget-operations"
 import { getEncryptedSavingsPlan, replaceEncryptedSavingsPlan } from "@/lib/privacy/encrypted-authority/savings-plan-operations"
 import { materializeEncryptedRecurring, type RecurringMaterializationResult } from "@/lib/privacy/encrypted-authority/recurring-mutation"
+import { tagQuickPicksFromState, taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
+import { getLocalDateKey } from "@/lib/date-filters"
 import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
 
 interface FinancialAuthorityContextValue {
@@ -41,15 +44,27 @@ interface FinancialAuthorityContextValue {
   getContexts: () => Promise<{ items: Context[] }>
   getTags: () => Promise<Tag[]>
   getCards: () => Promise<Card[]>
+  getTransactionReferences: () => Promise<{ tags: Tag[]; quickPickTags: Tag[]; cards: Card[]; contexts: Context[] }>
+  getOldestTransactionDate: () => Promise<string | null>
+  getTransactionsPage: (filters: TransactionFilters, page?: number) => Promise<any>
   createTag: (input: { name: string; icon_key?: string | null }) => Promise<Tag>
   createCard: (input: { name: string }) => Promise<Card>
   createContext: (input: { name: string; icon_key?: string | null }) => Promise<Context>
+  updateTag: (id: string, input: { name: string; icon_key: string | null }) => Promise<Tag>
+  deleteTag: (id: string) => Promise<void>
+  updateCard: (id: string, input: { name?: string; is_favorite?: boolean }) => Promise<Card>
+  deleteCard: (id: string) => Promise<void>
+  updateContext: (id: string, input: { name: string; icon_key: string | null }) => Promise<Context>
+  deleteContext: (id: string) => Promise<void>
   createFundEntry: (fundId: string, input: CreateFundEntryRequest) => Promise<FundEntry>
   getFunds: (filters?: { status?: "active" | "archived" | "all" }) => Promise<FundsListResponse>
   updateFundEntry: (fundId: string, entry: FundEntry, input: UpdateFundEntryRequest) => Promise<FundEntry>
   deleteFundEntry: (fundId: string, entry: FundEntry) => Promise<void>
   getFund: (fundId: string) => Promise<FundDetail>
   getFundEntries: (fundId: string) => Promise<FundEntriesPage>
+  getBudgetResolution: (month: string) => Promise<any>
+  getBudgetVersions: () => Promise<any>
+  saveBudget: (month: string, payload: Record<string, unknown>) => Promise<void>
   getMonthOverview: (month: string) => Promise<any>
   getInsightsMetrics: (from: string, to: string) => Promise<any>
   getRecurringExpenses: (month: string) => Promise<any>
@@ -193,9 +208,33 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     getContexts: async () => runEncrypted((deps) => getEncryptedContexts(deps)),
     getTags: async () => runEncrypted((deps) => getEncryptedTags(deps)),
     getCards: async () => runEncrypted((deps) => getEncryptedCards(deps)),
+    getTransactionReferences: async () => runEncrypted((deps) => { const state = deps.authority.getState(); const references = taxonomyFromState(state); return { tags: references.tags, quickPickTags: tagQuickPicksFromState(state, 5), cards: references.cards, contexts: references.contexts } }),
+    getOldestTransactionDate: async () => runEncrypted((deps) => {
+      const transactions = deps.authority.getState().transactions
+      return transactions.reduce<string | null>((oldest, transaction) => oldest === null || transaction.date < oldest ? transaction.date : oldest, null)
+    }),
+    getTransactionsPage: async (filters: TransactionFilters, page = 1) => runEncrypted((deps) => transactionsPageFromState(deps.authority.getState(), {
+      from: filters.date_from,
+      to: filters.date_to,
+      search: filters.q,
+      categories: filters.categories?.split(",") as ("needs" | "wants" | "savings")[] | undefined,
+      tagIds: filters.tag_ids?.split(","),
+      contextIds: filters.context_ids?.split(","),
+      cardIds: filters.card_ids?.split(","),
+      isSplit: filters.is_split === "split" ? true : filters.is_split === "not_split" ? false : undefined,
+      page,
+      pageSize: filters.page_size ?? 50,
+      sort: filters.sort === "date_asc" ? "date_asc" : "date_desc",
+    }, getLocalDateKey(), true)),
     createTag: (input: { name: string; icon_key?: string | null }) => runEncrypted((deps) => createEncryptedTag(deps, input)),
     createCard: (input: { name: string }) => runEncrypted((deps) => createEncryptedCard(deps, input)),
     createContext: (input: { name: string; icon_key?: string | null }) => runEncrypted((deps) => createEncryptedContext(deps, input)),
+    updateTag: (id: string, input: { name: string; icon_key: string | null }) => runEncrypted((deps) => updateEncryptedTag(deps.authority, id, input)),
+    deleteTag: (id: string) => runEncrypted((deps) => deleteEncryptedTag(deps.authority, id)),
+    updateCard: (id: string, input: { name?: string; is_favorite?: boolean }) => runEncrypted((deps) => updateEncryptedCard(deps.authority, id, input)),
+    deleteCard: (id: string) => runEncrypted((deps) => deleteEncryptedCard(deps.authority, id)),
+    updateContext: (id: string, input: { name: string; icon_key: string | null }) => runEncrypted((deps) => updateEncryptedContext(deps.authority, id, input)),
+    deleteContext: (id: string) => runEncrypted((deps) => deleteEncryptedContext(deps.authority, id)),
   }), [runEncrypted])
 
   const fundOperations = useMemo(() => ({
@@ -205,6 +244,12 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     deleteFundEntry: (fundId: string, entry: FundEntry) => runEncrypted((deps) => deleteEncryptedFundEntry(deps, fundId, entry)),
     getFund: (fundId: string) => runEncrypted((deps) => getEncryptedFund(deps, fundId)),
     getFundEntries: (fundId: string) => runEncrypted((deps) => getEncryptedFundEntries(deps, fundId)),
+  }), [runEncrypted])
+
+  const budgetOperations = useMemo(() => ({
+    getBudgetResolution: async (month: string) => runEncrypted((deps) => getEncryptedBudgetResolution(deps.authority, month)),
+    getBudgetVersions: async () => runEncrypted((deps) => getEncryptedBudgetVersions(deps.authority)),
+    saveBudget: (month: string, payload: Record<string, unknown>) => runEncrypted((deps) => saveEncryptedBudget(deps.authority, month, payload)),
   }), [runEncrypted])
 
   const derivedOperations = useMemo(() => ({
@@ -240,6 +285,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     ...transactionOperations,
     ...taxonomyOperations,
     ...fundOperations,
+    ...budgetOperations,
     ...derivedOperations,
     createRecurringExpense: (input) => recurring ? recurring.create(input) : unavailableFinancialOperation(),
     updateRecurringExpense: (id, input) => recurring ? recurring.update(id, input) : unavailableFinancialOperation(),
@@ -248,7 +294,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, budgetOperations, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
   useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 

@@ -40,7 +40,6 @@ import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerDialogClassName, mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { tagQuickPicksFromState, taxonomyFromState } from "@/lib/domain/financial/view-models"
 import { initialRecurringSchedule, recurringSchedulePayload, shouldInitializeRecurringOnEnable } from "@/lib/domain/financial/recurring-form"
 import { CATEGORY_CONFIG, hasRecurringSchedule, normalizeAmount, submitLabel } from "./transaction-editor-types"
 import { useTransactionEditor } from "./use-transaction-editor"
@@ -104,16 +103,10 @@ export function TransactionEditorForm({
     setError(null)
 
     try {
-      if (financialAuthority.authority) {
-        const state = financialAuthority.authority?.getState()
-        if (!state) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-        const references = taxonomyFromState(state)
-        setTags(references.tags)
-        setQuickPickTags(tagQuickPicksFromState(state, 5))
-        setCards(sortCards(references.cards))
-        return
-      }
-      throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      const references = await financialAuthority.getTransactionReferences()
+      setTags(references.tags)
+      setQuickPickTags(references.quickPickTags)
+      setCards(sortCards(references.cards))
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.error.message)
@@ -247,7 +240,7 @@ export function TransactionEditorForm({
     }, 300)
 
     return () => window.clearTimeout(timeoutId)
-  }, [expense, financialAuthority.authority, isEditMode, open])
+  }, [expense, financialAuthority, isEditMode, open])
 
   const resetForm = () => {
     const now = new Date()

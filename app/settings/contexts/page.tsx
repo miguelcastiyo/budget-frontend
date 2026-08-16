@@ -15,8 +15,6 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { CONTEXT_ICON_OPTIONS, getContextIcon, getContextIconByKey } from "@/lib/tag-icons"
 import type { Context } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { taxonomyFromState } from "@/lib/domain/financial/view-models"
-import { createEncryptedContext, deleteEncryptedContext, updateEncryptedContext } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 
 
 export default function ContextsSettingsPage() {
@@ -39,10 +37,7 @@ export default function ContextsSettingsPage() {
   const EditIcon = editIcon
 
   useEffect(() => {
-    const loadContexts = financialAuthority.authority
-      ? Promise.resolve().then(() => { if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED"); const state = financialAuthority.authority.getState(); return { items: taxonomyFromState({ ...state, contexts: state.contexts.filter((item) => !item.isDeleted) }).contexts } })
-      : Promise.reject(new Error("ENCRYPTED_AUTHORITY_REQUIRED"))
-    loadContexts
+    financialAuthority.getContexts()
       .then((response) => setContexts(response.items))
       .catch((err) => setError(err instanceof ApiError ? err.error.message : "Unable to load contexts"))
       .finally(() => setIsLoading(false))
@@ -74,8 +69,7 @@ export default function ContextsSettingsPage() {
     setError(null)
     try {
       const payload = { name: editingName.trim(), icon_key: editingIconKey || null }
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const updated = await updateEncryptedContext(financialAuthority.authority, editingId, payload)
+      const updated = await financialAuthority.updateContext(editingId, payload)
       setContexts((current) => current.map((item) => item.id === editingId ? updated : item))
       cancelEdit()
     } catch (err) {
@@ -91,8 +85,7 @@ export default function ContextsSettingsPage() {
     setError(null)
     try {
       const payload = { name: newName.trim(), icon_key: newIconKey || null }
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      const created = await createEncryptedContext({ authority: financialAuthority.authority, isAuthenticated: true }, payload)
+      const created = await financialAuthority.createContext(payload)
       setContexts((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)))
       resetNew()
     } catch (err) {
@@ -107,8 +100,7 @@ export default function ContextsSettingsPage() {
     setIsMutating(true)
     setError(null)
     try {
-      if (!financialAuthority.authority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
-      await deleteEncryptedContext(financialAuthority.authority, deleteId)
+      await financialAuthority.deleteContext(deleteId)
       setContexts((current) => current.filter((item) => item.id !== deleteId))
       setDeleteId(null)
     } catch (err) {
