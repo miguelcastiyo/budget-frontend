@@ -6,19 +6,23 @@ import { EncryptedRecordStore, type DecryptedFinancialRecord } from "./record-st
 import { rehydrateFinancialState, type RehydratedFinancialState } from "./rehydrate"
 import type { SourceMutationDiff } from "../../domain/financial/transaction-fund-diff"
 import { serializeEncryptedRecord, typedRecordFromPayload } from "../encrypted-records/adapters"
+import { auditEncryptedRecordPayloads, emptyCompatibilityAuditReport, mergeCompatibilityAuditReports, type CompatibilityAuditReport } from "../encrypted-records/compatibility-audit"
 
 export interface BatchCommitOptions { expectedRevisionOverrides?: Record<string, number> }
 
 export class EncryptedFinancialAuthority {
   readonly store = new EncryptedRecordStore()
+  private compatibilityReport: CompatibilityAuditReport = emptyCompatibilityAuditReport()
   private state: RehydratedFinancialState | null = null
 
   constructor(private readonly api: Pick<ApiClientCore, "request">, private readonly runtimeKey: CryptoKey, private readonly vaultId: string) {}
 
   getState(): RehydratedFinancialState { if (!this.state) throw new Error("ENCRYPTED_AUTHORITY_NOT_BOOTSTRAPPED"); return this.state }
+  getCompatibilityAudit(): CompatibilityAuditReport { return this.compatibilityReport }
 
   async bootstrap(): Promise<RehydratedFinancialState> {
     this.store.clear()
+    this.compatibilityReport = emptyCompatibilityAuditReport()
     let cursor = "0"
     let more = true
     while (more) {
@@ -31,6 +35,7 @@ export class EncryptedFinancialAuthority {
           if (error instanceof EncryptedRecordClientError) throw new Error(`${error.code}:${envelope.record_id}`, { cause: error })
           throw error
         }
+        this.compatibilityReport = mergeCompatibilityAuditReports(this.compatibilityReport, auditEncryptedRecordPayloads([value]))
         this.store.replace(typedRecordFromPayload(envelope, value))
       }
       cursor = batch.next_cursor; this.store.setCursor(cursor); more = batch.has_more

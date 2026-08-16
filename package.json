@@ -25,6 +25,7 @@
     "test:financial-domain": "node scripts/test-financial-domain-foundations.cjs",
     "test:recurring-commands": "node scripts/test-recurring-commands.cjs",
     "test:authority-operations": "node scripts/test-authority-operations.cjs",
+    "test:compatibility-audit": "node scripts/test-compatibility-audit.cjs",
     "test:encrypted-record-adapters": "node scripts/test-encrypted-record-adapters.cjs",
     "test:client-parity": "node scripts/client-parity-runner.cjs",
     "test:encrypted-only-boundary": "node scripts/test-encrypted-only-financial-boundary.mjs",

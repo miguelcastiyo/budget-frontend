@@ -8,6 +8,7 @@ const checks = [
   ["Financial domain", "test:financial-domain"],
   ["Recurring commands", "test:recurring-commands"],
   ["Authority operations", "test:authority-operations"],
+  ["Compatibility audit", "test:compatibility-audit"],
   ["Encrypted-record adapters", "test:encrypted-record-adapters"],
   ["Client parity", "test:client-parity"],
   ["Encrypted-only boundary", "test:encrypted-only-boundary"],
