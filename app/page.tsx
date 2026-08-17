@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { PiggyBank } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
-import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
-import { formatCurrency, formatSavingsCurrency } from "@/lib/formatters"
+import { getCurrentMonthKey } from "@/lib/date-filters"
+import { formatCurrency } from "@/lib/formatters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
@@ -25,6 +24,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { FundsCta } from "@/components/funds/funds-cta"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
 
@@ -270,7 +270,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <FundsShortcutCard month={currentMonth} savingsPlan={overview?.savings_plan ?? null} />
+          <FundsCta />
 
           <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
             <div className="flex items-center justify-between">
@@ -372,36 +372,5 @@ export default function DashboardPage() {
         onSaved={handleCloseoutSaved}
       />
     </div>
-  )
-}
-
-function FundsShortcutCard({ month, savingsPlan }: { month: string; savingsPlan: MonthOverviewResponse["savings_plan"] | null }) {
-  const monthName = formatMonthValue(month, { month: "long" }) ?? month
-  const actualDirected = savingsPlan ? Number.parseFloat(savingsPlan.transaction_directed_to_funds) || 0 : 0
-  const plannedToFunds = savingsPlan ? Number.parseFloat(savingsPlan.planned_to_funds) || 0 : 0
-  const planContext = savingsPlan?.has_plan
-    ? `${formatSavingsCurrency(actualDirected)} directed to Funds · ${formatSavingsCurrency(plannedToFunds)} planned`
-    : actualDirected > 0
-      ? `${formatSavingsCurrency(actualDirected)} directed to Funds · No ${monthName} plan`
-      : `No ${monthName} plan`
-
-  return (
-    <Card className="border-0 p-4 shadow-sm">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <PiggyBank className="size-4 shrink-0 text-muted-foreground" />
-            <p className="text-sm font-medium text-foreground">Savings plan</p>
-          </div>
-          <Button size="sm" variant="outline" className="shrink-0 rounded-full" asChild>
-            <Link href={`/funds/savings-plan?month=${getCurrentMonthKey()}`}>{savingsPlan?.has_plan ? "View plan" : "Plan savings"}</Link>
-          </Button>
-        </div>
-        <div className="min-w-0">
-          <p className="whitespace-normal text-sm text-muted-foreground">{savingsPlan?.has_budget ? `${formatSavingsCurrency(savingsPlan.saved_amount)} saved · ${formatSavingsCurrency(savingsPlan.budget_amount ?? "0")} budgeted` : "Decide where your monthly Savings should go."}</p>
-          {savingsPlan?.has_budget ? <p className="mt-1 text-xs text-muted-foreground">{planContext}{savingsPlan.needs_attention ? " · Plan needs review" : ""}</p> : null}
-        </div>
-      </div>
-    </Card>
   )
 }

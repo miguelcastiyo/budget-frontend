@@ -27,8 +27,7 @@ PORT=3001 scripts/dev-local.sh
 Use the normal sign-in UI or authentication endpoint. The resulting session
 cookie authenticates web requests, and the CSRF token returned with the
 session must be sent with cookie-session mutations. For supported native-client
-testing, use `Authorization: Session <session_token>`; the frontend does not
-use API keys as an alternative login or request credential.
+testing, use `Authorization: Session <session_token>`.
 
 Run diagnostics when local startup is confusing:
 
