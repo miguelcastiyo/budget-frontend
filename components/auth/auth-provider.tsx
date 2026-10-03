@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient, GLOBAL_AUTH_ERROR_EVENT } from "@/lib/api/client"
+import { clearTransactionViewStates } from "@/lib/transaction-view-state"
 import type { AuthMethod, AuthUser, Profile, SetupStatus, ThemePreference } from "@/lib/api/types"
 
 interface AuthContextValue {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthMethods(authMethodInventory.methods)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        clearTransactionViewStates()
         setProfile(null)
         setSetupStatus(null)
         setAuthMethods([])
@@ -98,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSetupStatus(nextSetupStatus)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        clearTransactionViewStates()
         setProfile(null)
         setSetupStatus(null)
         return
@@ -115,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refreshProfile()
       } catch {
         if (active) {
+          clearTransactionViewStates()
           setProfile(null)
           setSetupStatus(null)
         }
@@ -142,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleGlobalAuthError = () => {
+      clearTransactionViewStates()
       setProfile(null)
       setSetupStatus(null)
       setAuthMethods([])
@@ -159,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
     } finally {
+      clearTransactionViewStates()
       setProfile(null)
       setSetupStatus(null)
       setAuthMethods([])

@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation"
 import { LayoutDashboard, Receipt, LineChart, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
+import { useAuth } from "@/components/auth/auth-provider"
+import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
@@ -15,12 +17,15 @@ const navItems = [
 ]
 
 export function Header() {
+  const { profile } = useAuth()
   const pathname = usePathname()
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
 
   useEffect(() => {
-    setTransactionsHref(`/transactions?month=${getCurrentMonthKey()}`)
-  }, [])
+    setTransactionsHref(hasTransactionViewState(profile?.id ?? "")
+      ? "/transactions?resume=1"
+      : `/transactions?month=${getCurrentMonthKey()}`)
+  }, [profile?.id])
 
   return (
     <header className="sticky top-0 z-40 hidden lg:block bg-background/80 backdrop-blur-xl border-b border-border/50">

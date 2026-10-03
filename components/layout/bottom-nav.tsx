@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
+import { useAuth } from "@/components/auth/auth-provider"
+import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
 
@@ -91,6 +93,7 @@ export function BottomNav({
   showAddCoachmark = false,
   addCoachmarkText = "Start here. Add your first transaction.",
 }: BottomNavProps) {
+  const { profile } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
   const [hasHydrated, setHasHydrated] = useState(false)
@@ -100,9 +103,11 @@ export function BottomNav({
   useEffect(() => {
     const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
     setCoachmarkDismissed(dismissed)
-    setTransactionsHref(`/transactions?month=${getCurrentMonthKey()}`)
+    setTransactionsHref(hasTransactionViewState(profile?.id ?? "")
+      ? "/transactions?resume=1"
+      : `/transactions?month=${getCurrentMonthKey()}`)
     setHasHydrated(true)
-  }, [])
+  }, [profile?.id])
 
   const shouldShowCoachmark = useMemo(
     () => hasHydrated && showAddCoachmark && !coachmarkDismissed,

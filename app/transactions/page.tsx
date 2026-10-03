@@ -26,6 +26,8 @@ import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getLocalDateKey, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useAuth } from "@/components/auth/auth-provider"
+import { readTransactionViewState, writeTransactionViewState } from "@/lib/transaction-view-state"
 import type {
   Card,
   Category,
@@ -79,6 +81,8 @@ function parseCategoryQuery(value: string): Category | null {
 
 export default function TransactionsPage() {
   const financialAuthority = useFinancialAuthority()
+  const { profile } = useAuth()
+  const userId = profile?.id ?? ""
   const desktopFiltersStorageKey = "transactions-desktop-filters-collapsed"
   const router = useRouter()
   const pathname = usePathname()
@@ -105,7 +109,7 @@ export default function TransactionsPage() {
   const [splitFilter, setSplitFilter] = useState<SplitFilter>("all")
   const [customDateRange, setCustomDateRange] = useState<DateRangeFilter | null>(null)
   const [desktopFiltersCollapsed, setDesktopFiltersCollapsed] = useState(false)
-  const [queryFiltersInitialized, setQueryFiltersInitialized] = useState(false)
+  const [filtersInitializedForUserId, setFiltersInitializedForUserId] = useState<string | null>(null)
   const [hasAnyTransactions, setHasAnyTransactions] = useState<boolean | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -116,12 +120,16 @@ export default function TransactionsPage() {
   const [error, setError] = useState<ErrorDialogState | null>(null)
 
   useEffect(() => {
+    if (filtersInitializedForUserId !== userId) {
+      return
+    }
+
     const timeout = window.setTimeout(() => {
       setDebouncedSearchQuery(searchQuery)
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [searchQuery])
+  }, [filtersInitializedForUserId, searchQuery, userId])
 
   useEffect(() => {
     const savedState = window.localStorage.getItem(desktopFiltersStorageKey)
@@ -137,16 +145,31 @@ export default function TransactionsPage() {
   const queryTagId = searchParams.get("tag_id") ?? ""
   const queryCategory = searchParams.get("category") ?? ""
   const queryMonth = searchParams.get("month") ?? ""
+  const queryResumeSavedView = searchParams.get("resume") === "1"
   const queryOpenAdd = searchParams.get("add") === "1"
   const queryMonthLabel = useMemo(() => formatMonthLabel(queryMonth), [queryMonth])
 
   useEffect(() => {
+    if (!userId || filtersInitializedForUserId === userId) {
+      return
+    }
+
+    const savedState = readTransactionViewState(userId)
     const monthRange = queryMonth ? getMonthDateRange(queryMonth) : null
     const parsedCategory = queryCategory ? parseCategoryQuery(queryCategory) : null
+    const hasExplicitQueryFilters = Boolean(queryTagId || parsedCategory)
 
-    if (!queryTagId && !parsedCategory && !monthRange) {
-      setQueryFiltersInitialized(true)
-      return
+    if (savedState) {
+      setPreset(savedState.preset)
+      setCustomDateRange(savedState.customDateRange)
+      setSelectedCategories(savedState.selectedCategories)
+      setSelectedTags(savedState.selectedTags)
+      setSelectedCards(savedState.selectedCards)
+      setSelectedContexts(savedState.selectedContexts)
+      setSearchQuery(savedState.searchQuery)
+      setDebouncedSearchQuery(savedState.searchQuery)
+      setSortOrder(savedState.sortOrder)
+      setSplitFilter(savedState.splitFilter)
     }
 
     if (queryTagId) {
@@ -157,13 +180,40 @@ export default function TransactionsPage() {
       setSelectedCategories([parsedCategory])
     }
 
-    if (monthRange) {
+    // The nav's month query is a first-visit default. Explicit overview
+    // drill-downs include category/tag and should apply their requested month.
+    if (monthRange && (!savedState || hasExplicitQueryFilters || !queryResumeSavedView)) {
       setPreset("all")
       setCustomDateRange(monthRange)
     }
 
-    setQueryFiltersInitialized(true)
-  }, [queryCategory, queryMonth, queryTagId])
+    setFiltersInitializedForUserId(userId)
+
+    if (queryResumeSavedView) {
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete("resume")
+      const nextQuery = nextParams.toString()
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+    }
+  }, [filtersInitializedForUserId, pathname, queryCategory, queryMonth, queryResumeSavedView, queryTagId, router, searchParams, userId])
+
+  useEffect(() => {
+    if (!userId || filtersInitializedForUserId !== userId) {
+      return
+    }
+
+    writeTransactionViewState(userId, {
+      preset,
+      customDateRange,
+      selectedCategories,
+      selectedTags,
+      selectedCards,
+      selectedContexts,
+      searchQuery,
+      sortOrder,
+      splitFilter,
+    })
+  }, [customDateRange, filtersInitializedForUserId, preset, searchQuery, selectedCards, selectedCategories, selectedContexts, selectedTags, sortOrder, splitFilter, userId])
 
   useEffect(() => {
     if (!queryOpenAdd) {
@@ -284,12 +334,12 @@ export default function TransactionsPage() {
   }, [loadReferenceData])
 
   useEffect(() => {
-    if (!queryFiltersInitialized) {
+    if (!userId || filtersInitializedForUserId !== userId) {
       return
     }
 
     void loadTransactionsData()
-  }, [loadTransactionsData, queryFiltersInitialized])
+  }, [filtersInitializedForUserId, loadTransactionsData, userId])
 
   const refreshTransactionSurface = useCallback(async () => {
     await Promise.all([loadTransactionsData(), loadReferenceData()])
@@ -318,6 +368,13 @@ export default function TransactionsPage() {
   const handlePresetChange = (nextPreset: Preset | "all") => {
     setPreset(nextPreset)
     setCustomDateRange(null)
+
+    if (searchParams.get("month")) {
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete("month")
+      const nextQuery = nextParams.toString()
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+    }
   }
 
   const handleCustomDateRangeChange = useCallback(
