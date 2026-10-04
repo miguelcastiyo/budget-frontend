@@ -9,10 +9,9 @@ import { isPublicPath } from "@/lib/auth-routes"
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, isLoading, needsOnboarding } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
 
   const publicPath = isPublicPath(pathname)
-  const onOnboardingPage = pathname === "/onboarding"
 
   useEffect(() => {
     if (isLoading) {
@@ -24,22 +23,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       return
     }
 
-    if (isAuthenticated && needsOnboarding && !onOnboardingPage) {
-      router.replace("/onboarding")
-      return
-    }
-
     if (pathname === "/sign-in" && isAuthenticated) {
-      if (needsOnboarding) {
-        router.replace("/onboarding")
-        return
-      }
-
       const returnTo = new URLSearchParams(window.location.search).get("returnTo")
       const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/"
       router.replace(safeReturnTo)
     }
-  }, [isAuthenticated, isLoading, needsOnboarding, onOnboardingPage, pathname, publicPath, router])
+  }, [isAuthenticated, isLoading, pathname, publicPath, router])
 
   if (isLoading && !publicPath) {
     return (
@@ -54,10 +43,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!isLoading && pathname === "/sign-in" && isAuthenticated) {
-    return null
-  }
-
-  if (!isLoading && isAuthenticated && needsOnboarding && !onOnboardingPage) {
     return null
   }
 

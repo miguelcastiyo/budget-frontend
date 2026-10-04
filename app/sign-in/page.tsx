@@ -217,7 +217,7 @@ function SignInPageContent() {
     setSetupStatus(nextSetupStatus)
     const returnTo = searchParams.get("returnTo")
     const safeReturnTo = returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : null
-    router.push(safeReturnTo ?? (nextSetupStatus.budget_profile_complete ? "/" : "/onboarding"))
+    router.push(safeReturnTo ?? "/")
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {

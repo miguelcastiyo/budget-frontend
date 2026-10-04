@@ -1,6 +1,6 @@
-# Moved: Onboarding
+# Onboarding
 
-Status: Historical  
-Last reviewed: 2026-05-29
+Status: Retired
+Last reviewed: 2026-10-03
 
-This content has moved to [../../docs/features/onboarding.md](../../docs/features/onboarding.md).
+See the [onboarding status](../../docs-internal/product/features/onboarding.md).

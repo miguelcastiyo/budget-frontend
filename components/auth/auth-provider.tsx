@@ -12,7 +12,6 @@ interface AuthContextValue {
   authMethods: AuthMethod[]
   setupStatus: SetupStatus | null
   isAuthenticated: boolean
-  needsOnboarding: boolean
   isLoading: boolean
   refreshProfile: () => Promise<void>
   refreshSetupStatus: () => Promise<void>
@@ -176,7 +175,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authMethods,
     setupStatus,
     isAuthenticated: !!profile,
-    needsOnboarding: !!profile && !!setupStatus && !setupStatus.budget_profile_complete,
     isLoading,
     refreshProfile,
     refreshSetupStatus,
