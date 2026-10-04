@@ -1,7 +1,6 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
-import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ApiError, apiClient, GLOBAL_AUTH_ERROR_EVENT } from "@/lib/api/client"
 import { clearTransactionViewStates } from "@/lib/transaction-view-state"
@@ -46,7 +45,6 @@ function applyThemePreference(theme: ThemePreference) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
   const { setTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [authMethods, setAuthMethods] = useState<AuthMethod[]>([])
@@ -133,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false
     }
-  }, [pathname, refreshProfile])
+  }, [refreshProfile])
 
   useEffect(() => {
     const theme = profile?.user_preferences?.appearance?.theme
