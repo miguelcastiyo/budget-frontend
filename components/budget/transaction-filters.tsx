@@ -134,6 +134,37 @@ function ContextIconPreview({ context }: { context: Context }) {
   return <Icon aria-hidden="true" className="h-3.5 w-3.5" />
 }
 
+function DesktopFilterSection({
+  id,
+  label,
+  summary,
+  children,
+}: {
+  id: string
+  label: string
+  summary?: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(true)
+
+  return (
+    <section className="space-y-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
+        <span className="min-w-0 flex-1">{label}</span>
+        {summary && <span className="max-w-28 truncate text-[10px] font-normal normal-case tracking-normal">{summary}</span>}
+      </button>
+      {open && <div id={id} className="px-1">{children}</div>}
+    </section>
+  )
+}
+
 function CompactFilterSection({
   label,
   options,
@@ -161,11 +192,7 @@ function CompactFilterSection({
       : `${selected.slice(0, 2).map((option) => option.label).join(", ")} +${selected.length - 2}`
 
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between px-2">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-        {selected.length > 0 && <span className="text-[10px] font-medium text-muted-foreground">{selected.length}</span>}
-      </div>
+    <DesktopFilterSection id={`transaction-filter-${label.toLowerCase()}`} label={label} summary={selected.length > 0 ? `${selected.length} selected` : undefined}>
       {options.length === 0 ? (
         <p className="px-2 text-xs text-muted-foreground">No {label.toLocaleLowerCase()} yet</p>
       ) : (
@@ -223,7 +250,7 @@ function CompactFilterSection({
           )}
         </div>
       )}
-    </section>
+    </DesktopFilterSection>
   )
 }
 
