@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
@@ -118,6 +118,7 @@ export default function TransactionsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<ErrorDialogState | null>(null)
+  const materializedMonthRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (filtersInitializedForUserId !== userId) {
@@ -280,7 +281,7 @@ export default function TransactionsPage() {
     }
   }, [financialAuthority])
 
-  const loadTransactionsData = useCallback(async () => {
+  const loadTransactionsData = useCallback(async (options: { forceMaterialization?: boolean } = {}) => {
     if (financialAuthority.isLoading) {
       return
     }
@@ -288,12 +289,16 @@ export default function TransactionsPage() {
     setError(null)
 
     try {
-        // Transactions must be self-sufficient: opening Settings > Recurring
-        // first must not be required for a due recurring occurrence to appear.
-        // Materialization remains idempotent and only creates eligible
-        // occurrences for the current/selected month.
+      // Materialization is needed when entering a month and after mutations,
+      // but filter and sort changes can load the existing records directly.
+      const materializationMonth = activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7)
+      const shouldMaterialize = options.forceMaterialization || materializedMonthRef.current !== materializationMonth
+      if (shouldMaterialize) {
+        // Mark the month before awaiting so a filter change during a slow
+        // materialization does not start the same work again.
+        materializedMonthRef.current = materializationMonth
         try {
-          const materialization = await financialAuthority.materializeRecurring(activeTransactionFilters.date_from?.slice(0, 7) ?? getLocalDateKey().slice(0, 7))
+          const materialization = await financialAuthority.materializeRecurring(materializationMonth)
           if (materialization.status === "failed") {
             setError({ title: "Recurring transactions could not be posted", message: "Some recurring transactions could not be materialized for this month. Existing transactions remain visible; retry to try again.", code: materialization.code })
           }
@@ -302,8 +307,10 @@ export default function TransactionsPage() {
           // best-effort occurrence write is temporarily unavailable.
           setError(transactionError(err, "Some recurring transactions could not be materialized. Existing transactions remain visible; retry to try again."))
         }
-        const response = await financialAuthority.getTransactionsPage(activeTransactionFilters, 1)
-        setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
+      }
+
+      const response = await financialAuthority.getTransactionsPage(activeTransactionFilters, 1)
+      setTransactions(response.items); setCurrentPage(response.page); setTotalItems(response.total_items); setSummary(response.summary); setHasAnyTransactions(response.total_items > 0); return
     } catch (err) {
       setError(transactionError(err, "Unable to load transactions"))
     } finally {
@@ -342,7 +349,7 @@ export default function TransactionsPage() {
   }, [filtersInitializedForUserId, loadTransactionsData, userId])
 
   const refreshTransactionSurface = useCallback(async () => {
-    await Promise.all([loadTransactionsData(), loadReferenceData()])
+    await Promise.all([loadTransactionsData({ forceMaterialization: true }), loadReferenceData()])
   }, [loadReferenceData, loadTransactionsData])
 
   // Collection mutation invariant: mutating an item must preserve filters, sort,
