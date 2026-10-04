@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [isProgressDismissed, setIsProgressDismissed] = useState(false)
   const [isCloseoutTrayOpen, setIsCloseoutTrayOpen] = useState(false)
   const [closeoutTrayMode, setCloseoutTrayMode] = useState<MonthCloseoutTrayMode>("close")
+  const dashboardRequestRef = useRef(0)
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -59,25 +60,33 @@ export default function DashboardPage() {
     if (authority.isLoading) {
       return
     }
+    const requestId = ++dashboardRequestRef.current
     setIsLoading(true)
     setIsCloseoutLoading(true)
     setError(null)
 
     try {
-      const overviewRequest = authority.materializeRecurring(currentMonth).then((result) => {
-          setRecurringWarning(result.status === "failed" ? "Recurring items could not be fully posted. Overview is showing the last committed state." : null)
-          return authority.getMonthOverview(currentMonth)
-        })
+      const overviewRequest = authority.materializeRecurring(currentMonth).then(async (result) => ({
+        overview: await authority.getMonthOverview(currentMonth),
+        recurringWarning: result.status === "failed"
+          ? "Recurring items could not be fully posted. Overview is showing the last committed state."
+          : null,
+      }))
       const [overviewResult, closeoutResult] = await Promise.allSettled([
         overviewRequest,
         authority.getMonthCloseout(currentMonth),
       ])
 
+      if (requestId !== dashboardRequestRef.current) {
+        return
+      }
+
       if (overviewResult.status === "rejected") {
         throw overviewResult.reason
       }
 
-      setOverview(overviewResult.value)
+      setOverview(overviewResult.value.overview)
+      setRecurringWarning(overviewResult.value.recurringWarning)
 
       if (closeoutResult.status === "fulfilled" && closeoutResult.value) {
         setCloseout(closeoutResult.value)
@@ -86,14 +95,19 @@ export default function DashboardPage() {
       }
 
     } catch (err) {
+      if (requestId !== dashboardRequestRef.current) {
+        return
+      }
       if (err instanceof ApiError) {
         setError(err.error.message)
       } else {
         setError("Unable to load dashboard data")
       }
     } finally {
-      setIsLoading(false)
-      setIsCloseoutLoading(false)
+      if (requestId === dashboardRequestRef.current) {
+        setIsLoading(false)
+        setIsCloseoutLoading(false)
+      }
     }
   }, [authority, currentMonth])
 
@@ -169,7 +183,7 @@ export default function DashboardPage() {
     void loadDashboardData()
   }
 
-  if (isLoading) {
+  if (isLoading && !overview) {
     return (
       <div className="min-h-screen bg-background pb-mobile-nav">
         <Header />
@@ -213,6 +227,12 @@ export default function DashboardPage() {
             currentMonth={currentMonth}
             onChange={setCurrentMonth}
           />
+          {isLoading && (
+            <div className="mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground" role="status" aria-live="polite">
+              <Spinner className="size-3.5" />
+              <span>Loading {formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth}...</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6 lg:space-y-8">
