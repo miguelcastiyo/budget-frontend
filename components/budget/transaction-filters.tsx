@@ -592,8 +592,10 @@ export function TransactionFilters({
 
       {desktopMode && (
         <div className="space-y-5">
-          <section className="space-y-2">
-            <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Date</p>
+          <div className="flex items-center justify-end px-2">
+            {hasClearableFilters && <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-muted-foreground hover:text-foreground">Clear all</button>}
+          </div>
+          <DesktopFilterSection id="transaction-filter-date" label="Date" summary={dateChip ?? undefined}>
             <div className="grid gap-1">
               {datePresets.slice(0, 2).map((item) => (
                 <button
@@ -619,71 +621,60 @@ export function TransactionFilters({
                 Custom range
               </button>
             </div>
-          </section>
-
-          <section className="space-y-2">
-            <div className="flex items-center justify-between px-2">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Filters</p>
-              {hasClearableFilters && <button type="button" onClick={clearAllFilters} className="text-xs font-medium text-muted-foreground hover:text-foreground">Clear</button>}
+          </DesktopFilterSection>
+          <DesktopFilterSection id="transaction-filter-category" label="Category" summary={selectedCategories.length ? `${selectedCategories.length} selected` : undefined}>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((category) => (
+                <ChoiceChip
+                  key={category.value}
+                  label={category.label}
+                  selected={selectedCategories.includes(category.value)}
+                  onClick={() => toggleValue(category.value, selectedCategories, onCategoriesChange)}
+                  className="min-h-8 px-2.5 py-1 text-xs"
+                />
+              ))}
             </div>
-            <div className="space-y-5">
-              <section className="space-y-2">
-                <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Category</p>
-                <div className="flex flex-wrap gap-1.5 px-1">
-                  {categories.map((category) => (
-                    <ChoiceChip
-                      key={category.value}
-                      label={category.label}
-                      selected={selectedCategories.includes(category.value)}
-                      onClick={() => toggleValue(category.value, selectedCategories, onCategoriesChange)}
-                      className="min-h-8 px-2.5 py-1 text-xs"
-                    />
-                  ))}
-                </div>
-              </section>
+          </DesktopFilterSection>
 
-              <CompactFilterSection
-                label="Tags"
-                options={tags.map((tag) => ({ value: tag.id, label: tag.name, icon: <TagIconPreview tag={tag} /> }))}
-                selectedValues={selectedTags}
-                onToggle={(value) => toggleValue(value, selectedTags, onTagsChange)}
-                collapsedLimit={8}
-              />
-              <CompactFilterSection
-                label="Contexts"
-                options={contexts.map((context) => ({
-                  value: context.id,
-                  label: context.name,
-                  icon: <ContextIconPreview context={context} />,
-                }))}
-                selectedValues={selectedContexts}
-                onToggle={(value) => toggleValue(value, selectedContexts, onContextsChange)}
-                collapsedLimit={8}
-              />
-              <CompactFilterSection
-                label="Cards"
-                options={cards.map((card) => ({ value: card.id, label: card.name }))}
-                selectedValues={selectedCards}
-                onToggle={(value) => toggleValue(value, selectedCards, onCardsChange)}
-                collapsedLimit={8}
-              />
+          <CompactFilterSection
+            label="Tags"
+            options={tags.map((tag) => ({ value: tag.id, label: tag.name, icon: <TagIconPreview tag={tag} /> }))}
+            selectedValues={selectedTags}
+            onToggle={(value) => toggleValue(value, selectedTags, onTagsChange)}
+            collapsedLimit={8}
+          />
+          <CompactFilterSection
+            label="Contexts"
+            options={contexts.map((context) => ({
+              value: context.id,
+              label: context.name,
+              icon: <ContextIconPreview context={context} />,
+            }))}
+            selectedValues={selectedContexts}
+            onToggle={(value) => toggleValue(value, selectedContexts, onContextsChange)}
+            collapsedLimit={8}
+          />
+          <CompactFilterSection
+            label="Cards"
+            options={cards.map((card) => ({ value: card.id, label: card.name }))}
+            selectedValues={selectedCards}
+            onToggle={(value) => toggleValue(value, selectedValues, onCardsChange)}
+            collapsedLimit={8}
+          />
 
-              <section className="space-y-2">
-                <p className="px-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Split</p>
-                <div className="flex flex-wrap gap-1.5 px-1">
-                  {[{ value: "all", label: "All" }, { value: "split", label: "Split" }, { value: "not_split", label: "Not split" }].map((item) => (
-                    <ChoiceChip
-                      key={item.value}
-                      label={item.label}
-                      selected={splitFilter === item.value}
-                      onClick={() => onSplitFilterChange(item.value === "all" ? "all" : item.value as SplitFilter)}
-                      className="min-h-8 px-2.5 py-1 text-xs"
-                    />
-                  ))}
-                </div>
-              </section>
+          <DesktopFilterSection id="transaction-filter-split" label="Split" summary={splitFilter !== "all" ? (splitFilter === "split" ? "Split" : "Not split") : undefined}>
+            <div className="flex flex-wrap gap-1.5">
+              {[{ value: "all", label: "All" }, { value: "split", label: "Split" }, { value: "not_split", label: "Not split" }].map((item) => (
+                <ChoiceChip
+                  key={item.value}
+                  label={item.label}
+                  selected={splitFilter === item.value}
+                  onClick={() => onSplitFilterChange(item.value === "all" ? "all" : item.value as SplitFilter)}
+                  className="min-h-8 px-2.5 py-1 text-xs"
+                />
+              ))}
             </div>
-          </section>
+          </DesktopFilterSection>
         </div>
       )}
 
