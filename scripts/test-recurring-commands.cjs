@@ -18,6 +18,16 @@ global.window = { isSecureContext: true, crypto: webcrypto }
 const commands = require("../lib/privacy/encrypted-authority/recurring-commands.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
 const record = (id, data, family = "recurring_series") => ({ id, envelope: { record_id: id }, family, sourceId: id, data: { id, ...data } })
+const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+const shiftMonth = (month, amount) => {
+  const [year, monthNumber] = month.split("-").map(Number)
+  const date = new Date(year, monthNumber - 1 + amount, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+}
+const currentMonth = monthKey()
+const nextMonth = shiftMonth(currentMonth, 1)
+const followingMonth = shiftMonth(currentMonth, 2)
+const previousMonth = shiftMonth(currentMonth, -1)
 
 const createAuthority = (initialRecords = [], recurringOccurrences = []) => {
   const records = new Map(initialRecords.map((item) => [item.envelope.record_id, item]))
@@ -62,14 +72,14 @@ const currentData = {
   assert(edited.records.get("rule_1").data.amount_cents === 125000 && edited.records.get("rule_1").data.expense === "Rent and utilities", "edit persists updated recurring data")
 
   const scheduled = createAuthority([record("rule_1", currentData)])
-  await commands.scheduleEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", { effective_month: "2026-09", amount: "1300.00" })
-  assert(scheduled.records.get("rule_1").data.ends_month === "2026-08", "schedule closes the current version before the effective month")
+  await commands.scheduleEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", { effective_month: nextMonth, amount: "1300.00" })
+  assert(scheduled.records.get("rule_1").data.ends_month === shiftMonth(nextMonth, -1), "schedule closes the current version before the effective month")
   const scheduledRecord = [...scheduled.records.values()].find((item) => item.envelope.record_id !== "rule_1")
-  assert(scheduledRecord && scheduledRecord.data.starts_month === "2026-09" && scheduledRecord.data.amount_cents === 130000, "schedule persists a future version")
+  assert(scheduledRecord && scheduledRecord.data.starts_month === nextMonth && scheduledRecord.data.amount_cents === 130000, "schedule persists a future version")
 
   let duplicateError = null
   try {
-    await commands.scheduleEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", { effective_month: "2026-10", amount: "1400.00" })
+    await commands.scheduleEncryptedRecurringExpenseChange(scheduled.authority, "rule_1", { effective_month: followingMonth, amount: "1400.00" })
   } catch (error) {
     duplicateError = error
   }
@@ -78,7 +88,7 @@ const currentData = {
   const historicalSchedule = createAuthority([record("rule_1", currentData)])
   let historicalError = null
   try {
-    await commands.scheduleEncryptedRecurringExpenseChange(historicalSchedule.authority, "rule_1", { effective_month: "2026-07", amount: "1300.00" })
+    await commands.scheduleEncryptedRecurringExpenseChange(historicalSchedule.authority, "rule_1", { effective_month: previousMonth, amount: "1300.00" })
   } catch (error) {
     historicalError = error
   }
@@ -87,15 +97,15 @@ const currentData = {
   const noOpSchedule = createAuthority([record("rule_1", currentData)])
   let noOpError = null
   try {
-    await commands.scheduleEncryptedRecurringExpenseChange(noOpSchedule.authority, "rule_1", { effective_month: "2026-09" })
+    await commands.scheduleEncryptedRecurringExpenseChange(noOpSchedule.authority, "rule_1", { effective_month: nextMonth })
   } catch (error) {
     noOpError = error
   }
   assert(noOpError?.code === "RECURRING_NO_OP_CHANGE", "no-op schedule returns its domain error code")
 
   const postedScheduled = createAuthority(
-    [record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledRecord],
-    [{ recurring_expense_id: scheduledRecord.sourceId, occurrence_month: "2026-09-01", transaction_id: "txn_scheduled" }],
+    [record("rule_1", { ...currentData, ends_month: shiftMonth(nextMonth, -1) }), scheduledRecord],
+    [{ recurring_expense_id: scheduledRecord.sourceId, occurrence_month: `${nextMonth}-01`, transaction_id: "txn_scheduled" }],
   )
   let postedEditError = null
   try {
@@ -121,20 +131,20 @@ const currentData = {
   await commands.deleteEncryptedRecurringExpense(deleted.authority, "rule_1")
   assert(!deleted.records.has("rule_1"), "delete persists a tombstone")
 
-  const postedTransaction = record("txn_1", { date: "2026-08-15", expense: "Rent", amount_cents: 120000, category: "needs", tag_id: "tag_1", card_id: null, recurring_expense_id: "rule_1", notes: "August note", is_split: true }, "transaction")
+  const postedTransaction = record("txn_1", { date: `${currentMonth}-15`, expense: "Rent", amount_cents: 120000, category: "needs", tag_id: "tag_1", card_id: null, recurring_expense_id: "rule_1", notes: "Current month note", is_split: true }, "transaction")
   const propagated = createAuthority([record("rule_1", currentData), postedTransaction])
-  await commands.updateEncryptedRecurringTransaction(propagated.authority, postedTransaction, { ...postedTransaction.data, expense: "Rent and utilities", amount_cents: 125000, notes: "Changed note", date: "2026-08-20", is_split: false })
+  await commands.updateEncryptedRecurringTransaction(propagated.authority, postedTransaction, { ...postedTransaction.data, expense: "Rent and utilities", amount_cents: 125000, notes: "Changed note", date: `${currentMonth}-20`, is_split: false })
   const futureVersion = [...propagated.records.values()].find((item) => item.family === "recurring_series" && item.sourceId !== "rule_1")
-  assert(futureVersion && futureVersion.data.starts_month === "2026-09" && futureVersion.data.amount_cents === 125000 && futureVersion.data.expense === "Rent and utilities", "propagation creates the next future template")
-  assert(propagated.records.get("txn_1").data.notes === "Changed note" && propagated.records.get("txn_1").data.date === "2026-08-20" && propagated.records.get("txn_1").data.is_split === false, "propagation keeps occurrence-only edits on the transaction")
+  assert(futureVersion && futureVersion.data.starts_month === nextMonth && futureVersion.data.amount_cents === 125000 && futureVersion.data.expense === "Rent and utilities", "propagation creates the next future template")
+  assert(propagated.records.get("txn_1").data.notes === "Changed note" && propagated.records.get("txn_1").data.date === `${currentMonth}-20` && propagated.records.get("txn_1").data.is_split === false, "propagation keeps occurrence-only edits on the transaction")
   assert(propagated.getCommitCount() === 1, "propagation commits transaction and recurring change in one batch")
 
-  const scheduledExisting = record("rule_2", { ...currentData, id: "rule_2", series_id: "series_1", starts_month: "2026-09", amount_cents: 130000 })
-  const existing = createAuthority([record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledExisting, postedTransaction])
+  const scheduledExisting = record("rule_2", { ...currentData, id: "rule_2", series_id: "series_1", starts_month: nextMonth, amount_cents: 130000 })
+  const existing = createAuthority([record("rule_1", { ...currentData, ends_month: shiftMonth(nextMonth, -1) }), scheduledExisting, postedTransaction])
   await commands.updateEncryptedRecurringTransaction(existing.authority, postedTransaction, { ...postedTransaction.data, tag_id: "tag_2" })
   assert(existing.records.size === 3 && existing.records.get("rule_2").data.tag_id === "tag_2", "propagation updates an existing future version without duplicating it")
 
-  const materialized = createAuthority([record("rule_1", { ...currentData, ends_month: "2026-08" }), scheduledExisting, postedTransaction], [{ recurring_expense_id: "rule_2", occurrence_month: "2026-09-15", transaction_id: "txn_2" }])
+  const materialized = createAuthority([record("rule_1", { ...currentData, ends_month: shiftMonth(nextMonth, -1) }), scheduledExisting, postedTransaction], [{ recurring_expense_id: "rule_2", occurrence_month: `${nextMonth}-15`, transaction_id: "txn_2" }])
   let materializedError = null
   try { await commands.updateEncryptedRecurringTransaction(materialized.authority, postedTransaction, { ...postedTransaction.data, tag_id: "tag_2" }) } catch (error) { materializedError = error }
   assert(materializedError?.code === "RECURRING_FUTURE_VERSION_ALREADY_MATERIALIZED" && materialized.getCommitCount() === 0, "materialized future versions are protected before any commit")
