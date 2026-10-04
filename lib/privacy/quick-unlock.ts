@@ -14,6 +14,28 @@ export function quickUnlockCapability(): QuickUnlockCapability {
   return { supported: secureContext && typeof PublicKeyCredential !== "undefined" && typeof navigator.credentials?.create === "function" && typeof navigator.credentials?.get === "function", secureContext }
 }
 
+export async function resolveQuickUnlockCapability(): Promise<boolean> {
+  const basic = quickUnlockCapability()
+  if (!basic.supported || typeof window === "undefined") return false
+
+  const credentialApi = window.PublicKeyCredential as typeof PublicKeyCredential & {
+    getClientCapabilities?: () => Promise<Record<string, boolean>>
+    isUserVerifyingPlatformAuthenticatorAvailable?: () => Promise<boolean>
+  }
+
+  if (typeof credentialApi.isUserVerifyingPlatformAuthenticatorAvailable === "function" &&
+      !(await credentialApi.isUserVerifyingPlatformAuthenticatorAvailable())) {
+    return false
+  }
+
+  if (typeof credentialApi.getClientCapabilities === "function") {
+    const capabilities = await credentialApi.getClientCapabilities()
+    if (capabilities.prf === false) return false
+  }
+
+  return true
+}
+
 export function createPrfInput(): Uint8Array {
   if (!quickUnlockCapability().secureContext) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
   return crypto.getRandomValues(new Uint8Array(32))

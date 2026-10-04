@@ -21,7 +21,7 @@ import type { CsvImportPlan, CsvRow } from "@/lib/domain/financial/csv"
 import { materializeEncryptedRecurring, type RecurringMaterializationResult } from "@/lib/privacy/encrypted-authority/recurring-mutation"
 import { tagQuickPicksFromState, taxonomyFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
 import { getLocalDateKey } from "@/lib/date-filters"
-import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
+import { enrollQuickUnlock as enrollQuickUnlockClient, quickUnlockCapability, resolveQuickUnlockCapability, unlockWithQuickUnlock as unlockWithQuickUnlockClient } from "@/lib/privacy/quick-unlock"
 
 interface FinancialAuthorityContextValue {
   isVaultSetupRequired: boolean
@@ -106,8 +106,18 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const [isLoading, setIsLoading] = useState(true)
   const [authority, setAuthority] = useState<EncryptedFinancialAuthority | null>(null)
   const [quickUnlockStatus, setQuickUnlockStatus] = useState<"unknown" | "not_enrolled" | "enrolled">("unknown")
-  const capability = useMemo(() => quickUnlockCapability(), [])
+  const [quickUnlockSupported, setQuickUnlockSupported] = useState(() => quickUnlockCapability().supported)
   const vaultManager = useMemo(() => new VaultManager(), [])
+
+  useEffect(() => {
+    let active = true
+    void resolveQuickUnlockCapability().then((supported) => {
+      if (active) setQuickUnlockSupported(supported)
+    }).catch(() => {
+      if (active) setQuickUnlockSupported(false)
+    })
+    return () => { active = false }
+  }, [])
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) {
@@ -158,19 +168,19 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const lock = useCallback(() => { vaultManager.lock(); setAuthority(null) }, [vaultManager])
 
   const unlockWithQuickUnlock = useCallback(async () => {
-    if (isVaultSetupRequired || !capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
+    if (isVaultSetupRequired || !quickUnlockSupported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
     await installAuthority(await unlockWithQuickUnlockClient(apiClient))
-  }, [capability.supported, installAuthority, isVaultSetupRequired])
+  }, [installAuthority, isVaultSetupRequired, quickUnlockSupported])
 
   const enrollQuickUnlock = useCallback(async () => {
     const runtimeKey = vaultManager.getRuntimeKey()
     if (!authority || !runtimeKey) throw new Error("VAULT_LOCKED")
-    if (!capability.supported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
+    if (!quickUnlockSupported) throw new Error("QUICK_UNLOCK_UNSUPPORTED")
     const wrappingKey = vaultManager.getQuickUnlockWrapKey()
     if (!wrappingKey) throw new Error("QUICK_UNLOCK_REQUIRES_PASSPHRASE_UNLOCK")
     await enrollQuickUnlockClient(apiClient, wrappingKey)
     setQuickUnlockStatus("enrolled")
-  }, [authority, capability.supported, vaultManager])
+  }, [authority, quickUnlockSupported, vaultManager])
 
   const revokeQuickUnlock = useCallback(async () => {
     const status = await apiClient.getQuickUnlockStatus()
@@ -306,7 +316,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     changePassphrase,
     rotateRecoverySecret,
     lock,
-    quickUnlockCapability: capability.supported ? "supported" : "unsupported",
+    quickUnlockCapability: quickUnlockSupported ? "supported" : "unsupported",
     quickUnlockStatus,
     unlockWithQuickUnlock,
     enrollQuickUnlock,
@@ -324,7 +334,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, budgetOperations, capability.supported, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, budgetOperations, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, quickUnlockSupported, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
   useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 
