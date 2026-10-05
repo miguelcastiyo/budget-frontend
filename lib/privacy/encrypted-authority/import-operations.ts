@@ -11,7 +11,7 @@ export interface EncryptedCsvImportOptions {
 }
 
 export function getEncryptedImportTags(authority: EncryptedFinancialAuthority): Tag[] {
-  return authority.getState().tags.map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey }))
+  return authority.getState().tags.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name, icon_key: item.iconKey }))
 }
 
 export function planEncryptedCsvImport(authority: EncryptedFinancialAuthority, rows: CsvRow[], options: EncryptedCsvImportOptions): CsvImportPlan {

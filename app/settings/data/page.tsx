@@ -184,7 +184,15 @@ export default function DataSettingsPage() {
         }
         const preview: CsvImportPreviewResponse = { mode: "preview", headers: parsed.headers, sample_rows: parsed.rows.slice(0, 5), column_profiles: parsed.headers.map((header) => ({ header, blank_count: parsed.rows.filter((item) => !item[header]?.trim()).length, unique_values_truncated: false, unique_values: [...new Set(parsed.rows.map((item) => item[header] ?? ""))].filter(Boolean).slice(0, 100).map((value) => ({ value, count: parsed.rows.filter((item) => item[header] === value).length })) })), date_profiles: [], suggested_mapping: suggestedMapping, total_rows: parsed.rows.length, limits: { max_bytes: 10_000_000, max_rows: 100_000, max_returned_errors: 100 } }
         const tagsResponse = await authority.getImportTags()
-        setImportPreview(preview); setExistingTags(tagsResponse); setImportMapping(suggestedMapping); setDateYear(String(currentImportYear())); setCategoryMode(suggestedMapping.category ? "exact_column" : "default"); setCategorySourceHeader(suggestedMapping.category ?? ""); setCategoryValueMap({}); setTagValueMap({}); setImportStep("map")
+        setImportPreview(preview)
+        setExistingTags(tagsResponse)
+        setImportMapping(suggestedMapping)
+        setDateYear(String(currentImportYear()))
+        setCategoryMode(suggestedMapping.category ? "exact_column" : "default")
+        setCategorySourceHeader(suggestedMapping.category ?? "")
+        setCategoryValueMap({})
+        setTagValueMap(suggestedMapping.tag ? defaultTagValueMap(preview, suggestedMapping.tag, tagsResponse) : {})
+        setImportStep("map")
         return
       }
       throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")

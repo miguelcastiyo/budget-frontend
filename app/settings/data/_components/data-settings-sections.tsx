@@ -28,6 +28,7 @@ import {
   completeSummarySentence,
   currentImportYear,
   dateProfileForHeader,
+  defaultTagValueMap,
   HEADER_IMPORT_FIELDS,
   type CategorySetupMode,
   type HeaderImportField,
@@ -555,6 +556,7 @@ export function TagSetup({
 }) {
   const profile = profileForHeader(preview, tagHeader)
   const values = profile?.unique_values ?? []
+  const defaultValues = defaultTagValueMap(preview, tagHeader, tags)
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-background p-3 sm:p-4">
@@ -565,7 +567,7 @@ export function TagSetup({
       ) : (
         <div className="max-h-[calc(100dvh-22rem)] space-y-2 overflow-y-auto pr-1 sm:max-h-[28rem]">
           {values.map((item) => {
-            const entry = valueMap[item.value] ?? { mode: "new", name: item.value }
+            const entry = valueMap[item.value] ?? defaultValues[item.value] ?? { mode: "new", name: item.value }
             const selectValue = entry.mode === "existing" ? `existing:${entry.tag_id}` : "__new"
             return (
               <div key={item.value} className="grid gap-3 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[minmax(10rem,1fr)_minmax(18rem,24rem)] md:items-center">
