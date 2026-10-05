@@ -19,7 +19,8 @@ export function planEncryptedCsvImport(authority: EncryptedFinancialAuthority, r
   return planCsvImport(rows, state.transactions, {
     year: options.year,
     userId: "authority-user",
-    batchId: `csv_${createEncryptedRecordId()}`,
+    batchId: createEncryptedRecordId(),
+    createRecordId: createEncryptedRecordId,
     tags: state.tags.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })),
     cards: state.cards.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })),
     contexts: state.contexts.filter((item) => !item.isDeleted).map((item) => ({ id: item.id, name: item.name })),
@@ -28,7 +29,7 @@ export function planEncryptedCsvImport(authority: EncryptedFinancialAuthority, r
 }
 
 export async function commitEncryptedCsvImport(authority: EncryptedFinancialAuthority, plan: CsvImportPlan, sourceFilename: string): Promise<{ batchId: string }> {
-  const batchId = plan.accepted[0]?.id.split(":").slice(0, -1).join(":") ?? `csv_${createEncryptedRecordId()}`
+  const batchId = plan.batchId
   const taxonomyCreates: SourceMutationDiff["creates"] = plan.taxonomyCreates.map((item) => ({
     id: item.id,
     family: item.family,

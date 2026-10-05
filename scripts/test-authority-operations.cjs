@@ -85,7 +85,10 @@ function makeAuthority(initialRecords = []) {
   const entries = await getEncryptedFundEntries(deps(created.authority), "fund_1")
   assert(funds.items.length === 1 && entries.items[0]?.id === entry.id, "fund operations preserve fund and ledger lookups")
 
-  const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Home" }], { year: 2026, tagValueMap: {} })
+  const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Imported tag", card: "Imported card", context: "Imported context" }], { year: 2026, tagValueMap: {} })
+  const validRecordId = (id) => /^rec_[A-Za-z0-9_-]{8,90}$/.test(id)
+  assert(validRecordId(importPlan.batchId) && importPlan.accepted.every((item) => validRecordId(item.id)) && importPlan.taxonomyCreates.every((item) => validRecordId(item.id)), "CSV import plans use backend-compatible encrypted record IDs")
+  assert(importPlan.taxonomyCreates.some((item) => item.id === importPlan.accepted[0].tagId) && importPlan.taxonomyCreates.some((item) => item.id === importPlan.accepted[0].cardId) && importPlan.taxonomyCreates.some((item) => item.id === importPlan.accepted[0].contextId), "CSV import keeps taxonomy relationships attached to generated IDs")
   const committedImport = await commitEncryptedCsvImport(created.authority, importPlan, "august.csv")
   assert(created.records.has(committedImport.batchId), "import operation creates an import run alongside its transactions")
   assert(getEncryptedDataRuns(created.authority, 10)[0]?.source_filename === "august.csv", "import operation projects encrypted run activity")

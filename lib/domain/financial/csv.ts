@@ -5,7 +5,7 @@ import type { TransactionRecord } from "./types"
 
 export interface CsvRow { row: number; date: string; expense: string; amount: string; externalCategory?: string; tag?: string; context?: string; card?: string; isSplit?: boolean; notes?: string }
 export interface CsvImportTaxonomyCreate { family: "taxonomy_tag" | "taxonomy_card" | "taxonomy_context"; id: string; name: string }
-export interface CsvImportPlan { accepted: TransactionRecord[]; errors: { row: number; field: string; message: string }[]; skippedBlankAmountRows: number; duplicates: CsvRow[]; newTags: string[]; newCards: string[]; newContexts: string[]; taxonomyCreates: CsvImportTaxonomyCreate[] }
+export interface CsvImportPlan { batchId: string; accepted: TransactionRecord[]; errors: { row: number; field: string; message: string }[]; skippedBlankAmountRows: number; duplicates: CsvRow[]; newTags: string[]; newCards: string[]; newContexts: string[]; taxonomyCreates: CsvImportTaxonomyCreate[] }
 
 export function normalizeCsvDate(value: string, year: number): string {
   const trimmed = value.trim()
@@ -18,9 +18,17 @@ export function normalizeCsvDate(value: string, year: number): string {
   return dateOnly(normalized)
 }
 export function mapCategory(value: string | undefined): "needs" | "wants" | "savings" { const normalized = value?.trim().toLowerCase(); if (normalized === "debit" || normalized === "needs") return "needs"; if (normalized === "wants") return "wants"; if (normalized === "savings") return "savings"; throw new Error("INVALID_CATEGORY") }
-export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], options: { year: number; userId: string; batchId: string; tags?: Array<{ id: string; name: string }>; cards?: Array<{ id: string; name: string }>; contexts?: Array<{ id: string; name: string }>; tagValueMap?: Record<string, { mode?: "existing" | "new"; tag_id?: string; name?: string }> }): CsvImportPlan {
+export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], options: { year: number; userId: string; batchId: string; createRecordId?: () => string; tags?: Array<{ id: string; name: string }>; cards?: Array<{ id: string; name: string }>; contexts?: Array<{ id: string; name: string }>; tagValueMap?: Record<string, { mode?: "existing" | "new"; tag_id?: string; name?: string }> }): CsvImportPlan {
   const accepted: TransactionRecord[] = []; const errors: CsvImportPlan["errors"] = []; const duplicates: CsvRow[] = []; const newTags: string[] = []; const newCards: string[] = []; const newContexts: string[] = []; const taxonomyCreates: CsvImportPlan["taxonomyCreates"] = []
-  const taxonomyId = (family: CsvImportTaxonomyCreate["family"], name: string) => `${options.batchId}:${family}:${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+  const generatedTaxonomyIds = new Map<string, string>()
+  const taxonomyId = (family: CsvImportTaxonomyCreate["family"], name: string) => {
+    const key = `${family}:${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+    const existingId = generatedTaxonomyIds.get(key)
+    if (existingId) return existingId
+    const id = options.createRecordId?.() ?? `${options.batchId}:${key}`
+    generatedTaxonomyIds.set(key, id)
+    return id
+  }
   const resolveTaxonomy = (family: CsvImportTaxonomyCreate["family"], value: string | undefined, existingItems: Array<{ id: string; name: string }> | undefined, onNew: (name: string) => void) => {
     const name = value?.trim() ?? ""
     if (!name) return null
@@ -42,7 +50,7 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     const tagId = tagMapping?.mode === "existing" && tagMapping.tag_id ? tagMapping.tag_id : resolveTaxonomy("taxonomy_tag", tagName, options.tags, (name) => { if (!newTags.includes(name)) newTags.push(name) })
     const cardId = resolveTaxonomy("taxonomy_card", row.card, options.cards, (name) => { if (!newCards.includes(name)) newCards.push(name) })
     const contextId = resolveTaxonomy("taxonomy_context", row.context, options.contexts, (name) => { if (!newContexts.includes(name)) newContexts.push(name) })
-    const candidate = createTransaction({ id: `${options.batchId}:${row.row}`, userId: options.userId, date, expense: row.expense, amount: formatMoneyCents(amountCents), category, isSplit: row.isSplit, notes: row.notes, source: "import", importFingerprint: null, tagId, contextId, cardId, sequence: row.row })
+    const candidate = createTransaction({ id: options.createRecordId?.() ?? `${options.batchId}:${row.row}`, userId: options.userId, date, expense: row.expense, amount: formatMoneyCents(amountCents), category, isSplit: row.isSplit, notes: row.notes, source: "import", importFingerprint: null, tagId, contextId, cardId, sequence: row.row })
     const stableTaxonomyValue = (id: string | null, name: string | undefined, items: Array<{ id: string; name: string }> | undefined) => {
       if (name?.trim()) return name.trim().toLocaleLowerCase()
       return items?.find((item) => item.id === id)?.name.trim().toLocaleLowerCase() ?? id
@@ -53,7 +61,7 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     if (existing.concat(accepted).some((item) => item.importFingerprint === fingerprint || duplicateFingerprint({ date: item.date, amount: formatMoneyCents(item.amountCents), expense: item.expense, category: item.category, isSplit: item.isSplit, tagId: item.tagId, cardId: item.cardId }) === fingerprint)) { duplicates.push(row); continue }
     accepted.push({ ...candidate, importFingerprint: fingerprint })
   }
-  return { accepted, errors, skippedBlankAmountRows: rows.filter((row) => !row.amount.trim()).length, duplicates, newTags, newCards, newContexts, taxonomyCreates }
+  return { batchId: options.batchId, accepted, errors, skippedBlankAmountRows: rows.filter((row) => !row.amount.trim()).length, duplicates, newTags, newCards, newContexts, taxonomyCreates }
 }
 export function rollbackImport(records: TransactionRecord[], batchPrefix: string): TransactionRecord[] { return records.map((record) => record.id.startsWith(`${batchPrefix}:`) ? { ...record, isDeleted: true } : record) }
 export function escapeCsvField(value: string | null | undefined): string { const text = value ?? ""; return /^[=+\-@]/.test(text) ? `'${text}` : /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text }
