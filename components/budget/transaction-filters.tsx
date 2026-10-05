@@ -658,7 +658,7 @@ export function TransactionFilters({
             label="Cards"
             options={cards.map((card) => ({ value: card.id, label: card.name }))}
             selectedValues={selectedCards}
-            onToggle={(value) => toggleValue(value, selectedValues, onCardsChange)}
+            onToggle={(value) => toggleValue(value, selectedCards, onCardsChange)}
             collapsedLimit={8}
           />
 

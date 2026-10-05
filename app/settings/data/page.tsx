@@ -61,8 +61,11 @@ function parseCsvText(text: string): { headers: string[]; rows: Record<string, s
     } else if (character === "," && !quoted) { row.push(cell); cell = "" } else if ((character === "\n" || character === "\r") && !quoted) { if (character === "\r" && text[index + 1] === "\n") index += 1; row.push(cell); if (row.some((value) => value.trim())) rows.push(row); row = []; cell = "" } else cell += character
   }
   if (cell || row.length) { row.push(cell); rows.push(row) }
-  const headers = rows.shift()?.map((value) => value.trim()) ?? []
-  return { headers, rows: rows.map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]))) }
+  const namedColumns = (rows.shift() ?? [])
+    .map((value, index) => ({ header: value.trim(), index }))
+    .filter(({ header }) => header.length > 0)
+  const headers = namedColumns.map(({ header }) => header)
+  return { headers, rows: rows.map((values) => Object.fromEntries(namedColumns.map(({ header, index }) => [header, values[index] ?? ""]))) }
 }
 
 export default function DataSettingsPage() {
@@ -167,6 +170,12 @@ export default function DataSettingsPage() {
     try {
       if (authority.isUnlocked) {
         const parsed = parseCsvText(await file.text())
+        if (parsed.headers.length === 0) {
+          setImportFile(null)
+          setImportError("CSV needs a header row with at least one named column.")
+          if (fileInputRef.current) fileInputRef.current.value = ""
+          return
+        }
         const lower = new Map(parsed.headers.map((header) => [header.toLowerCase(), header]))
         const suggestedMapping: CsvImportMapping = {}
         for (const field of ["date", "expense", "amount", "category", "tag", "card", "context", "is_split", "notes"] as const) {
