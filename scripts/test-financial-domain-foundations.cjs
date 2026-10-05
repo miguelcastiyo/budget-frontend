@@ -8,6 +8,7 @@ Module._resolveFilename = function (request, parent, isMain, options) { return o
 require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText, filename)
 const money = require("../lib/domain/financial/money.ts")
 const clock = require("../lib/domain/financial/clock.ts")
+const csv = require("../lib/domain/financial/csv.ts")
 const transactions = require("../lib/domain/financial/transactions.ts")
 const budgets = require("../lib/domain/financial/budgets.ts")
 const viewModels = require("../lib/domain/financial/view-models.ts")
@@ -17,6 +18,19 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 assert(money.parseMoneyCents("1,234.50") === 123450, "money parsing")
 assert(money.formatMoneyCents(123450) === "1234.50", "money formatting")
 assert(clock.daysInMonth("2024-02") === 29 && clock.daysInMonth("2026-02") === 28, "calendar month lengths")
+assert(csv.normalizeCsvDate("9/9/2026", 2025) === "2026-09-09", "CSV dates with an explicit year")
+assert(csv.normalizeCsvDate("9/9", 2026) === "2026-09-09", "CSV dates using the selected year")
+assert(csv.normalizeCsvDate("2026-09-09", 2025) === "2026-09-09", "ISO CSV dates")
+let invalidCsvDateRejected = false
+try { csv.normalizeCsvDate("2/30/2026", 2026) } catch { invalidCsvDateRejected = true }
+assert(invalidCsvDateRejected, "invalid calendar dates are rejected")
+const csvPlan = csv.planCsvImport([
+  { row: 2, date: "9/9/2026", expense: "Imported expense", amount: "$14.27", externalCategory: "Wants", tag: "Example" },
+  { row: 3, date: "2/30/2026", expense: "Bad date", amount: "$14.27", externalCategory: "Wants", tag: "Example" },
+  { row: 4, date: "9/11/2026", expense: "Bad amount", amount: "$invalid", externalCategory: "Wants", tag: "Example" },
+], [], { year: 2025, userId: "user_1", batchId: "csv_test" })
+assert(csvPlan.accepted.length === 1 && csvPlan.accepted[0].date === "2026-09-09" && csvPlan.accepted[0].amountCents === 1427, "CSV import accepts dated dollar amounts")
+assert(csvPlan.errors.length === 2 && csvPlan.errors[0].field === "date" && csvPlan.errors[1].field === "amount", "CSV import still rejects malformed dates and amounts")
 const transaction = transactions.createTransaction({ id: "txn_1", userId: "user_1", date: "2026-01-15", expense: " Coffee ", amount: "12.50", category: "needs", notes: " note " })
 assert(transaction.expense === "Coffee" && transaction.notes === "note" && transaction.amountCents === 1250, "transaction normalization")
 assert(transactions.transactionSummary([transaction], {}).totalSpent === "12.50", "transaction summary")

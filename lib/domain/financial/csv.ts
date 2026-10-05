@@ -8,7 +8,13 @@ export interface CsvImportTaxonomyCreate { family: "taxonomy_tag" | "taxonomy_ca
 export interface CsvImportPlan { accepted: TransactionRecord[]; errors: { row: number; field: string; message: string }[]; skippedBlankAmountRows: number; duplicates: CsvRow[]; newTags: string[]; newCards: string[]; newContexts: string[]; taxonomyCreates: CsvImportTaxonomyCreate[] }
 
 export function normalizeCsvDate(value: string, year: number): string {
-  const trimmed = value.trim(); const normalized = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : /^\d{1,2}\/\d{1,2}$/.test(trimmed) ? `${year}-${trimmed.split("/").map((part) => part.padStart(2, "0")).join("-")}` : ""
+  const trimmed = value.trim()
+  const slashDate = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(trimmed)
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? trimmed
+    : slashDate
+      ? `${slashDate[3] ?? year}-${slashDate[1].padStart(2, "0")}-${slashDate[2].padStart(2, "0")}`
+      : ""
   return dateOnly(normalized)
 }
 export function mapCategory(value: string | undefined): "needs" | "wants" | "savings" { const normalized = value?.trim().toLowerCase(); if (normalized === "debit" || normalized === "needs") return "needs"; if (normalized === "wants") return "wants"; if (normalized === "savings") return "savings"; throw new Error("INVALID_CATEGORY") }
@@ -28,7 +34,7 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     if (!row.amount.trim()) continue
     let date: string; let amountCents: number; let category: "needs" | "wants" | "savings"
     try { date = normalizeCsvDate(row.date, options.year) } catch { errors.push({ row: row.row, field: "date", message: "must be a valid date" }); continue }
-    try { amountCents = parseMoneyCents(row.amount) } catch { errors.push({ row: row.row, field: "amount", message: "must be a decimal number" }); continue }
+    try { amountCents = parseMoneyCents(row.amount.trim().replace(/^\$\s*/, "")) } catch { errors.push({ row: row.row, field: "amount", message: "must be a decimal number" }); continue }
     try { category = mapCategory(row.externalCategory) } catch { errors.push({ row: row.row, field: "category", message: "must be a supported category" }); continue }
     if (amountCents <= 0) { errors.push({ row: row.row, field: "amount", message: "must be greater than 0" }); continue }
     const tagMapping = row.tag?.trim() ? options.tagValueMap?.[row.tag] : undefined
