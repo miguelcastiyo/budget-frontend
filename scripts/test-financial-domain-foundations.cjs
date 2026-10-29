@@ -61,3 +61,19 @@ const ambiguousTransaction = { ...legacyTransaction, envelope: envelope("run_leg
 const ambiguousAnalysis = lineageRepair.analyzeImportLineage({ store: { values: () => [legacyRun, legacyTransaction, ambiguousTransaction] } }, "run_legacy")
 assert(ambiguousAnalysis.status === "ambiguous", "duplicate legacy row identity remains unavailable")
 console.log("Phase 4 financial-domain foundation tests passed")
+
+const pending = require("../lib/domain/financial/pending-transactions.ts")
+const { rehydrateFinancialState } = require("../lib/privacy/encrypted-authority/rehydrate.ts")
+const captureDate = new Date(2026, 9, 28, 23, 30)
+const prepared = pending.createPendingTransaction("rec_pending", { amount: "12.50", description: "  " }, captureDate)
+assert(prepared.date === "2026-10-28" && prepared.description === null && prepared.amountCents === 1250, "pending defaults to local date and normalizes blank description")
+const updated = pending.updatePendingTransaction(prepared, { amount: null, description: " Coffee ", notes: " note " })
+assert(updated.amountCents === null && updated.description === "Coffee" && updated.notes === "note" && updated.capturedAt === prepared.capturedAt, "pending update preserves capture time and supports description only")
+for (const input of [{}, { amount: "0" }, { amount: "bad" }, { description: "a", date: "2026-02-30" }]) {
+  let failed = false
+  try { pending.createPendingTransaction("rec_pending", input, captureDate) } catch { failed = true }
+  assert(failed, "invalid pending input rejected")
+}
+const pendingRecord = { envelope: envelope("rec_pending"), family: "pending_transaction", schemaVersion: "pending_transaction_v1", sourceId: "rec_pending", data: { captured_at: prepared.capturedAt, date: prepared.date, amount_cents: 1250, description: null } }
+const pendingState = rehydrateFinancialState([pendingRecord])
+assert(pendingState.pendingTransactions.length === 1 && pendingState.pendingTransactions[0].amountCents === 1250 && pendingState.transactions.length === 0, "pending rehydrates separately from transactions")

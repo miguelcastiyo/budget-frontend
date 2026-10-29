@@ -9,6 +9,8 @@ import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret,
 import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, CsvImportResponse, DataRunItem, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
 import { encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
+import type { PendingTransaction, PendingTransactionInput } from "@/lib/domain/financial/pending-transactions"
+import { getPendingTransactions, preparePendingTransaction, preparePendingTransactionUpdate } from "@/lib/privacy/encrypted-authority/pending-transaction-operations"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
 import { createEncryptedCard, createEncryptedContext, createEncryptedTag, deleteEncryptedCard, deleteEncryptedContext, deleteEncryptedTag, getEncryptedCards, getEncryptedContexts, getEncryptedTags, updateEncryptedCard, updateEncryptedContext, updateEncryptedTag } from "@/lib/privacy/encrypted-authority/taxonomy-operations"
 import { createEncryptedFund, createEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFund, getEncryptedFundEntries, getEncryptedFunds, setEncryptedFundStatus, updateEncryptedFund, updateEncryptedFundEntry } from "@/lib/privacy/encrypted-authority/fund-operations"
@@ -39,6 +41,9 @@ interface FinancialAuthorityContextValue {
   unlockWithQuickUnlock: () => Promise<void>
   enrollQuickUnlock: () => Promise<void>
   revokeQuickUnlock: () => Promise<void>
+  getPendingTransactions: () => Promise<PendingTransaction[]>
+  preparePendingTransaction: (input: PendingTransactionInput) => PendingTransaction
+  preparePendingTransactionUpdate: (current: PendingTransaction, input: PendingTransactionInput) => PendingTransaction
   createTransaction: (input: CreateTransactionRequest) => Promise<Transaction>
   updateTransaction: (current: Transaction, input: UpdateTransactionRequest) => Promise<Transaction>
   updateRecurringTransaction: (current: Transaction, input: UpdateTransactionRequest) => Promise<Transaction>
@@ -221,6 +226,9 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const recurring = useMemo(() => operationDeps ? createRecurringOperations(operationDeps) : null, [operationDeps])
 
   const transactionOperations = useMemo(() => ({
+    getPendingTransactions: async () => runEncrypted((deps) => getPendingTransactions(deps)),
+    preparePendingTransaction: (input: PendingTransactionInput) => runEncrypted((deps) => preparePendingTransaction(deps, input)),
+    preparePendingTransactionUpdate: (current: PendingTransaction, input: PendingTransactionInput) => runEncrypted((deps) => preparePendingTransactionUpdate(deps, current, input)),
     createTransaction: (input: CreateTransactionRequest) => runEncrypted((deps) => createEncryptedTransaction(deps, input)),
     updateTransaction: (current: Transaction, input: UpdateTransactionRequest) => runEncrypted((deps) => updateEncryptedTransaction(deps, current, input)),
     updateRecurringTransaction: (current: Transaction, input: UpdateTransactionRequest) => runEncrypted((deps) => updateEncryptedRecurringTransactionScope(deps, current, input)),

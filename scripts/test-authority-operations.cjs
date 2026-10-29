@@ -95,5 +95,20 @@ function makeAuthority(initialRecords = []) {
   await rollbackEncryptedCsvImport(created.authority, committedImport.batchId)
   assert(created.records.get(committedImport.batchId)?.data.status === "rolled_back" && ![...created.records.values()].some((record) => record.family === "transaction" && record.data.import_run_id === committedImport.batchId), "import rollback operation tombstones imported transactions and marks the run")
 
+  const { EncryptedFinancialAuthority } = require("../lib/privacy/encrypted-authority/authority.ts")
+  const guarded = new EncryptedFinancialAuthority({ request: async () => { throw new Error("unexpected network request") } }, null, "vault")
+  const pendingRecord = { envelope: { record_id: "rec_pending", record_revision: 1 }, family: "pending_transaction", schemaVersion: "pending_transaction_v1", sourceId: "rec_pending", data: {} }
+  guarded.store.replace(pendingRecord)
+  for (const operation of [
+    () => guarded.create("pending_transaction", "pending_transaction_v1", "rec_new", {}),
+    () => guarded.update("rec_pending", {}),
+    () => guarded.remove("rec_pending"),
+    () => guarded.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: "rec_pending", family: "transaction", data: {} }] }),
+  ]) {
+    let blocked = false
+    try { await operation() } catch (error) { blocked = error.message === "PENDING_TRANSACTION_WRITES_DISABLED" }
+    assert(blocked, "pending writes are blocked before network access")
+  }
+
   console.log("Encrypted authority operation tests passed")
 })().catch((error) => { console.error(error); process.exitCode = 1 })

@@ -45,6 +45,7 @@ export class EncryptedFinancialAuthority {
   }
 
   async create(family: string, schemaVersion: string, sourceId: string, data: Record<string, unknown>) {
+    if (family === "pending_transaction") throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const payload = serializeEncryptedRecord({ family: family as DecryptedFinancialRecord["family"], schemaVersion, sourceId, data })
     const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, payload, 1)
     const envelope = await this.api.request<EncryptedRecordEnvelope>("/me/encrypted-records", { method: "POST", body: JSON.stringify({ envelope: encrypted.envelope, idempotency_key: encrypted.idempotencyKey }) })
@@ -58,6 +59,7 @@ export class EncryptedFinancialAuthority {
 
   async update(recordId: string, data: Record<string, unknown>) {
     const current = this.store.get(recordId); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+    if (current.family === "pending_transaction") throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const payload = serializeEncryptedRecord({ family: current.family, schemaVersion: current.schemaVersion, sourceId: current.sourceId, data })
     const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, payload, current.envelope.record_revision + 1, recordId)
     const envelope = await this.api.request<EncryptedRecordEnvelope>(`/me/encrypted-records/${encodeURIComponent(recordId)}`, { method: "PUT", body: JSON.stringify({ envelope: encrypted.envelope, expected_revision: current.envelope.record_revision, idempotency_key: encrypted.idempotencyKey }) })
@@ -71,11 +73,13 @@ export class EncryptedFinancialAuthority {
 
   async remove(recordId: string) {
     const current = this.store.get(recordId); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+    if (current.family === "pending_transaction") throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const envelope = await this.api.request<EncryptedRecordEnvelope>(`/me/encrypted-records/${encodeURIComponent(recordId)}`, { method: "DELETE", body: JSON.stringify({ expected_revision: current.envelope.record_revision, idempotency_key: crypto.randomUUID() }) })
     this.store.remove(recordId); this.state = rehydrateFinancialState(this.store.values()); return envelope
   }
 
   async commitSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}) {
+    if ([...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const creates: Array<{ envelope: EncryptedRecordEnvelope; idempotency_key: string }> = []
     const updates: Array<{ envelope: EncryptedRecordEnvelope; expected_revision: number; idempotency_key: string }> = []
     const tombstones: Array<{ record_id: string; expected_revision: number; idempotency_key: string }> = []

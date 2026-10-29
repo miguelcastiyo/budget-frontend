@@ -26,3 +26,5 @@ for (const payload of [null, {}, { record_family: "unknown", record_schema_versi
   assert(failed, "malformed and unsupported records fail explicitly")
 }
 console.log("Encrypted record adapter tests passed")
+const pendingPayload = serializeEncryptedRecord({ family: "pending_transaction", schemaVersion: "pending_transaction_v1", sourceId: "rec_pending", data: { id: "rec_pending", captured_at: "2026-10-28T12:00:00.000Z", date: "2026-10-28", amount_cents: null, description: "Coffee" } })
+assert(parseEncryptedRecordPayload(pendingPayload).data.amount_cents === null, "pending record preserves null amount")

@@ -26,7 +26,7 @@ const FAMILY_ALIASES: Record<string, EncryptedRecordFamily> = {
 }
 
 const FAMILIES = new Set<EncryptedRecordFamily>([
-  "transaction", "taxonomy_tag", "taxonomy_card", "taxonomy_context", "budget_version",
+  "transaction", "pending_transaction", "taxonomy_tag", "taxonomy_card", "taxonomy_context", "budget_version",
   "recurring_series", "recurring_occurrence", "fund", "fund_ledger_entry", "savings_plan",
   "savings_plan_allocation", "month_closeout", "closeout_allocation", "import_run",
 ])
@@ -52,7 +52,7 @@ function canonicalData(value: unknown): RecordData {
   const input = value as RecordData
   const output: RecordData = { ...input }
   const aliases: Record<string, string> = {
-    sourceId: "source_id", userId: "user_id", amountCents: "amount_cents", isSplit: "is_split",
+    capturedAt: "captured_at", sourceId: "source_id", userId: "user_id", amountCents: "amount_cents", isSplit: "is_split",
     recurringExpenseId: "recurring_expense_id", importFingerprint: "import_fingerprint", tagId: "tag_id",
     contextId: "context_id", cardId: "card_id", isDeleted: "is_deleted", startsMonth: "starts_month",
     endsMonth: "ends_month", billingType: "billing_type", billingDay: "billing_day", fundId: "fund_id",

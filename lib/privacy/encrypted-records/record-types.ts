@@ -2,6 +2,7 @@ import type { EncryptedRecordEnvelope } from "./types"
 
 export type EncryptedRecordFamily =
   | "transaction"
+  | "pending_transaction"
   | "taxonomy_tag"
   | "taxonomy_card"
   | "taxonomy_context"
@@ -20,6 +21,7 @@ export type RecordData = Record<string, unknown>
 
 type CommonRecordData = RecordData & { id?: string; user_id?: string; is_deleted?: boolean }
 export type TransactionRecordData = CommonRecordData & { date?: string; expense?: string; amount_cents?: number; category?: string; is_split?: boolean; notes?: string | null; source?: string; recurring_expense_id?: string | null; tag_id?: string | null; context_id?: string | null; card_id?: string | null }
+export type PendingTransactionRecordData = CommonRecordData & { captured_at?: string; date?: string; amount_cents?: number | null; description?: string | null; category?: string | null; tag_id?: string | null; card_id?: string | null; context_id?: string | null; is_split?: boolean | null; notes?: string | null }
 export type TaxonomyRecordData = CommonRecordData & { name?: string; icon_key?: string | null; is_favorite?: boolean }
 export type BudgetRecordData = CommonRecordData & { effective_month?: string; monthly_income_cents?: number }
 export type RecurringSeriesRecordData = CommonRecordData & { series_id?: string; expense?: string; amount_cents?: number; category?: string; billing_type?: string; billing_day?: number | null; starts_month?: string; ends_month?: string | null; is_active?: boolean }
@@ -34,6 +36,7 @@ export type ImportRunRecordData = CommonRecordData & { status?: string; source_f
 
 export interface RecordDataByFamily {
   transaction: TransactionRecordData
+  pending_transaction: PendingTransactionRecordData
   taxonomy_tag: TaxonomyRecordData
   taxonomy_card: TaxonomyRecordData
   taxonomy_context: TaxonomyRecordData

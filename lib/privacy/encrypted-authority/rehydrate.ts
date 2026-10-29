@@ -1,3 +1,5 @@
+import { createPendingTransaction, type PendingTransaction } from "../../domain/financial/pending-transactions"
+import { formatMoneyCents } from "../../domain/financial/money"
 import type { FinancialState, BudgetSettingsRecord, TaxonomyRecord, TransactionRecord } from "../../domain/financial/types"
 import { parseMoneyCents } from "../../domain/financial/money"
 import type { DecryptedFinancialRecord } from "./record-store"
@@ -5,6 +7,7 @@ import type { RecordDataByFamily } from "../encrypted-records/record-types"
 import { canonicalRecordFamily } from "../encrypted-records/adapters"
 
 export interface RehydratedFinancialState extends FinancialState {
+  pendingTransactions: PendingTransaction[]
   recurringRules: RecordDataByFamily["recurring_series"][]
   recurringOccurrences: RecordDataByFamily["recurring_occurrence"][]
   funds: RecordDataByFamily["fund"][]
@@ -74,24 +77,33 @@ function budget(record: DecryptedFinancialRecord): BudgetSettingsRecord {
 }
 
 export function rehydrateFinancialState(records: Iterable<DecryptedFinancialRecord>): RehydratedFinancialState {
-  const state: RehydratedFinancialState = { transactions: [], tags: [], contexts: [], cards: [], budgets: [], recurringRules: [], recurringOccurrences: [], funds: [], fundLedgerEntries: [], savingsPlans: [], closeouts: [], closeoutAllocations: [], importRuns: [] }
+  const state: RehydratedFinancialState = { transactions: [], pendingTransactions: [], tags: [], contexts: [], cards: [], budgets: [], recurringRules: [], recurringOccurrences: [], funds: [], fundLedgerEntries: [], savingsPlans: [], closeouts: [], closeoutAllocations: [], importRuns: [] }
   for (const record of records) {
     const family = canonicalRecordFamily(record.family)
     try {
       switch (family) {
+        case "pending_transaction": {
+          const d = record.data as RecordDataByFamily["pending_transaction"]
+          if (typeof d.date !== "string") throw new Error("INVALID_PENDING_DATE")
+          if (typeof d.captured_at !== "string" || new Date(d.captured_at).toISOString() !== d.captured_at) throw new Error("INVALID_CAPTURE_TIME")
+          if (d.amount_cents != null && (typeof d.amount_cents !== "number" || !Number.isSafeInteger(d.amount_cents))) throw new Error("INVALID_PENDING_AMOUNT")
+          const pending = createPendingTransaction(record.envelope.record_id, { date: d.date, amount: d.amount_cents == null ? null : formatMoneyCents(d.amount_cents), description: d.description, category: d.category as PendingTransaction["category"], tagId: d.tag_id, cardId: d.card_id, contextId: d.context_id, isSplit: d.is_split, notes: d.notes }, new Date(d.captured_at))
+          state.pendingTransactions.push(pending)
+          break
+        }
         case "transaction": state.transactions.push(transaction(record)); break
         case "taxonomy_tag": state.tags.push(taxonomy(record)); break
         case "taxonomy_context": state.contexts.push(taxonomy(record)); break
         case "taxonomy_card": state.cards.push(taxonomy(record)); break
         case "budget_version": state.budgets.push(budget(record)); break
-        case "recurring_series": state.recurringRules.push({ ...record.data, id: record.data.id ?? record.sourceId, source_id: record.sourceId }); break
+        case "recurring_series": state.recurringRules.push({ ...(record.data as RecordDataByFamily["recurring_series"]), id: record.data.id ?? record.sourceId, source_id: record.sourceId }); break
         case "recurring_occurrence": state.recurringOccurrences.push({ ...record.data, id: record.data.id ?? record.sourceId }); break
         case "fund": state.funds.push(record.data); break
-        case "fund_ledger_entry": state.fundLedgerEntries.push(record.data); break
+        case "fund_ledger_entry": state.fundLedgerEntries.push(record.data as RecordDataByFamily["fund_ledger_entry"]); break
         case "savings_plan":
         case "savings_plan_allocation": state.savingsPlans.push(record.data); break
         case "month_closeout": state.closeouts.push(record.data); break
-        case "closeout_allocation": state.closeoutAllocations.push(record.data); break
+        case "closeout_allocation": state.closeoutAllocations.push(record.data as RecordDataByFamily["closeout_allocation"]); break
         case "import_run": state.importRuns.push(record.data); break
         default: throw new Error(`ENCRYPTED_RECORD_FAMILY_UNSUPPORTED:${record.family}`)
       }
