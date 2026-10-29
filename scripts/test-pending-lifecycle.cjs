@@ -51,6 +51,14 @@ function harness() {
   for (const key of ["capturedAt", "date", "amountCents", "description", "category", "tagId", "cardId", "contextId", "isSplit", "notes"]) assert.equal(restored[key], plan.pending[key], key)
   assert.equal(h.authority.getState().transactions.length, 0)
   assert.equal(h.records.has("rec_ledger"), false, "Undo removes linked Fund effect")
+  const edited = harness(); const editedSession = new PendingReviewSession(edited.deps)
+  const editedPlan = await editedSession.prepareFinalization("rec_pending", { amount: "16.75", description: "Edited", date: "2026-11-02", category: "needs", tagId: "rec_tag", cardId: null, contextId: "rec_context", isSplit: false, notes: "Updated" }, 1)
+  await editedSession.finalizePendingTransaction(editedPlan)
+  const editedUndo = await editedSession.prepareUndo(); await editedSession.undo(editedUndo)
+  const editedRestored = edited.authority.getState().pendingTransactions[0]
+  assert.equal(editedRestored.amountCents, 1675); assert.equal(editedRestored.description, "Edited"); assert.equal(editedRestored.notes, "Updated"); assert.equal(editedRestored.date, "2026-11-02"); assert.equal(editedRestored.category, "needs")
+  const changed = harness()
+  await assert.rejects(() => new PendingReviewSession(changed.deps).prepareFinalization("rec_pending", {}, 2), /PENDING_TRANSACTION_CONFLICT/)
   const bad = harness(); bad.records.delete("rec_tag")
   await assert.rejects(() => new PendingReviewSession(bad.deps).prepareFinalization("rec_pending"), /Active tag/)
   for (const change of [{ amount_cents: null }, { amount_cents: 0 }, { description: null }, { category: null }]) {

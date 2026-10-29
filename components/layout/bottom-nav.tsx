@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X } from "lucide-react"
+import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X, ListChecks } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
@@ -44,9 +46,10 @@ interface MobileBottomNavItemProps {
   href?: string
   isActive?: boolean
   onAction?: () => void
+  badge?: number
 }
 
-function MobileBottomNavItem({ item, href, isActive = false, onAction }: MobileBottomNavItemProps) {
+function MobileBottomNavItem({ item, href, isActive = false, onAction, badge }: MobileBottomNavItemProps) {
   const Icon = item.icon
   const className = cn(
     "mobile-nav-item",
@@ -56,8 +59,9 @@ function MobileBottomNavItem({ item, href, isActive = false, onAction }: MobileB
   )
   const content = (
     <>
-      <span className={cn("mobile-nav-icon", item.type === "route" && isActive && "mobile-nav-icon-active")}>
+      <span className={cn("mobile-nav-icon relative", item.type === "route" && isActive && "mobile-nav-icon-active")}>
         <Icon className="size-5" aria-hidden="true" />
+        {badge != null && badge > 0 && <span className="absolute -right-2 -top-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground" aria-label={`${badge} pending`}>{badge}</span>}
       </span>
       <span className="mobile-nav-label">{item.label}</span>
     </>
@@ -94,6 +98,8 @@ export function BottomNav({
   addCoachmarkText = "Start here. Add your first transaction.",
 }: BottomNavProps) {
   const { profile } = useAuth()
+  const authority = useFinancialAuthority()
+  const [reviewEnabled, setReviewEnabled] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const [hasHydrated, setHasHydrated] = useState(false)
@@ -101,6 +107,7 @@ export function BottomNav({
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
 
   useEffect(() => {
+    setReviewEnabled(pendingDevelopmentEnabled())
     const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
     setCoachmarkDismissed(dismissed)
     setTransactionsHref(hasTransactionViewState(profile?.id ?? "")
@@ -132,8 +139,8 @@ export function BottomNav({
 
   return (
     <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary">
-      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-center gap-0.5 px-1.5 py-1">
-        {mobileNavItems.map((item) => {
+      <div className={cn("mx-auto grid h-full max-w-lg items-center gap-0.5 px-1.5 py-1", reviewEnabled ? "grid-cols-6" : "grid-cols-5")}>
+        {(reviewEnabled ? [...mobileNavItems.slice(0, 2), { type: "route" as const, href: "/review", icon: ListChecks, label: "Review" }, ...mobileNavItems.slice(2)] : mobileNavItems).map((item) => {
           if (item.type === "action") {
             return (
               <div key={item.action} className="relative flex h-full items-center justify-center">
@@ -158,7 +165,7 @@ export function BottomNav({
 
           const isActive = isRouteActive(pathname, item.href)
           const href = item.href === "/transactions" ? transactionsHref : item.href
-          return <MobileBottomNavItem key={item.href} item={item} href={href} isActive={isActive} />
+          return <MobileBottomNavItem key={item.href} item={item} href={href} isActive={isActive} badge={item.href === "/review" && authority.isUnlocked && !authority.isLoading ? authority.pendingGlobalCount : undefined} />
         })}
       </div>
     </nav>

@@ -16,3 +16,15 @@ export function preparePendingTransactionUpdate(deps: EncryptedOperationDependen
 export function getPendingTransactions(deps: EncryptedOperationDependencies): PendingTransaction[] {
   return requireEncryptedAuthority(deps).getState().pendingTransactions.map((item) => ({ ...item }))
 }
+
+export async function savePendingTransaction(deps: EncryptedOperationDependencies, pending: PendingTransaction, expectedRevision?: number) {
+  const authority = requireEncryptedAuthority(deps)
+  const { pendingData } = await import("./pending-lifecycle")
+  const existing = authority.store.get(pending.id)
+  if (existing && existing.family !== "pending_transaction") throw new Error("PENDING_TRANSACTION_CONFLICT")
+  const source = { id: pending.id, family: "pending_transaction", data: pendingData(pending) }
+  if (existing && expectedRevision === undefined) throw new Error("PENDING_TRANSACTION_CONFLICT")
+  if (!existing && expectedRevision !== undefined) throw new Error("PENDING_TRANSACTION_CONFLICT")
+  const diff = existing ? { creates: [], updates: [source], tombstones: [] } : { creates: [source], updates: [], tombstones: [] }
+  return authority.prepareSourceDiff(diff, undefined, existing ? { expectedRevisionOverrides: { [pending.id]: expectedRevision! } } : {})
+}

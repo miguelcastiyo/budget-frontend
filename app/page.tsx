@@ -24,6 +24,8 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
+import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { FundsCta } from "@/components/funds/funds-cta"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
@@ -32,6 +34,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { setupStatus, refreshProfile } = useAuth()
   const authority = useFinancialAuthority()
+  const [reviewEnabled, setReviewEnabled] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [overview, setOverview] = useState<MonthOverviewResponse | null>(null)
@@ -53,6 +56,7 @@ export default function DashboardPage() {
       return
     }
 
+    setReviewEnabled(pendingDevelopmentEnabled())
     setIsProgressDismissed(window.localStorage.getItem(FIRST_MONTH_PROGRESS_DISMISSED_KEY) === "1")
   }, [])
 
@@ -235,6 +239,10 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {reviewEnabled && authority.isUnlocked && !authority.isLoading && (() => {
+          const pending = authority.getPendingMonthSummary(currentMonth)
+          return pending.count > 0 ? <Link href="/review" className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-secondary/50 px-4 py-3 text-sm"><span>{pending.count} pending · {formatCurrency(Number(formatMoneyCents(pending.knownAmountCents)))} known{pending.unknownAmountCount > 0 ? ` · ${pending.unknownAmountCount} without amount` : ""}</span><span className="font-semibold">Review →</span></Link> : null
+        })()}
         <div className="space-y-6 lg:space-y-8">
           {shouldShowFirstMonthActionCard && (
             <FirstMonthActionCard

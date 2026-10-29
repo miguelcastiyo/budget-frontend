@@ -1,11 +1,16 @@
+const backendOrigin = process.env.BACKEND_ORIGIN || "http://localhost:8000"
+let localBackend = false
+try { const url = new URL(backendOrigin); localBackend = url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) } catch { /* Invalid backend origins cannot enable pending writes. */ }
+const pendingDevelopment = process.env.NODE_ENV === "development" && process.env.BUDGET_ENABLE_PENDING_DEV === "1" && localBackend
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: { NEXT_PUBLIC_PENDING_DEVELOPMENT: pendingDevelopment ? "1" : "0" },
   distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     unoptimized: true,
   },
   async rewrites() {
-    const backendOrigin = process.env.BACKEND_ORIGIN || "http://localhost:8000"
 
     return [
       {

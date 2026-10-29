@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Receipt, LineChart, Settings } from "lucide-react"
+import { LayoutDashboard, Receipt, LineChart, Settings, ListChecks } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
+import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const navItems = [
@@ -19,7 +21,11 @@ const navItems = [
 export function Header() {
   const { profile } = useAuth()
   const pathname = usePathname()
+  const authority = useFinancialAuthority()
+  const [reviewEnabled, setReviewEnabled] = useState(false)
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
+
+  useEffect(() => { setReviewEnabled(pendingDevelopmentEnabled()) }, [])
 
   useEffect(() => {
     setTransactionsHref(hasTransactionViewState(profile?.id ?? "")
@@ -32,7 +38,7 @@ export function Header() {
       <div className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex-1">
           <nav className="hidden lg:flex items-center gap-1">
-            {navItems.map((item) => {
+            {(reviewEnabled ? [...navItems.slice(0, 2), { href: "/review", icon: ListChecks, label: "Review" }, ...navItems.slice(2)] : navItems).map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== "/" && pathname.startsWith(item.href))
               const href = item.href === "/transactions" ? transactionsHref : item.href
@@ -50,6 +56,7 @@ export function Header() {
                 >
                   <item.icon className="w-4 h-4" />
                   {item.label}
+                  {item.href === "/review" && authority.isUnlocked && !authority.isLoading && authority.pendingGlobalCount > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground" aria-label={`${authority.pendingGlobalCount} pending`}>{authority.pendingGlobalCount}</span>}
                 </Link>
               )
             })}

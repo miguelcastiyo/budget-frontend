@@ -12,7 +12,7 @@ Module._resolveFilename = function (request, parent, isMain, options) { return r
 require.extensions[".ts"] = (module, filename) => {
   let source = fs.readFileSync(filename, "utf8")
   if (filename.endsWith("/encrypted-authority/authority.ts")) {
-    const guard = /    if \(\[\.\.\.diff\.creates, \.\.\.diff\.updates, \.\.\.diff\.tombstones\]\.some\(\(record\) => record\.family === "pending_transaction" \|\| this\.store\.get\(record\.id\)\?\.family === "pending_transaction"\)\) throw new Error\("PENDING_TRANSACTION_WRITES_DISABLED"\)\n/g
+    const guard = / {4}if \(!pendingDevelopmentEnabled\(\) && \[\.\.\.diff\.creates, \.\.\.diff\.updates, \.\.\.diff\.tombstones\]\.some\(\(record\) => record\.family === "pending_transaction" \|\| this\.store\.get\(record\.id\)\?\.family === "pending_transaction"\)\) throw new Error\("PENDING_TRANSACTION_WRITES_DISABLED"\)\n/g
     const matches = source.match(guard) || []
     assert.equal(matches.length, 2, "expected guarded production implementation")
     source = source.replace(guard, "")

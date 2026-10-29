@@ -3,7 +3,7 @@ import { createTransaction } from "@/lib/domain/financial/transactions"
 import { FinancialDomainError } from "@/lib/domain/financial/errors"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { transactionFundDiff, transactionFundState, type SourceMutationDiff } from "@/lib/domain/financial/transaction-fund-diff"
-import type { PendingTransaction } from "@/lib/domain/financial/pending-transactions"
+import { updatePendingTransaction, type PendingTransaction, type PendingTransactionInput } from "@/lib/domain/financial/pending-transactions"
 import { createDeterministicEncryptedRecordId, createEncryptedRecordId } from "../encrypted-records/crypto"
 import { requireEncryptedAuthority, sameReference, transactionData, uiTransaction, type EncryptedOperationDependencies } from "./authority-adapters"
 import { prepareTransactionDeletion } from "./transaction-operations"
@@ -18,7 +18,7 @@ function assertOpenMonth(deps: EncryptedOperationDependencies, date: string) {
   if (closeouts.some((item) => String(item.month ?? "").slice(0, 7) === date.slice(0, 7) && isClosedCloseout(item))) throw new Error("PENDING_MONTH_CLOSED")
 }
 
-function pendingData(p: PendingTransaction): Record<string, unknown> {
+export function pendingData(p: PendingTransaction): Record<string, unknown> {
   return { id: p.id, captured_at: p.capturedAt, date: p.date, amount_cents: p.amountCents, description: p.description, category: p.category, tag_id: p.tagId, card_id: p.cardId, context_id: p.contextId, is_split: p.isSplit, notes: p.notes }
 }
 
@@ -42,12 +42,14 @@ export class PendingReviewSession {
   private last: { pending: PendingTransaction; transactionId: string; revision: number; ledgerRevisions: Map<string, number> } | null = null
   constructor(private readonly deps: EncryptedOperationDependencies) {}
 
-  async prepareFinalization(pendingId: string): Promise<{ batch: PreparedSourceBatch; pending: PendingTransaction; transactionId: string }> {
+  async prepareFinalization(pendingId: string, changes?: PendingTransactionInput, expectedRevision?: number): Promise<{ batch: PreparedSourceBatch; pending: PendingTransaction; transactionId: string }> {
     const authority = requireEncryptedAuthority(this.deps)
     await authority.bootstrap()
     const record = authority.store.get(pendingId)
-    const pending = authority.getState().pendingTransactions.find((item) => item.id === pendingId)
-    if (!record || record.family !== "pending_transaction" || !pending) throw new Error("PENDING_TRANSACTION_NOT_FOUND")
+    const savedPending = authority.getState().pendingTransactions.find((item) => item.id === pendingId)
+    if (!record || record.family !== "pending_transaction" || !savedPending) throw new Error("PENDING_TRANSACTION_NOT_FOUND")
+    if (expectedRevision !== undefined && expectedRevision !== record.envelope.record_revision) throw new Error("PENDING_TRANSACTION_CONFLICT")
+    const pending = changes ? updatePendingTransaction(savedPending, changes) : savedPending
     assertOpenMonth(this.deps, pending.date)
     if (!pending.tagId || !authority.getState().tags.some((tag) => !tag.isDeleted && sameReference(tag.id, pending.tagId!))) throw new FinancialDomainError("VALIDATION_FAILED", "Active tag required", [{ field: "tag", message: "an active tag is required" }])
     const transactionId = await pendingFinalizedId(pendingId)
