@@ -360,3 +360,12 @@
     padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
   }
 }
+
+@keyframes review-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-swipe-card { transition: none !important; }
+}
