@@ -1,7 +1,7 @@
 import type { CreateTransactionRequest, Transaction, TransactionSuggestionsResponse, UpdateTransactionRequest } from "@/lib/api/types"
 import { createTransaction, updateTransaction } from "@/lib/domain/financial/transactions"
 import { parseMoneyCents } from "@/lib/domain/financial/money"
-import { transactionFundDiff, transactionFundState } from "@/lib/domain/financial/transaction-fund-diff"
+import { transactionFundDiff, transactionFundState, type SourceMutationDiff } from "@/lib/domain/financial/transaction-fund-diff"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
 import { transactionData, resolveTransactionRecord, requireEncryptedAuthority, uiTransaction, type EncryptedOperationDependencies } from "./authority-adapters"
 import { updateEncryptedRecurringTransaction } from "./recurring-commands"
@@ -89,7 +89,7 @@ export async function updateEncryptedRecurringTransactionScope(deps: EncryptedOp
   return uiTransaction(authority, saved)
 }
 
-export async function deleteEncryptedTransaction(deps: EncryptedOperationDependencies, current: Transaction): Promise<void> {
+export function prepareTransactionDeletion(deps: EncryptedOperationDependencies, current: Transaction): SourceMutationDiff {
   const { authority, record } = currentTransactionRecord(current, deps)
   const recordId = record.envelope.record_id
   const ledger = authority.getState().fundLedgerEntries.find((item) => {
@@ -98,10 +98,15 @@ export async function deleteEncryptedTransaction(deps: EncryptedOperationDepende
   })
   const ledgerRecord = ledger ? authority.store.values().find((item) => item.family === "fund_ledger_entry" && (String(item.data.id ?? "") === String(ledger.id) || item.sourceId === String(ledger.id))) : undefined
   const priorEntry = ledgerRecord ? { id: ledgerRecord.envelope.record_id, family: "fund_ledger_entry", data: ledgerRecord.data } : null
-  await authority.commitSourceDiff(transactionFundDiff(
+  return transactionFundDiff(
     transactionFundState({ id: recordId, family: "transaction", data: record.data }, priorEntry),
     transactionFundState({ id: recordId, family: "transaction", data: { ...record.data, is_deleted: true } }, null),
-  ))
+  )
+}
+
+export async function deleteEncryptedTransaction(deps: EncryptedOperationDependencies, current: Transaction): Promise<void> {
+  const authority = requireEncryptedAuthority(deps)
+  await authority.commitSourceDiff(prepareTransactionDeletion(deps, current))
 }
 
 export function getEncryptedTransactionSuggestions(deps: EncryptedOperationDependencies, query: string, limit = 5): TransactionSuggestionsResponse {

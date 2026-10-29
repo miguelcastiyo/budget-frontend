@@ -9,11 +9,14 @@ import { serializeEncryptedRecord, typedRecordFromPayload } from "../encrypted-r
 import { auditEncryptedRecordPayloads, emptyCompatibilityAuditReport, mergeCompatibilityAuditReports, type CompatibilityAuditReport } from "../encrypted-records/compatibility-audit"
 
 export interface BatchCommitOptions { expectedRevisionOverrides?: Record<string, number> }
+export interface PreparedSourceBatch { readonly body: string }
+
 
 export class EncryptedFinancialAuthority {
   readonly store = new EncryptedRecordStore()
   private compatibilityReport: CompatibilityAuditReport = emptyCompatibilityAuditReport()
   private state: RehydratedFinancialState | null = null
+  private readonly preparedDiffs = new WeakMap<PreparedSourceBatch, SourceMutationDiff>()
 
   constructor(private readonly api: Pick<ApiClientCore, "request">, private readonly runtimeKey: CryptoKey, private readonly vaultId: string) {}
 
@@ -78,7 +81,7 @@ export class EncryptedFinancialAuthority {
     this.store.remove(recordId); this.state = rehydrateFinancialState(this.store.values()); return envelope
   }
 
-  async commitSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}) {
+  async prepareSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}): Promise<PreparedSourceBatch> {
     if ([...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const creates: Array<{ envelope: EncryptedRecordEnvelope; idempotency_key: string }> = []
     const updates: Array<{ envelope: EncryptedRecordEnvelope; expected_revision: number; idempotency_key: string }> = []
@@ -100,18 +103,36 @@ export class EncryptedFinancialAuthority {
       updates.push({ envelope: encrypted.envelope, expected_revision: expectedRevision, idempotency_key: mutationIds() })
     }
     for (const record of diff.tombstones) { const current = this.store.get(record.id); if (!current) throw new Error(`ENCRYPTED_RECORD_NOT_FOUND:${record.id}`); tombstones.push({ record_id: record.id, expected_revision: options.expectedRevisionOverrides?.[record.id] ?? current.envelope.record_revision, idempotency_key: mutationIds() }) }
-    const result = await this.api.request<{ records: EncryptedRecordEnvelope[]; idempotent: boolean }>("/me/encrypted-records/batch", { method: "POST", body: JSON.stringify({ idempotency_key: idempotencyKey, creates, updates, tombstones }) })
+    const prepared = Object.freeze({ body: JSON.stringify({ idempotency_key: idempotencyKey, creates, updates, tombstones }) })
+    this.preparedDiffs.set(prepared, structuredClone(diff))
+    return prepared
+  }
+
+  async submitPreparedSourceDiff(prepared: PreparedSourceBatch) {
+    const diff = this.preparedDiffs.get(prepared)
+    if (!diff) throw new Error("ENCRYPTED_BATCH_PLAN_INVALID")
+    if ([...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    const result = await this.api.request<{ records: EncryptedRecordEnvelope[]; idempotent: boolean }>("/me/encrypted-records/batch", { method: "POST", body: prepared.body })
     const byId = new Map(result.records.map((envelope) => [envelope.record_id, envelope]))
     for (const record of [...diff.creates, ...diff.updates]) {
       const envelope = byId.get(record.id)
-      if (envelope) {
+      if (envelope && BigInt(envelope.sync_sequence) > BigInt(this.store.getCursor())) {
         const prior = this.store.get(record.id)
+        if (prior && prior.envelope.record_revision > envelope.record_revision) continue
         const payload = serializeEncryptedRecord({ family: record.family as DecryptedFinancialRecord["family"], schemaVersion: prior?.schemaVersion ?? `${record.family}_v1`, sourceId: prior?.sourceId ?? record.id, data: record.data })
         this.store.replace({ envelope, family: payload.record_family, schemaVersion: payload.record_schema_version, sourceId: payload.source_id, data: payload.data })
       }
     }
-    for (const record of diff.tombstones) this.store.remove(record.id)
+    for (const record of diff.tombstones) {
+      const envelope = byId.get(record.id)
+      const current = this.store.get(record.id)
+      if (envelope && BigInt(envelope.sync_sequence) > BigInt(this.store.getCursor()) && (!current || current.envelope.record_revision <= envelope.record_revision)) this.store.remove(record.id)
+    }
     this.state = rehydrateFinancialState(this.store.values())
     return result
+  }
+
+  async commitSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}) {
+    return this.submitPreparedSourceDiff(await this.prepareSourceDiff(diff, idempotencyKey, options))
   }
 }
