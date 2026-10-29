@@ -1,3 +1,4 @@
+import { isClosedCloseout } from "./pending-summary"
 import { createTransaction } from "@/lib/domain/financial/transactions"
 import { FinancialDomainError } from "@/lib/domain/financial/errors"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
@@ -14,7 +15,7 @@ export function pendingFinalizedId(pendingId: string): Promise<string> {
 
 function assertOpenMonth(deps: EncryptedOperationDependencies, date: string) {
   const closeouts = requireEncryptedAuthority(deps).getState().closeouts
-  if (closeouts.some((item) => String(item.month ?? "").slice(0, 7) === date.slice(0, 7) && item.is_deleted !== true && item.is_reopened !== true && item.status === "closed")) throw new Error("PENDING_MONTH_CLOSED")
+  if (closeouts.some((item) => String(item.month ?? "").slice(0, 7) === date.slice(0, 7) && isClosedCloseout(item))) throw new Error("PENDING_MONTH_CLOSED")
 }
 
 function pendingData(p: PendingTransaction): Record<string, unknown> {

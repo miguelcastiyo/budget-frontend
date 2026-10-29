@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { apiClient } from "@/lib/api/client"
 import { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority"
@@ -9,6 +9,7 @@ import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret,
 import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, CsvImportResponse, DataRunItem, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
 import { encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
+import { pendingMonthSummary, pendingCloseoutConflicts, type PendingMonthSummary, type PendingCloseoutConflict } from "@/lib/privacy/encrypted-authority/pending-summary"
 import type { PendingTransaction, PendingTransactionInput } from "@/lib/domain/financial/pending-transactions"
 import { getPendingTransactions, preparePendingTransaction, preparePendingTransactionUpdate } from "@/lib/privacy/encrypted-authority/pending-transaction-operations"
 import { createEncryptedTransaction, deleteEncryptedTransaction, getEncryptedTransactionSuggestions, updateEncryptedRecurringTransactionScope, updateEncryptedTransaction } from "@/lib/privacy/encrypted-authority/transaction-operations"
@@ -41,6 +42,10 @@ interface FinancialAuthorityContextValue {
   unlockWithQuickUnlock: () => Promise<void>
   enrollQuickUnlock: () => Promise<void>
   revokeQuickUnlock: () => Promise<void>
+  pendingGlobalCount: number
+  pendingCloseoutConflicts: PendingCloseoutConflict[]
+  getPendingMonthSummary: (month: string) => PendingMonthSummary
+  syncFinancialState: () => Promise<void>
   getPendingTransactions: () => Promise<PendingTransaction[]>
   preparePendingTransaction: (input: PendingTransactionInput) => PendingTransaction
   preparePendingTransactionUpdate: (current: PendingTransaction, input: PendingTransactionInput) => PendingTransaction
@@ -103,6 +108,9 @@ interface FinancialAuthorityContextValue {
 
 const FinancialAuthorityContext = createContext<FinancialAuthorityContextValue | undefined>(undefined)
 
+const emptySubscribe = () => () => {}
+const zeroVersion = () => 0
+
 function unavailableFinancialOperation(): never { throw new Error("ENCRYPTED_AUTHORITY_LOCKED") }
 
 export function FinancialAuthorityProvider({ children }: { children: React.ReactNode }) {
@@ -113,6 +121,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const [quickUnlockStatus, setQuickUnlockStatus] = useState<"unknown" | "not_enrolled" | "enrolled">("unknown")
   const [quickUnlockSupported, setQuickUnlockSupported] = useState(() => quickUnlockCapability().supported)
   const vaultManager = useMemo(() => new VaultManager(), [])
+  const authorityVersion = useSyncExternalStore(authority?.subscribe ?? emptySubscribe, authority?.getVersion ?? zeroVersion, zeroVersion)
 
   useEffect(() => {
     let active = true
@@ -316,6 +325,10 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const value = useMemo<FinancialAuthorityContextValue>(() => ({
     isVaultSetupRequired,
     isLoading,
+    pendingGlobalCount: authority ? authority.getState().pendingTransactions.length : 0,
+    pendingCloseoutConflicts: authority ? pendingCloseoutConflicts(authority.getState()) : [],
+    getPendingMonthSummary: (month) => runEncrypted((deps) => pendingMonthSummary(deps.authority.getState().pendingTransactions, month)),
+    syncFinancialState: async () => { await runEncrypted((deps) => deps.authority.bootstrap()) },
     isUnlocked: Boolean(authority),
     refresh,
     authority,
@@ -342,7 +355,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, budgetOperations, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, quickUnlockSupported, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, authorityVersion, runEncrypted, budgetOperations, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, quickUnlockSupported, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
   useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 

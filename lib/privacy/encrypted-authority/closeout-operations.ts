@@ -1,4 +1,6 @@
 import type { MonthCloseoutResponse } from "@/lib/api/types"
+import { FinancialDomainError } from "@/lib/domain/financial/errors"
+import { pendingMonthSummary } from "./pending-summary"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
 import { encryptedCloseout } from "./derived"
 import { commitEncryptedCloseout, reopenEncryptedCloseout } from "./closeout-mutation"
@@ -32,6 +34,8 @@ export async function reopenEncryptedMonth(deps: EncryptedOperationDependencies,
 
 export async function createEncryptedMonthCloseout(deps: EncryptedOperationDependencies, month: string, payload: Record<string, unknown>): Promise<MonthCloseoutResponse> {
   const authority = requireEncryptedAuthority(deps)
+  await authority.bootstrap()
+  if (pendingMonthSummary(authority.getState().pendingTransactions, month).count > 0) throw new FinancialDomainError("MONTH_HAS_PENDING_TRANSACTIONS", "Resolve pending transactions before closing this month")
   const id = createEncryptedRecordId()
   await authority.createSource("month_closeout", "month_closeout_v1", id, { id, month, status: "closed", ...payload })
   return encryptedCloseout(authority.getState(), month)

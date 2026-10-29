@@ -1,3 +1,5 @@
+import { FinancialDomainError } from "@/lib/domain/financial/errors"
+import { pendingMonthSummary } from "./pending-summary"
 import type { EncryptedFinancialAuthority } from "./authority"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
 import { parseMoneyCents } from "@/lib/domain/financial/money"
@@ -20,7 +22,9 @@ export async function commitEncryptedCloseout(
   month: string,
   payload: CloseoutPayload,
 ) {
+  await authority.bootstrap()
   const state = authority.getState()
+  if (pendingMonthSummary(state.pendingTransactions, month).count > 0) throw new FinancialDomainError("MONTH_HAS_PENDING_TRANSACTIONS", "Resolve pending transactions before closing this month")
   const priorCloseouts = authority.store.values().filter((record) =>
     record.family === "month_closeout" && String(record.data.month ?? "") === month,
   )

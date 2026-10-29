@@ -16,35 +16,51 @@ export class EncryptedFinancialAuthority {
   readonly store = new EncryptedRecordStore()
   private compatibilityReport: CompatibilityAuditReport = emptyCompatibilityAuditReport()
   private state: RehydratedFinancialState | null = null
+  private readonly listeners = new Set<() => void>()
+  private stateVersion = 0
   private readonly preparedDiffs = new WeakMap<PreparedSourceBatch, SourceMutationDiff>()
 
   constructor(private readonly api: Pick<ApiClientCore, "request">, private readonly runtimeKey: CryptoKey, private readonly vaultId: string) {}
 
   getState(): RehydratedFinancialState { if (!this.state) throw new Error("ENCRYPTED_AUTHORITY_NOT_BOOTSTRAPPED"); return this.state }
   getCompatibilityAudit(): CompatibilityAuditReport { return this.compatibilityReport }
+  subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
+  getVersion = () => this.stateVersion
+  private publish(state: RehydratedFinancialState) {
+    this.state = state
+    this.stateVersion++
+    for (const listener of this.listeners) { try { listener() } catch { /* A subscriber must not break a committed mutation. */ } }
+  }
 
   async bootstrap(): Promise<RehydratedFinancialState> {
-    this.store.clear()
-    this.compatibilityReport = emptyCompatibilityAuditReport()
+    const version = this.stateVersion
+    const staged = new EncryptedRecordStore()
+    let report = emptyCompatibilityAuditReport()
     let cursor = "0"
     let more = true
     while (more) {
       const batch = await this.api.request<{ changes: EncryptedRecordEnvelope[]; next_cursor: string; has_more: boolean }>(`/me/encrypted-records/sync?after=${encodeURIComponent(cursor)}&limit=100`)
       for (const envelope of batch.changes) {
-        if (envelope.deleted) { this.store.remove(envelope.record_id); continue }
+        if (envelope.deleted) { staged.remove(envelope.record_id); continue }
         let value: unknown
         try { value = await decryptSyntheticRecord(this.runtimeKey, envelope) }
         catch (error) {
           if (error instanceof EncryptedRecordClientError) throw new Error(`${error.code}:${envelope.record_id}`, { cause: error })
           throw error
         }
-        this.compatibilityReport = mergeCompatibilityAuditReports(this.compatibilityReport, auditEncryptedRecordPayloads([value]))
-        this.store.replace(typedRecordFromPayload(envelope, value))
+        report = mergeCompatibilityAuditReports(report, auditEncryptedRecordPayloads([value]))
+        staged.replace(typedRecordFromPayload(envelope, value))
       }
-      cursor = batch.next_cursor; this.store.setCursor(cursor); more = batch.has_more
+      cursor = batch.next_cursor; staged.setCursor(cursor); more = batch.has_more
     }
-    this.state = rehydrateFinancialState(this.store.values())
-    return this.state
+    const state = rehydrateFinancialState(staged.values())
+    if (version !== this.stateVersion) throw new Error("ENCRYPTED_AUTHORITY_SYNC_CONFLICT")
+    this.store.clear()
+    for (const record of staged.values()) this.store.replace(record)
+    this.store.setCursor(staged.getCursor())
+    this.compatibilityReport = report
+    this.publish(state)
+    return state
   }
 
   async create(family: string, schemaVersion: string, sourceId: string, data: Record<string, unknown>) {
@@ -52,7 +68,7 @@ export class EncryptedFinancialAuthority {
     const payload = serializeEncryptedRecord({ family: family as DecryptedFinancialRecord["family"], schemaVersion, sourceId, data })
     const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, payload, 1)
     const envelope = await this.api.request<EncryptedRecordEnvelope>("/me/encrypted-records", { method: "POST", body: JSON.stringify({ envelope: encrypted.envelope, idempotency_key: encrypted.idempotencyKey }) })
-    this.store.replace({ envelope, family: payload.record_family, schemaVersion: payload.record_schema_version, sourceId, data: payload.data }); this.state = rehydrateFinancialState(this.store.values()); return this.getState()
+    this.store.replace({ envelope, family: payload.record_family, schemaVersion: payload.record_schema_version, sourceId, data: payload.data }); this.publish(rehydrateFinancialState(this.store.values())); return this.getState()
   }
 
   async createSource(family: string, schemaVersion: string, sourceId: string, data: Record<string, unknown>) {
@@ -66,7 +82,7 @@ export class EncryptedFinancialAuthority {
     const payload = serializeEncryptedRecord({ family: current.family, schemaVersion: current.schemaVersion, sourceId: current.sourceId, data })
     const encrypted = await encryptSyntheticRecord(this.runtimeKey, this.vaultId, payload, current.envelope.record_revision + 1, recordId)
     const envelope = await this.api.request<EncryptedRecordEnvelope>(`/me/encrypted-records/${encodeURIComponent(recordId)}`, { method: "PUT", body: JSON.stringify({ envelope: encrypted.envelope, expected_revision: current.envelope.record_revision, idempotency_key: encrypted.idempotencyKey }) })
-    this.store.replace({ ...current, envelope, data }); this.state = rehydrateFinancialState(this.store.values()); return this.getState()
+    this.store.replace({ ...current, envelope, data }); this.publish(rehydrateFinancialState(this.store.values())); return this.getState()
   }
 
   async updateSource(recordId: string, data: Record<string, unknown>) {
@@ -78,7 +94,7 @@ export class EncryptedFinancialAuthority {
     const current = this.store.get(recordId); if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
     if (current.family === "pending_transaction") throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const envelope = await this.api.request<EncryptedRecordEnvelope>(`/me/encrypted-records/${encodeURIComponent(recordId)}`, { method: "DELETE", body: JSON.stringify({ expected_revision: current.envelope.record_revision, idempotency_key: crypto.randomUUID() }) })
-    this.store.remove(recordId); this.state = rehydrateFinancialState(this.store.values()); return envelope
+    this.store.remove(recordId); this.publish(rehydrateFinancialState(this.store.values())); return envelope
   }
 
   async prepareSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}): Promise<PreparedSourceBatch> {
@@ -128,7 +144,7 @@ export class EncryptedFinancialAuthority {
       const current = this.store.get(record.id)
       if (envelope && BigInt(envelope.sync_sequence) > BigInt(this.store.getCursor()) && (!current || current.envelope.record_revision <= envelope.record_revision)) this.store.remove(record.id)
     }
-    this.state = rehydrateFinancialState(this.store.values())
+    this.publish(rehydrateFinancialState(this.store.values()))
     return result
   }
 

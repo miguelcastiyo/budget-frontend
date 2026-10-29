@@ -865,6 +865,7 @@ export interface MonthCloseoutResponse {
   month: string
   status: MonthCloseoutStatus
   is_closeable: boolean
+  pending_count?: number
   computed: MonthCloseoutComputed | null
   closeout: MonthCloseoutSaved | null
 }

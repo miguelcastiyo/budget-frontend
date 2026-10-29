@@ -14,7 +14,7 @@ require.extensions[".ts"] = (module, filename) => module._compile(ts.transpileMo
 }).outputText, filename)
 global.window = { isSecureContext: true, crypto: webcrypto }
 
-const { createEncryptedTransaction, updateEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
+const { createEncryptedTransaction, updateEncryptedTransaction, deleteEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
 const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
 const { createEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
 const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
@@ -79,6 +79,8 @@ function makeAuthority(initialRecords = []) {
   assert(transaction.amount === "5.25" && transaction.tag.id === tag.id, "transaction operation maps encrypted data to UI data")
   const updated = await updateEncryptedTransaction(deps(created.authority), transaction, { date: "2026-08-02", expense: "Coffee shop", amount: "6.25", category: "wants", is_split: false, notes: "Morning", tag_id: tag.id, card_id: card.id, context_id: context.id })
   assert(updated.expense === "Coffee shop" && updated.notes === "Morning", "transaction update remains routed through the operation module")
+  await deleteEncryptedTransaction(deps(created.authority), updated)
+  assert(!created.records.has(updated.id), "historical transaction deletion remains routed through the transaction operation")
 
   const entry = await createEncryptedFundEntry(deps(created.authority), "fund_1", { entry_date: "2026-08-03", entry_type: "contribution", direction: "in", amount: "25.00", source_type: "manual", note: "Seed" })
   const funds = await getEncryptedFunds(deps(created.authority), { status: "active" })
