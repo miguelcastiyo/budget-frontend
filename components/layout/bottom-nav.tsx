@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
@@ -99,7 +98,7 @@ export function BottomNav({
 }: BottomNavProps) {
   const { profile } = useAuth()
   const authority = useFinancialAuthority()
-  const [reviewEnabled, setReviewEnabled] = useState(false)
+  const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
   const pathname = usePathname()
   const router = useRouter()
   const [hasHydrated, setHasHydrated] = useState(false)
@@ -107,7 +106,6 @@ export function BottomNav({
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
 
   useEffect(() => {
-    setReviewEnabled(pendingDevelopmentEnabled())
     const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
     setCoachmarkDismissed(dismissed)
     setTransactionsHref(hasTransactionViewState(profile?.id ?? "")

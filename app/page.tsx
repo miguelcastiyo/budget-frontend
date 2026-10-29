@@ -24,7 +24,6 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { FundsCta } from "@/components/funds/funds-cta"
 
@@ -34,7 +33,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const { setupStatus, refreshProfile } = useAuth()
   const authority = useFinancialAuthority()
-  const [reviewEnabled, setReviewEnabled] = useState(false)
+  const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey())
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [overview, setOverview] = useState<MonthOverviewResponse | null>(null)
@@ -56,7 +55,6 @@ export default function DashboardPage() {
       return
     }
 
-    setReviewEnabled(pendingDevelopmentEnabled())
     setIsProgressDismissed(window.localStorage.getItem(FIRST_MONTH_PROGRESS_DISMISSED_KEY) === "1")
   }, [])
 

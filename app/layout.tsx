@@ -6,6 +6,7 @@ import { GoogleOauthProvider } from '@/components/auth/google-oauth-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FinancialAuthorityProvider } from '@/components/privacy/financial-authority-provider'
 import { EncryptedVaultBoundary } from '@/components/privacy/encrypted-vault-boundary'
+import { ClientUpdateNotice } from '@/components/common/client-update-notice'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -56,6 +57,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
+        <ClientUpdateNotice />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <GoogleOauthProvider>
             <AuthProvider>

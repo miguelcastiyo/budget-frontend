@@ -24,6 +24,8 @@ function harness() {
     store: { get: (id) => records.get(id), values: () => [...records.values()] },
     bootstrap: async () => {}, getState: () => rehydrateFinancialState(records.values()),
     prepareSourceDiff: async (diff, key, options) => ({ diff: structuredClone(diff), options }),
+    preparePendingFinalization: async (diff, id, revision) => ({ diff: structuredClone(diff), options: { expectedRevisionOverrides: { [id]: revision } } }),
+    preparePendingUndo: async (diff, id, revisions) => ({ diff: structuredClone(diff), options: { expectedRevisionOverrides: revisions } }),
     submitPreparedSourceDiff: async (batch) => {
       for (const [id, revision] of Object.entries(batch.options?.expectedRevisionOverrides ?? {})) if (records.get(id)?.envelope.record_revision !== revision) throw Error("CONFLICT")
       for (const item of batch.diff.creates) if (records.has(item.id)) throw Error("DUPLICATE")

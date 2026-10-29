@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
 
 const navItems = [
@@ -22,10 +21,8 @@ export function Header() {
   const { profile } = useAuth()
   const pathname = usePathname()
   const authority = useFinancialAuthority()
-  const [reviewEnabled, setReviewEnabled] = useState(false)
+  const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
-
-  useEffect(() => { setReviewEnabled(pendingDevelopmentEnabled()) }, [])
 
   useEffect(() => {
     setTransactionsHref(hasTransactionViewState(profile?.id ?? "")

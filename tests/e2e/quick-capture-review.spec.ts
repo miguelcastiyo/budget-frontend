@@ -35,6 +35,12 @@ test("Quick Capture and Review persist, skip, finalize, and undo", async ({ page
   await capture.getByLabel("Description").fill("Coffee")
   await capture.getByRole("button", { name: "Save expense" }).click()
   await expect(page.getByText("2 pending", { exact: true })).toBeVisible()
+  if (process.env.PENDING_UI_TEST_ROLLBACK === "1") {
+    await page.route("**/api/pending-capabilities", (route) => route.fulfill({ json: { capture: false, recovery: true }, headers: { "Cache-Control": "no-store" } }))
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")))
+    await expect(page.getByRole("form", { name: "Quick Capture" })).toHaveCount(0)
+    await expect(page.getByRole("form", { name: "Review transaction" })).toBeVisible()
+  }
   let review = page.getByRole("form", { name: "Review transaction" })
   await expect(review.getByLabel("Amount")).toHaveValue("12.50")
   await review.getByRole("button", { name: "Skip" }).click()
@@ -122,10 +128,12 @@ test("Quick Capture and Review persist, skip, finalize, and undo", async ({ page
   }
   await page.setViewportSize({ width: 1280, height: 800 })
   await page.locator("header").getByRole("link", { name: /Review/ }).click()
-  await page.getByRole("link", { name: "Full transaction entry" }).click()
-  await expect(page.getByRole("heading", { name: "New Transaction" })).toBeVisible()
-  await page.keyboard.press("Escape")
-  await page.locator("header").getByRole("link", { name: /Review/ }).click()
+  if (process.env.PENDING_UI_TEST_ROLLBACK !== "1") {
+    await page.getByRole("link", { name: "Full transaction entry" }).click()
+    await expect(page.getByRole("heading", { name: "New Transaction" })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await page.locator("header").getByRole("link", { name: /Review/ }).click()
+  }
   review = page.getByRole("form", { name: "Review transaction" })
   await review.getByLabel("Description").fill("Lunch")
   await review.getByRole("button", { name: "Needs" }).click()

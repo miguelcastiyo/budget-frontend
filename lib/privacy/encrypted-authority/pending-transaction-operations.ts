@@ -26,5 +26,6 @@ export async function savePendingTransaction(deps: EncryptedOperationDependencie
   if (existing && expectedRevision === undefined) throw new Error("PENDING_TRANSACTION_CONFLICT")
   if (!existing && expectedRevision !== undefined) throw new Error("PENDING_TRANSACTION_CONFLICT")
   const diff = existing ? { creates: [], updates: [source], tombstones: [] } : { creates: [source], updates: [], tombstones: [] }
-  return authority.prepareSourceDiff(diff, undefined, existing ? { expectedRevisionOverrides: { [pending.id]: expectedRevision! } } : {})
+  if (existing) return authority.prepareSourceDiff(diff, undefined, { expectedRevisionOverrides: { [pending.id]: expectedRevision! } })
+  return authority.preparePendingCapture(diff)
 }

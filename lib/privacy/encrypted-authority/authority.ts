@@ -1,3 +1,4 @@
+import { createDeterministicEncryptedRecordId } from "../encrypted-records/crypto"
 import { pendingDevelopmentEnabled } from "./pending-development"
 import type { ApiClientCore } from "../../api/core"
 import type { EncryptedRecordEnvelope } from "../encrypted-records/types"
@@ -19,7 +20,12 @@ export class EncryptedFinancialAuthority {
   private state: RehydratedFinancialState | null = null
   private readonly listeners = new Set<() => void>()
   private stateVersion = 0
-  private readonly preparedDiffs = new WeakMap<PreparedSourceBatch, SourceMutationDiff>()
+  private readonly preparedDiffs = new WeakMap<PreparedSourceBatch, { diff: SourceMutationDiff; scope: "ordinary" | "capture" | "finalize" | "undo" }>()
+  private pendingCapabilities = { capture: false, recovery: false }
+  setPendingCapabilities(capabilities: { capture: boolean; recovery: boolean }) { this.pendingCapabilities = { ...capabilities } }
+  private pendingAllowed(scope: "capture" | "finalize" | "undo") {
+    return pendingDevelopmentEnabled() || (scope === "capture" ? this.pendingCapabilities.capture && this.pendingCapabilities.recovery : this.pendingCapabilities.recovery)
+  }
 
   constructor(private readonly api: Pick<ApiClientCore, "request">, private readonly runtimeKey: CryptoKey, private readonly vaultId: string) {}
 
@@ -100,6 +106,31 @@ export class EncryptedFinancialAuthority {
 
   async prepareSourceDiff(diff: SourceMutationDiff, idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}): Promise<PreparedSourceBatch> {
     if (!pendingDevelopmentEnabled() && [...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    return this.prepareScopedDiff(diff, "ordinary", idempotencyKey, options)
+  }
+
+  async preparePendingCapture(diff: SourceMutationDiff): Promise<PreparedSourceBatch> {
+    if (!this.pendingAllowed("capture")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    if (diff.creates.length !== 1 || diff.creates[0].family !== "pending_transaction" || diff.updates.length || diff.tombstones.length) throw new Error("PENDING_BATCH_INVALID")
+    return this.prepareScopedDiff(diff, "capture")
+  }
+
+  async preparePendingFinalization(diff: SourceMutationDiff, pendingId: string, expectedRevision: number): Promise<PreparedSourceBatch> {
+    if (!this.pendingAllowed("finalize")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    const pending = this.store.get(pendingId)
+    const transactionId = await createDeterministicEncryptedRecordId(`pending-finalization:v1:${pendingId}`)
+    if (pending?.family !== "pending_transaction" || diff.updates.length || diff.tombstones.length !== 1 || diff.tombstones[0].id !== pendingId || diff.creates.length !== 1 || diff.creates[0].family !== "transaction" || diff.creates[0].id !== transactionId || diff.creates[0].data.pending_transaction_id !== pendingId) throw new Error("PENDING_BATCH_INVALID")
+    return this.prepareScopedDiff(diff, "finalize", undefined, { expectedRevisionOverrides: { [pendingId]: expectedRevision } })
+  }
+
+  async preparePendingUndo(diff: SourceMutationDiff, transactionId: string, revisions: Record<string, number>): Promise<PreparedSourceBatch> {
+    if (!this.pendingAllowed("undo")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    const transaction = this.store.get(transactionId)
+    if (transaction?.family !== "transaction" || typeof transaction.data.pending_transaction_id !== "string" || diff.updates.length || diff.creates.length !== 1 || diff.creates[0].family !== "pending_transaction" || !diff.tombstones.some((record) => record.id === transactionId) || diff.tombstones.some((record) => record.id !== transactionId && (this.store.get(record.id)?.family !== "fund_ledger_entry" || this.store.get(record.id)?.data.source_transaction_id !== transactionId))) throw new Error("PENDING_BATCH_INVALID")
+    return this.prepareScopedDiff(diff, "undo", undefined, { expectedRevisionOverrides: revisions })
+  }
+
+  private async prepareScopedDiff(diff: SourceMutationDiff, scope: "ordinary" | "capture" | "finalize" | "undo", idempotencyKey = `batch_${crypto.randomUUID()}`, options: BatchCommitOptions = {}): Promise<PreparedSourceBatch> {
     const creates: Array<{ envelope: EncryptedRecordEnvelope; idempotency_key: string }> = []
     const updates: Array<{ envelope: EncryptedRecordEnvelope; expected_revision: number; idempotency_key: string }> = []
     const tombstones: Array<{ record_id: string; expected_revision: number; idempotency_key: string }> = []
@@ -121,14 +152,16 @@ export class EncryptedFinancialAuthority {
     }
     for (const record of diff.tombstones) { const current = this.store.get(record.id); if (!current) throw new Error(`ENCRYPTED_RECORD_NOT_FOUND:${record.id}`); tombstones.push({ record_id: record.id, expected_revision: options.expectedRevisionOverrides?.[record.id] ?? current.envelope.record_revision, idempotency_key: mutationIds() }) }
     const prepared = Object.freeze({ body: JSON.stringify({ idempotency_key: idempotencyKey, creates, updates, tombstones }) })
-    this.preparedDiffs.set(prepared, structuredClone(diff))
+    this.preparedDiffs.set(prepared, { diff: structuredClone(diff), scope })
     return prepared
   }
 
   async submitPreparedSourceDiff(prepared: PreparedSourceBatch) {
-    const diff = this.preparedDiffs.get(prepared)
-    if (!diff) throw new Error("ENCRYPTED_BATCH_PLAN_INVALID")
-    if (!pendingDevelopmentEnabled() && [...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    const entry = this.preparedDiffs.get(prepared)
+    if (!entry) throw new Error("ENCRYPTED_BATCH_PLAN_INVALID")
+    const { diff, scope } = entry
+    if (scope !== "ordinary" && !this.pendingAllowed(scope)) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
+    if (scope === "ordinary" && !pendingDevelopmentEnabled() && [...diff.creates, ...diff.updates, ...diff.tombstones].some((record) => record.family === "pending_transaction" || this.store.get(record.id)?.family === "pending_transaction")) throw new Error("PENDING_TRANSACTION_WRITES_DISABLED")
     const result = await this.api.request<{ records: EncryptedRecordEnvelope[]; idempotent: boolean }>("/me/encrypted-records/batch", { method: "POST", body: prepared.body })
     const byId = new Map(result.records.map((envelope) => [envelope.record_id, envelope]))
     for (const record of [...diff.creates, ...diff.updates]) {

@@ -57,7 +57,7 @@ export class PendingReviewSession {
     const data = { ...transactionData(transaction), pending_transaction_id: pendingId }
     const diff = transactionFundDiff(null, transactionFundState({ id: transactionId, family: "transaction", data }))
     diff.tombstones.push({ id: pendingId, family: "pending_transaction", data: record.data })
-    const batch = await authority.prepareSourceDiff(diff, undefined, { expectedRevisionOverrides: { [pendingId]: record.envelope.record_revision } })
+    const batch = await authority.preparePendingFinalization(diff, pendingId, record.envelope.record_revision)
     const prepared = { batch, pending: Object.freeze({ ...pending }), transactionId }
     Object.freeze(prepared)
     this.finalizations.add(prepared)
@@ -92,7 +92,7 @@ export class PendingReviewSession {
     const restored = { ...last.pending, id: createEncryptedRecordId() }
     diff.creates.push({ id: restored.id, family: "pending_transaction", data: pendingData(restored) })
     const revisions = Object.fromEntries([[record.envelope.record_id, last.revision], ...ledger])
-    const batch = await authority.prepareSourceDiff(diff, undefined, { expectedRevisionOverrides: revisions })
+    const batch = await authority.preparePendingUndo(diff, last.transactionId, revisions)
     this.undos.set(batch, last.transactionId)
     return batch
   }

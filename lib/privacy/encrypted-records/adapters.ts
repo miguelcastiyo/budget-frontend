@@ -43,7 +43,7 @@ export function canonicalRecordFamily(value: unknown): EncryptedRecordFamily {
 function canonicalSchemaVersion(family: EncryptedRecordFamily, value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") throw new Error("ENCRYPTED_RECORD_PAYLOAD_INVALID:schema_version")
   const version = value.trim()
-  if (!version.endsWith("_v1")) throw new Error(`ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED:${version}`)
+  if ((family === "pending_transaction" && version !== "pending_transaction_v1") || !version.endsWith("_v1")) throw new Error(`ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED:${version}`)
   return version
 }
 

@@ -13,6 +13,7 @@ function friendlyUnlockError(error: unknown) {
   const code = error instanceof Error ? error.message.split(":")[0] : ""
   if (code === "ENCRYPTED_RECORD_DECRYPT_FAILED") return "We couldn't restore one encrypted record. Your Vault remains locked."
   if (code === "ENCRYPTED_RECORD_REHYDRATION_FAILED") return "We couldn't restore your encrypted records. Your Vault remains locked."
+  if (error instanceof Error && (error.message.includes("unsupported_family:") || code === "ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED")) return "This version of Budget cannot read an encrypted record. Update and reload the app; if installed, close and reopen it or open Budget in Safari. Your Vault remains locked."
   if (code === "ENCRYPTED_RECORD_PAYLOAD_INVALID") return "An encrypted record is invalid. Your Vault remains locked."
   return "We couldn't unlock your Vault. Check your passphrase and try again."
 }

@@ -7,6 +7,7 @@ const checks = [
   ["Client fixture loader", "test:client-fixture-loader"],
   ["Financial domain", "test:financial-domain"],
   ["Recurring commands", "test:recurring-commands"],
+  ["Pending rollout", "test:pending-rollout"],
   ["Review swipe", "test:review-swipe"],
   ["Pending development gate", "test:pending-development"],
   ["Pending financial integration", "test:pending-financial"],

@@ -14,8 +14,10 @@ require.extensions[".ts"] = (module, filename) => {
   if (filename.endsWith("/encrypted-authority/authority.ts")) {
     const guard = / {4}if \(!pendingDevelopmentEnabled\(\) && \[\.\.\.diff\.creates, \.\.\.diff\.updates, \.\.\.diff\.tombstones\]\.some\(\(record\) => record\.family === "pending_transaction" \|\| this\.store\.get\(record\.id\)\?\.family === "pending_transaction"\)\) throw new Error\("PENDING_TRANSACTION_WRITES_DISABLED"\)\n/g
     const matches = source.match(guard) || []
-    assert.equal(matches.length, 2, "expected guarded production implementation")
+    assert.equal(matches.length, 1, "expected guarded production implementation")
     source = source.replace(guard, "")
+    source = source.replace('if (scope === "ordinary" && !pendingDevelopmentEnabled() &&', 'if (false &&')
+    source = source.replace('return pendingDevelopmentEnabled() || (scope === "capture"', 'return true || (scope === "capture"')
   }
   module._compile(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, filename)
 }

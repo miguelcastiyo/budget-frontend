@@ -5,6 +5,7 @@ export function isQuickUnlockCancellation(error: unknown): boolean {
 export function quickUnlockErrorMessage(error: unknown): string {
   if (isQuickUnlockCancellation(error)) return ""
   const code = typeof error === "object" && error !== null && "error" in error && typeof (error as { error?: { code?: unknown } }).error?.code === "string" ? String((error as { error: { code: string } }).error.code) : error instanceof Error ? (error.name && error.name !== "Error" ? error.name : error.message) : ""
+  if (code.includes("unsupported_family:") || code.startsWith("ENCRYPTED_RECORD_SCHEMA_UNSUPPORTED")) return "This version of Budget cannot read an encrypted record. Update and reload the app, then unlock again."
   if (code === "QUICK_UNLOCK_UNSUPPORTED") return "Quick Unlock isn't available on this device."
   if (code === "QUICK_UNLOCK_PRF_UNAVAILABLE" || code === "QUICK_UNLOCK_PRF_INVALID") return "This browser did not return the security capability Quick Unlock needs. Try Safari or the installed Budget app, then use your Vault passphrase if it continues."
   if (code === "QUICK_UNLOCK_REQUIRES_PASSPHRASE_UNLOCK") return "Unlock your Vault with your passphrase once before enabling Quick Unlock on this device."

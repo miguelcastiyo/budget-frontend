@@ -9,6 +9,7 @@ import { createPassphraseWrapper, createRecoveryWrapper, generateRecoverySecret,
 import type { TransactionFilters, Card, Context, CreateTransactionRequest, CreateFundEntryRequest, CreateFundRequest, CsvImportResponse, DataRunItem, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Tag, Transaction, TransactionSuggestionsResponse, UpdateFundEntryRequest, UpdateFundRequest, UpdateTransactionRequest, MonthCloseoutResponse, CloseMonthRequest, UpdateMonthCloseoutRequest, ReplaceSavingsPlanRequest } from "@/lib/api/types"
 import { encryptedFundCloseoutSummary, encryptedInsights, encryptedMonthOverview, encryptedRecurring } from "@/lib/privacy/encrypted-authority/derived"
 import { requireEncryptedAuthority, type EncryptedOperationDependencies } from "@/lib/privacy/encrypted-authority/authority-adapters"
+import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { pendingMonthSummary, pendingCloseoutConflicts, type PendingMonthSummary, type PendingCloseoutConflict } from "@/lib/privacy/encrypted-authority/pending-summary"
 import type { PendingTransaction, PendingTransactionInput } from "@/lib/domain/financial/pending-transactions"
 import { getPendingTransactions, preparePendingTransaction, preparePendingTransactionUpdate } from "@/lib/privacy/encrypted-authority/pending-transaction-operations"
@@ -42,6 +43,8 @@ interface FinancialAuthorityContextValue {
   unlockWithQuickUnlock: () => Promise<void>
   enrollQuickUnlock: () => Promise<void>
   revokeQuickUnlock: () => Promise<void>
+  pendingCaptureEnabled: boolean
+  pendingRecoveryEnabled: boolean
   pendingGlobalCount: number
   pendingCloseoutConflicts: PendingCloseoutConflict[]
   getPendingMonthSummary: (month: string) => PendingMonthSummary
@@ -114,14 +117,41 @@ const zeroVersion = () => 0
 function unavailableFinancialOperation(): never { throw new Error("ENCRYPTED_AUTHORITY_LOCKED") }
 
 export function FinancialAuthorityProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, profile } = useAuth()
+  const [localPendingEnabled, setLocalPendingEnabled] = useState(false)
+  const [rollout, setRollout] = useState<{ account: string; capture: boolean; recovery: boolean } | null>(null)
   const [isVaultSetupRequired, setIsVaultSetupRequired] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [authority, setAuthority] = useState<EncryptedFinancialAuthority | null>(null)
   const [quickUnlockStatus, setQuickUnlockStatus] = useState<"unknown" | "not_enrolled" | "enrolled">("unknown")
   const [quickUnlockSupported, setQuickUnlockSupported] = useState(() => quickUnlockCapability().supported)
   const vaultManager = useMemo(() => new VaultManager(), [])
+  const accountId = profile?.id == null ? "" : String(profile.id)
+  const validRollout = isAuthenticated && rollout?.account === accountId ? rollout : null
+  const captureEnabled = localPendingEnabled || Boolean(validRollout?.capture && validRollout.recovery)
+  const recoveryEnabled = localPendingEnabled || Boolean(validRollout?.recovery)
   const authorityVersion = useSyncExternalStore(authority?.subscribe ?? emptySubscribe, authority?.getVersion ?? zeroVersion, zeroVersion)
+
+  useEffect(() => { setLocalPendingEnabled(pendingDevelopmentEnabled()) }, [])
+  useEffect(() => {
+    if (!isAuthenticated || !accountId) { setRollout(null); return }
+    let active = true
+    let requestSequence = 0
+    async function load() {
+      const request = ++requestSequence
+      try {
+        const response = await fetch("/api/pending-capabilities", { cache: "no-store", credentials: "same-origin" })
+        if (!response.ok) throw new Error("CAPABILITIES_UNAVAILABLE")
+        const data: unknown = await response.json()
+        if (!data || typeof data !== "object" || typeof (data as { capture?: unknown }).capture !== "boolean" || typeof (data as { recovery?: unknown }).recovery !== "boolean") throw new Error("CAPABILITIES_INVALID")
+        if (active && request === requestSequence) setRollout({ account: accountId, capture: (data as { capture: boolean }).capture, recovery: (data as { recovery: boolean }).recovery })
+      } catch { if (active && request === requestSequence) setRollout({ account: accountId, capture: false, recovery: false }) }
+    }
+    const onVisible = () => { if (document.visibilityState === "visible") void load() }
+    void load(); document.addEventListener("visibilitychange", onVisible)
+    return () => { active = false; document.removeEventListener("visibilitychange", onVisible) }
+  }, [isAuthenticated, accountId])
+  useEffect(() => { authority?.setPendingCapabilities({ capture: captureEnabled, recovery: recoveryEnabled }) }, [authority, captureEnabled, recoveryEnabled])
 
   useEffect(() => {
     let active = true
@@ -325,6 +355,8 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
   const value = useMemo<FinancialAuthorityContextValue>(() => ({
     isVaultSetupRequired,
     isLoading,
+    pendingCaptureEnabled: captureEnabled,
+    pendingRecoveryEnabled: recoveryEnabled,
     pendingGlobalCount: authority ? authority.getState().pendingTransactions.length : 0,
     pendingCloseoutConflicts: authority ? pendingCloseoutConflicts(authority.getState()) : [],
     getPendingMonthSummary: (month) => runEncrypted((deps) => pendingMonthSummary(deps.authority.getState().pendingTransactions, month)),
@@ -355,7 +387,7 @@ export function FinancialAuthorityProvider({ children }: { children: React.React
     cancelRecurringExpenseChange: (currentId, scheduledId) => recurring ? recurring.cancel(currentId, scheduledId) : unavailableFinancialOperation(),
     replaceSavingsPlan: (month, request) => runEncrypted((deps) => replaceEncryptedSavingsPlan(deps, month, request)),
     ...closeoutOperations,
-  }), [authority, authorityVersion, runEncrypted, budgetOperations, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, quickUnlockSupported, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
+  }), [authority, authorityVersion, captureEnabled, recoveryEnabled, runEncrypted, budgetOperations, changePassphrase, closeoutOperations, derivedOperations, enrollQuickUnlock, fundOperations, importOperations, isLoading, isVaultSetupRequired, lock, quickUnlockStatus, quickUnlockSupported, refresh, recurring, rotateRecoverySecret, taxonomyOperations, transactionOperations, unlock, unlockWithQuickUnlock, unlockWithRecovery, revokeQuickUnlock])
 
   useEffect(() => { void refresh(); return () => { vaultManager.lock() } }, [refresh, vaultManager])
 

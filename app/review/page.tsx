@@ -6,7 +6,6 @@ import { ApiError } from "@/lib/api/core"
 import { Header } from "@/components/layout/header"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { pendingDevelopmentEnabled } from "@/lib/privacy/encrypted-authority/pending-development"
 import { PendingReviewSession } from "@/lib/privacy/encrypted-authority/pending-lifecycle"
 import type { Card, Context, Tag } from "@/lib/api/types"
 import { ReviewItem } from "@/components/review/review-item"
@@ -16,7 +15,6 @@ import type { PreparedSourceBatch } from "@/lib/privacy/encrypted-authority/auth
 
 export default function ReviewPage() {
   const api = useFinancialAuthority()
-  const [enabled, setEnabled] = useState(false)
   const [finalizedCount, setFinalizedCount] = useState(0)
   const [skipped, setSkipped] = useState<Set<string>>(new Set())
   const [notice, setNotice] = useState("")
@@ -27,8 +25,8 @@ export default function ReviewPage() {
   const [references, setReferences] = useState<{ tags: Tag[]; cards: Card[]; contexts: Context[] }>({ tags: [], cards: [], contexts: [] })
   const authority = api.authority
   const authorityVersion = authority?.getVersion()
+  const enabled = api.pendingCaptureEnabled || api.pendingGlobalCount > 0 || canUndo
   const session = useMemo(() => authority ? new PendingReviewSession({ authority, isAuthenticated: true }) : null, [authority])
-  useEffect(() => { setEnabled(pendingDevelopmentEnabled()) }, [])
   useEffect(() => { setSkipped(new Set()); setFinalizedCount(0); setCanUndo(false); setUndoBatch(null) }, [authority])
   useEffect(() => {
     if (!authority || !enabled) return
@@ -47,13 +45,14 @@ export default function ReviewPage() {
   }
   if (!enabled) return <main className="mx-auto max-w-lg p-6"><p>Review is unavailable.</p><Link href="/" className="underline">Back to Overview</Link></main>
   return <div className="min-h-screen bg-background pb-mobile-nav"><Header /><main className="mx-auto max-w-lg space-y-8 px-5 pt-standalone-safe-top pb-8">
-    <header><p className="text-sm text-muted-foreground">Capture now, organize later</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Quick Capture</h1></header>
-    <QuickCapture authority={authority} busy={busy} setBusy={setBusy} onError={setError} onNotice={setNotice} />
+    <header><p className="text-sm text-muted-foreground">Capture now, organize later</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{api.pendingCaptureEnabled ? "Quick Capture" : "Review"}</h1></header>
+    {api.pendingCaptureEnabled && <QuickCapture authority={authority} busy={busy} setBusy={setBusy} onError={setError} onNotice={setNotice} />}
+    {!api.pendingRecoveryEnabled && api.pendingGlobalCount > 0 && <p role="alert">Review is temporarily unavailable. Your pending expenses remain encrypted; reconnect or contact support to restore Review.</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error} <button className="underline" onClick={() => void api.syncFinancialState().catch(() => setError("Sync failed. Try again."))}>Sync</button></p>}
     {notice && <p role="status" className="text-sm">{notice} {canUndo && <button onClick={() => void undo()} disabled={busy} className="font-semibold underline">Undo</button>}</p>}
     <section className="space-y-4 border-t border-border pt-6"><div className="flex items-center justify-between"><h2 className="text-2xl font-semibold tracking-tight">Review</h2>{authority && !api.isLoading && <span className="text-sm text-muted-foreground">{queue.length} pending</span>}</div>
       {authority && !api.isLoading && <p className="text-sm text-muted-foreground" aria-label="Review progress">{finalizedCount} finalized · {queue.filter((item) => skipped.has(item.id)).length} skipped</p>}
-      {!authority || api.isLoading ? <p className="text-sm text-muted-foreground">Unlock your Vault to view pending transactions.</p> : !current ? <p className="text-sm text-muted-foreground">{queue.length ? "You’ve reached the end of this pass." : finalizedCount > 0 ? "Review complete." : "Nothing to review yet."} {queue.length > 0 && <button className="underline" onClick={() => setSkipped(new Set())}>Review skipped items</button>}</p> : authority && session && deps ? <ReviewItem key={`${current.id}:${authority.store.get(current.id)?.envelope.record_revision}`} item={current} authority={authority} session={session} references={references} busy={busy} setBusy={setBusy} onSkip={() => setSkipped((old) => new Set([...old, current.id]))} onDone={() => { setFinalizedCount((count) => count + 1); setNotice("Transaction finalized."); setCanUndo(true); setUndoBatch(null); setError("") }} onError={setError} onTagCreated={(tag) => setReferences((old) => ({ ...old, tags: [...old.tags, tag] }))} getSuggestions={api.getTransactionSuggestions} createTag={api.createTag} reopen={api.reopenMonth} /> : null}
+      {!authority || api.isLoading ? <p className="text-sm text-muted-foreground">Unlock your Vault to view pending transactions.</p> : !current ? <p className="text-sm text-muted-foreground">{queue.length ? "You’ve reached the end of this pass." : finalizedCount > 0 ? "Review complete." : "Nothing to review yet."} {queue.length > 0 && <button className="underline" onClick={() => setSkipped(new Set())}>Review skipped items</button>}</p> : authority && session && deps && api.pendingRecoveryEnabled ? <ReviewItem key={`${current.id}:${authority.store.get(current.id)?.envelope.record_revision}`} item={current} authority={authority} session={session} references={references} busy={busy} setBusy={setBusy} onSkip={() => setSkipped((old) => new Set([...old, current.id]))} onDone={() => { setFinalizedCount((count) => count + 1); setNotice("Transaction finalized."); setCanUndo(true); setUndoBatch(null); setError("") }} onError={setError} onTagCreated={(tag) => setReferences((old) => ({ ...old, tags: [...old.tags, tag] }))} getSuggestions={api.getTransactionSuggestions} createTag={api.createTag} reopen={api.reopenMonth} /> : null}
     </section>
   </main><BottomNav /></div>
 }
