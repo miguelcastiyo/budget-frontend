@@ -4,7 +4,50 @@ import { getCurrentMonthKey } from "@/lib/date-filters"
 import { fundVMFromState } from "@/lib/domain/financial/view-models"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
-import { fundEntryFromData, fundEntrySourceId, requireEncryptedAuthority, resolveFundEntryRecord, type EncryptedOperationDependencies } from "./authority-adapters"
+import { fundEntryFromData, fundEntrySourceId, requireEncryptedAuthority, resolveFundEntryRecord, resolveRecord, sameReference, transactionData, type EncryptedOperationDependencies } from "./authority-adapters"
+import { createTransaction } from "@/lib/domain/financial/transactions"
+import type { PreparedSourceBatch } from "./authority"
+
+export type PreparedSavingsContribution = { batch: PreparedSourceBatch; fundId: string; transactionId: string; entryId: string }
+
+/** Prepare both financial effects together. The returned batch belongs to this authority instance. */
+export async function prepareSavingsContribution(deps: EncryptedOperationDependencies, fundId: string, input: CreateFundEntryRequest): Promise<PreparedSavingsContribution> {
+  const authority = requireEncryptedAuthority(deps)
+  await authority.bootstrap()
+  const fund = fundRecord(authority, fundId)
+  if (!fund || (fund.data.status ?? "active") !== "active" || fund.data.is_deleted === true) throw new Error("An active fund is required.")
+  if (input.budget_tracking !== "create_transaction" || input.entry_type !== "contribution" || input.direction !== "in" || input.transaction_id || !input.transaction) throw new Error("Invalid savings contribution.")
+  const { transaction } = input
+  const state = authority.getState()
+  if (!transaction.tag_id || !state.tags.some((tag) => !tag.isDeleted && sameReference(tag.id, transaction.tag_id))) throw new Error("Choose an active tag for the savings transaction.")
+  if (transaction.card_id && !state.cards.some((card) => !card.isDeleted && sameReference(card.id, transaction.card_id!))) throw new Error("Choose an active card for the savings transaction.")
+  const tagRecord = resolveRecord(authority, "taxonomy_tag", transaction.tag_id)
+  const cardRecord = transaction.card_id ? resolveRecord(authority, "taxonomy_card", transaction.card_id) : undefined
+  if (!tagRecord || (transaction.card_id && !cardRecord)) throw new Error("Selected transaction references are unavailable.")
+  const transactionId = createEncryptedRecordId()
+  const entryId = createEncryptedRecordId()
+  const record = createTransaction({ id: transactionId, userId: "authority-user", date: input.entry_date ?? "", expense: transaction.expense, amount: input.amount, category: "savings", tagId: transaction.tag_id, cardId: transaction.card_id, notes: transaction.notes })
+  const entry = { id: entryId, fund_id: fundId, entry_date: record.date, entry_type: "contribution", direction: "in", amount_cents: record.amountCents, source_type: "transaction", source_transaction_id: transactionId, source_closeout_id: null, note: input.note ?? record.notes, is_voided: false, is_deleted: false }
+  const references = [fund, tagRecord, ...(cardRecord ? [cardRecord] : [])].map((item) => ({ id: item.envelope.record_id, family: item.family, data: item.data }))
+  const batch = await authority.prepareSourceDiff({ creates: [{ id: transactionId, family: "transaction", data: transactionData(record) }, { id: entryId, family: "fund_ledger_entry", data: entry }], updates: references, tombstones: [] })
+  return { batch, fundId, transactionId, entryId }
+}
+
+export function savingsContributionConfirmed(deps: EncryptedOperationDependencies, ids: Pick<PreparedSavingsContribution, "fundId" | "transactionId" | "entryId">): boolean {
+  const authority = requireEncryptedAuthority(deps)
+  const transaction = authority.store.get(ids.transactionId)
+  const entry = authority.store.get(ids.entryId)
+  return transaction?.family === "transaction" && entry?.family === "fund_ledger_entry" && entry.data.source_transaction_id === ids.transactionId && String(entry.data.fund_id) === ids.fundId
+}
+
+export async function submitSavingsContribution(deps: EncryptedOperationDependencies, prepared: PreparedSavingsContribution): Promise<void> {
+  const authority = requireEncryptedAuthority(deps)
+  await authority.submitPreparedSourceDiff(prepared.batch)
+  if (!savingsContributionConfirmed(deps, prepared)) {
+    await authority.bootstrap()
+    if (!savingsContributionConfirmed(deps, prepared)) throw new Error("Contribution outcome is unresolved. Synchronize before continuing.")
+  }
+}
 
 function ledgerEntriesFromState(deps: EncryptedOperationDependencies): FundLedgerEntry[] {
   const authority = requireEncryptedAuthority(deps)

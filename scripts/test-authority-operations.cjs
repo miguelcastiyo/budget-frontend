@@ -16,7 +16,7 @@ global.window = { isSecureContext: true, crypto: webcrypto }
 
 const { createEncryptedTransaction, updateEncryptedTransaction, deleteEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
 const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
-const { createEncryptedFundEntry, updateEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
+const { createEncryptedFundEntry, prepareSavingsContribution, submitSavingsContribution, updateEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
 const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
 const { commitEncryptedCsvImport, getEncryptedDataRuns, planEncryptedCsvImport, rollbackEncryptedCsvImport } = require("../lib/privacy/encrypted-authority/import-operations.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
@@ -39,6 +39,9 @@ function makeAuthority(initialRecords = []) {
       importRuns: [...records.values()].filter((record) => record.family === "import_run").map((record) => record.data),
     }),
     createSource: async (family, schemaVersion, id, data) => { records.set(id, makeRecord(id, family, data)); return records.get(id) },
+    bootstrap: async () => {},
+    prepareSourceDiff: async (diff) => ({ diff }),
+    submitPreparedSourceDiff: async (batch) => authority.commitSourceDiff(batch.diff),
     update: async (id, data) => { const current = records.get(id); records.set(id, { ...current, data }); return records.get(id) },
     commitSourceDiff: async ({ creates, updates, tombstones }) => {
       for (const record of updates) records.set(record.id, { ...records.get(record.id), data: record.data })
@@ -111,6 +114,25 @@ function makeAuthority(initialRecords = []) {
   await deleteEncryptedTransaction(deps(created.authority), editedAgain)
   assert(created.records.get("linked_1").data.is_voided === true && !created.records.has(linkedTransaction.id), "deletion voids the linked entry")
   assert(!(await getEncryptedFundEntries(deps(created.authority), "fund_1")).items.some((item) => item.id === "linked_1"), "voided entries are excluded from the visible ledger")
+
+  const request = { entry_date: "2026-08-03", entry_type: "contribution", direction: "in", amount: "200.00", source_type: "manual", budget_tracking: "create_transaction", transaction: { expense: "Reserve", tag_id: "tag_1", card_id: null, notes: "Savings" } }
+  const prepared = await prepareSavingsContribution(deps(created.authority), "fund_1", request)
+  assert(prepared.batch.diff.creates.length === 2 && prepared.batch.diff.updates.some((record) => record.id === "fund_1"), "savings contribution prepares both records and revision-checks the fund")
+  assert(!created.records.has(prepared.transactionId) && !created.records.has(prepared.entryId), "preparation alone does not save either record")
+  const submitBatch = created.authority.submitPreparedSourceDiff
+  created.authority.submitPreparedSourceDiff = async () => { throw new Error("network failure") }
+  await require("node:assert/strict").rejects(() => submitSavingsContribution(deps(created.authority), prepared))
+  assert(!created.records.has(prepared.transactionId) && !created.records.has(prepared.entryId), "failed batch has no partial effects")
+  created.authority.submitPreparedSourceDiff = submitBatch
+  await submitSavingsContribution(deps(created.authority), prepared)
+  assert(created.records.get(prepared.transactionId).data.category === "savings" && created.records.get(prepared.entryId).data.source_transaction_id === prepared.transactionId, "confirmed batch creates one Savings transaction and linked ledger entry")
+  for (const invalid of [{ ...request, amount: "0" }, { ...request, transaction: { ...request.transaction, tag_id: "missing" } }]) await require("node:assert/strict").rejects(() => prepareSavingsContribution(deps(created.authority), "fund_1", invalid))
+  created.records.get("tag_1").data.is_deleted = true
+  await require("node:assert/strict").rejects(() => prepareSavingsContribution(deps(created.authority), "fund_1", request))
+  created.records.get("tag_1").data.is_deleted = false
+  created.records.get("fund_1").data.status = "archived"
+  await require("node:assert/strict").rejects(() => prepareSavingsContribution(deps(created.authority), "fund_1", request))
+  created.records.get("fund_1").data.status = "active"
 
   const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Imported tag", card: "Imported card", context: "Imported context" }], { year: 2026, tagValueMap: {} })
   const validRecordId = (id) => /^rec_[A-Za-z0-9_-]{8,90}$/.test(id)

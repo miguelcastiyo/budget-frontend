@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -71,6 +71,9 @@ import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useAuth } from "@/components/auth/auth-provider"
+import { prepareSavingsContribution, savingsContributionConfirmed, submitSavingsContribution, type PreparedSavingsContribution } from "@/lib/privacy/encrypted-authority/fund-operations"
+import type { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority/authority"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 import styles from "@/components/funds/v2-funds.module.css"
 
@@ -937,7 +940,7 @@ export function FundDetailPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      {isLoading && !fund ? (
         <Card className="border-0">
           <CardContent className="flex items-center justify-center gap-3 pt-6">
             <Spinner className="size-5" />
@@ -1543,12 +1546,19 @@ export function FundEntryDialog({
 }) {
   const { version } = useInterfacePreference()
   const financialAuthority = useFinancialAuthority()
+  const { profile } = useAuth()
+  const account = profile?.id == null ? "" : String(profile.id)
+  const recoveryKey = `budget.fund-contribution-recovery.${encodeURIComponent(account)}`
+  const preparedRef = useRef<{ authority: EncryptedFinancialAuthority; value: PreparedSavingsContribution; uncertain: boolean } | null>(null)
+  const inFlight = useRef(false)
+  const [unresolved, setUnresolved] = useState(false)
+  const [referencesLoading, setReferencesLoading] = useState(false)
   const [values, setValues] = useState<EntryFormState>(getEntryFormState())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<BudgetCard[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactions] = useState<Transaction[]>([])
 
   useEffect(() => {
     if (!open) {
@@ -1563,18 +1573,48 @@ export function FundEntryDialog({
     if (!open || mode !== "create" || intent === "use") {
       return
     }
-    setTags([])
-    setCards([])
-    setTransactions([])
-  }, [financialAuthority, open, mode, intent])
+    let active = true
+    setReferencesLoading(true)
+    void financialAuthority.getTransactionReferences().then((refs) => {
+      if (active) { setTags(refs.tags); setCards(refs.cards); setReferencesLoading(false) }
+    }).catch(() => { if (active) { setError("Unable to load Tags and Cards. Close and reopen to retry."); setReferencesLoading(false) } })
+    return () => { active = false }
+  }, [financialAuthority.authority, open, mode, intent])
+
+  useEffect(() => {
+    if (!open || !account || !financialAuthority.authority) return
+    let marker: { fundId: string; transactionId: string; entryId: string } | null = null
+    try { marker = JSON.parse(sessionStorage.getItem(recoveryKey) || "null") } catch { setError("Recovery storage is unavailable; savings transaction contributions cannot be safely saved."); return }
+    if (!marker) { setUnresolved(false); return }
+    setUnresolved(true)
+    const authority = financialAuthority.authority
+    let active = true
+    void authority.bootstrap().then(() => {
+      if (!active || !marker) return
+      if (savingsContributionConfirmed({ authority, isAuthenticated: true }, marker)) {
+        sessionStorage.removeItem(recoveryKey); preparedRef.current = null; setUnresolved(false)
+        setError("Previous contribution confirmed. Refresh the Fund to see it.")
+      } else setError("The previous contribution outcome is unresolved. Retry the original request or synchronize before making another contribution.")
+    }).catch(() => { if (active) setError("Unable to synchronize the previous contribution. Try again before continuing.") })
+    return () => { active = false }
+  }, [account, financialAuthority.authority, open, recoveryKey])
 
   const isLinkMode = values.budget_tracking === "link_existing_transaction"
   const isCreateTransactionMode = values.budget_tracking === "create_transaction"
   const selectedEntryDate = parseIsoDate(values.entry_date)
 
   const submit = async () => {
+    if (inFlight.current || (unresolved && (!preparedRef.current || preparedRef.current.authority !== financialAuthority.authority))) return
+    if (!preparedRef.current && account) {
+      try { if (sessionStorage.getItem(recoveryKey)) { setUnresolved(true); setError("Synchronize the previous contribution before continuing."); return } }
+      catch { if (isCreateTransactionMode) { setError("Recovery storage is unavailable. Unable to safely submit a contribution."); return } }
+    }
     if (!values.amount) {
       setError("Amount is required.")
+      return
+    }
+    if (isCreateTransactionMode && parseAmount(values.amount) <= 0) {
+      setError("Amount must be greater than zero.")
       return
     }
 
@@ -1595,11 +1635,34 @@ export function FundEntryDialog({
     }
 
     setIsSubmitting(true)
+    inFlight.current = true
     setError(null)
 
     try {
       if (mode === "create") {
-        await financialAuthority.createFundEntry(fund.id, buildEntryPayload(values, intent))
+        if (isCreateTransactionMode) {
+          const authority = financialAuthority.authority
+          if (!authority || !account) throw new Error("Unlock the Vault before saving.")
+          let prepared = preparedRef.current
+          if (!prepared) {
+            const value = await prepareSavingsContribution({ authority, isAuthenticated: true }, fund.id, buildEntryPayload(values, intent))
+            // Persist only opaque IDs before submitting; if storage is unavailable,
+            // do not send a write that could be lost across a reload.
+            sessionStorage.setItem(recoveryKey, JSON.stringify({ fundId: value.fundId, transactionId: value.transactionId, entryId: value.entryId }))
+            prepared = { authority, value, uncertain: false }
+            preparedRef.current = prepared
+          }
+          if (prepared.authority !== authority) throw new Error("Synchronize the previous contribution before continuing.")
+          try {
+            await submitSavingsContribution({ authority, isAuthenticated: true }, prepared.value)
+          } catch (err) {
+            if (!prepared.uncertain && err instanceof ApiError && err.status >= 400 && err.status < 500) {
+              sessionStorage.removeItem(recoveryKey); preparedRef.current = null; setUnresolved(false)
+            } else { prepared.uncertain = true; setUnresolved(true) }
+            throw err
+          }
+          sessionStorage.removeItem(recoveryKey); preparedRef.current = null; setUnresolved(false)
+        } else await financialAuthority.createFundEntry(fund.id, buildEntryPayload(values, intent))
       } else if (entry) {
         const payload: UpdateFundEntryRequest = {
           entry_date: values.entry_date,
@@ -1618,28 +1681,44 @@ export function FundEntryDialog({
         setError(err instanceof Error ? err.message : "Unable to save fund entry")
       }
     } finally {
+      inFlight.current = false
       setIsSubmitting(false)
     }
+  }
+
+  const synchronizeContribution = async () => {
+    const authority = financialAuthority.authority
+    if (!authority || inFlight.current) return
+    inFlight.current = true; setIsSubmitting(true)
+    try {
+      const marker = JSON.parse(sessionStorage.getItem(recoveryKey) || "null")
+      if (!marker) throw new Error("The recovery record is unavailable.")
+      await authority.bootstrap()
+      if (!savingsContributionConfirmed({ authority, isAuthenticated: true }, marker)) throw new Error("The contribution outcome is still unresolved. Do not create a replacement.")
+      sessionStorage.removeItem(recoveryKey); preparedRef.current = null; setUnresolved(false); setError(null); onSaved()
+    } catch (err) { setError(err instanceof Error ? err.message : "Unable to synchronize the contribution.") }
+    finally { inFlight.current = false; setIsSubmitting(false) }
   }
 
   return (
     <ResponsiveDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => { if (!isSubmitting && !unresolved) onOpenChange(next) }}
       contentClassName={version === "v2" ? styles.portal : undefined}
       title={mode === "create" ? (intent === "add" ? "Add money" : "Use money") : "Edit fund entry"}
       description={fund.name}
       footer={
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="text-sm text-muted-foreground">{error ?? "Every fund move goes through the ledger."}</div>
-          <Button className="h-12 rounded-xl px-6" onClick={() => void submit()} disabled={isSubmitting || fund.status !== "active"}>
-            {isSubmitting ? "Saving..." : mode === "create" ? "Save entry" : "Save changes"}
+          {unresolved ? <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => void synchronizeContribution()}>Synchronize</Button> : null}
+          <Button className="h-12 rounded-xl px-6" onClick={() => void submit()} disabled={isSubmitting || fund.status !== "active" || (unresolved && !preparedRef.current) || (isCreateTransactionMode && referencesLoading)}>
+            {isSubmitting ? "Saving..." : unresolved ? "Retry original save" : mode === "create" ? "Save entry" : "Save changes"}
           </Button>
         </div>
       }
       bodyClassName="space-y-5"
     >
-      <div className="grid min-w-0 gap-4">
+      <fieldset disabled={isSubmitting || unresolved} className="grid min-w-0 gap-4">
         <AmountInput
           id="fund-entry-amount"
           name="fund-entry-amount"
@@ -1691,7 +1770,7 @@ export function FundEntryDialog({
                   <button
                     key={option.value}
                     type="button"
-                    disabled={option.value !== "fund_only"}
+                    disabled={option.value === "link_existing_transaction"}
                     className={cn(
                       "min-w-0 overflow-hidden rounded-2xl border px-4 py-4 text-left transition-colors",
                       isSelected
@@ -1701,7 +1780,7 @@ export function FundEntryDialog({
                     onClick={() => setValues((current) => ({ ...current, budget_tracking: option.value }))}
                   >
                     <p className="text-balance font-medium leading-tight text-foreground">{option.label}</p>
-                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.value === "fund_only" ? option.helper : "Temporarily unavailable while transaction-linked contributions are being restored."}</p>
+                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.value !== "link_existing_transaction" ? option.helper : "Temporarily unavailable while transaction linking is being restored."}</p>
                   </button>
                 )
               })}
@@ -1814,7 +1893,7 @@ export function FundEntryDialog({
             placeholder={intent === "add" ? "Why you added this money." : "What this money was used for."}
           />
         </div>
-      </div>
+      </fieldset>
     </ResponsiveDialog>
   )
 }
