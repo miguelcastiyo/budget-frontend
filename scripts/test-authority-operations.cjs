@@ -16,7 +16,7 @@ global.window = { isSecureContext: true, crypto: webcrypto }
 
 const { createEncryptedTransaction, updateEncryptedTransaction, deleteEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
 const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
-const { createEncryptedFundEntry, prepareSavingsContribution, submitSavingsContribution, updateEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
+const { createEncryptedFundEntry, eligibleSavingsTransactions, prepareSavingsContribution, prepareLinkedSavingsContribution, submitSavingsContribution, updateEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
 const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
 const { commitEncryptedCsvImport, getEncryptedDataRuns, planEncryptedCsvImport, rollbackEncryptedCsvImport } = require("../lib/privacy/encrypted-authority/import-operations.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
@@ -133,6 +133,53 @@ function makeAuthority(initialRecords = []) {
   created.records.get("fund_1").data.status = "archived"
   await require("node:assert/strict").rejects(() => prepareSavingsContribution(deps(created.authority), "fund_1", request))
   created.records.get("fund_1").data.status = "active"
+  const existingSavings = await createEncryptedTransaction(deps(created.authority), { date: "2026-08-04", expense: "Existing savings", amount: "42.00", category: "savings", is_split: false, tag_id: "tag_1", notes: "Transaction note" })
+  const linkRequest = { entry_date: "2026-09-01", entry_type: "contribution", direction: "in", amount: "42.00", source_type: "manual", budget_tracking: "link_existing_transaction", transaction_id: existingSavings.id, note: "Custom note" }
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(created.authority), "missing", linkRequest))
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(created.authority), "fund_1", { ...linkRequest, amount: "43.00" }))
+  const originalRecordCount = created.records.size
+  const linkedPlan = await prepareLinkedSavingsContribution(deps(created.authority), "fund_1", linkRequest)
+  assert(linkedPlan.batch.diff.creates.length === 1 && linkedPlan.batch.diff.creates[0].family === "fund_ledger_entry" && linkedPlan.batch.diff.updates.some((item) => item.id === existingSavings.id), "link prepares one ledger record and revision-checks the existing transaction")
+  await submitSavingsContribution(deps(created.authority), linkedPlan)
+  assert(created.records.size === originalRecordCount + 1 && created.records.get(linkedPlan.entryId).data.entry_date === "2026-08-04", "link adds only a ledger entry and uses transaction date")
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(created.authority), "fund_1", linkRequest))
+  const editedLinked = await updateEncryptedTransaction(deps(created.authority), existingSavings, { amount: "50.00", date: "2026-08-05", notes: "Updated" })
+  assert(created.records.get(linkedPlan.entryId).data.amount_cents === 5000 && created.records.get(linkedPlan.entryId).data.entry_date === "2026-08-05" && created.records.get(linkedPlan.entryId).data.note === "Custom note", "linked edits update the ledger and retain a custom note")
+  await deleteEncryptedTransaction(deps(created.authority), editedLinked)
+  assert(created.records.get(linkedPlan.entryId).data.is_voided === true, "deleting linked transaction voids its contribution")
+  const competing = makeAuthority([
+    makeRecord("fund_a", "fund", { name: "A", status: "active" }),
+    makeRecord("fund_b", "fund", { name: "B", status: "active" }),
+    makeRecord("tx_shared", "transaction", { date: "2026-08-04", expense: "Shared", amountCents: 4200, amount_cents: 4200, category: "savings", isDeleted: false, source: "manual", notes: null }),
+  ])
+  competing.authority.prepareSourceDiff = async (diff) => ({ diff, revisions: new Map(diff.updates.map((item) => [item.id, competing.records.get(item.id).envelope.record_revision])) })
+  competing.authority.submitPreparedSourceDiff = async (batch) => {
+    for (const [id, expected] of batch.revisions) if (competing.records.get(id)?.envelope.record_revision !== expected) throw new Error("REVISION_CONFLICT")
+    await competing.authority.commitSourceDiff(batch.diff)
+    for (const [id] of batch.revisions) competing.records.get(id).envelope.record_revision++
+  }
+  const competingRequest = { ...linkRequest, transaction_id: "tx_shared" }
+  competing.records.get("fund_a").data.status = "archived"
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(competing.authority), "fund_a", competingRequest), /active fund/)
+  competing.records.get("fund_a").data.status = "active"
+  competing.records.set("pending_2", makeRecord("pending_2", "pending_transaction", { amount_cents: 4200, category: "savings" }))
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(competing.authority), "fund_a", { ...competingRequest, transaction_id: "pending_2" }))
+  competing.records.set("needs_1", makeRecord("needs_1", "transaction", { date: "2026-08-04", expense: "Needs", amountCents: 4200, category: "needs", isDeleted: false, source: "manual" }))
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(competing.authority), "fund_a", { ...competingRequest, transaction_id: "needs_1" }))
+  const first = await prepareLinkedSavingsContribution(deps(competing.authority), "fund_a", competingRequest)
+  const second = await prepareLinkedSavingsContribution(deps(competing.authority), "fund_b", competingRequest)
+  await submitSavingsContribution(deps(competing.authority), first)
+  await require("node:assert/strict").rejects(() => submitSavingsContribution(deps(competing.authority), second), /REVISION_CONFLICT/)
+  assert(!competing.records.has(second.entryId) && competing.records.has(first.entryId), "competing links conflict atomically on the shared transaction revision")
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(competing.authority), "fund_b", competingRequest), /already linked/)
+  competing.records.set("extra_link", makeRecord("extra_link", "fund_ledger_entry", { source_transaction_id: "tx_shared", fund_id: "fund_b", is_voided: false }))
+  await require("node:assert/strict").rejects(() => prepareLinkedSavingsContribution(deps(competing.authority), "fund_b", competingRequest), /conflicting Fund links/)
+  const eligible = makeAuthority(Array.from({ length: 105 }, (_, index) => makeRecord(`savings_${index}`, "transaction", { date: "2026-01-01", expense: `Savings ${index}`, amountCents: 100, category: "savings", isDeleted: false, isSplit: false, source: "manual", tagId: null, contextId: null, cardId: null, createdSequence: index })))
+  eligible.records.set("pending_1", makeRecord("pending_1", "pending_transaction", { amount_cents: 100 }))
+  eligible.records.set("future_1", makeRecord("future_1", "transaction", { date: "2999-01-01", expense: "Future recurring", amountCents: 100, category: "savings", isDeleted: false, source: "recurring" }))
+  eligible.records.set("used_1", makeRecord("used_1", "fund_ledger_entry", { source_transaction_id: "savings_0", is_voided: false }))
+  const choices = await eligibleSavingsTransactions(deps(eligible.authority))
+  assert(choices.length === 104 && !choices.some((item) => ["savings_0", "pending_1", "future_1"].includes(item.id)), "picker reads all pages and excludes linked, pending and projected transactions")
 
   const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Imported tag", card: "Imported card", context: "Imported context" }], { year: 2026, tagValueMap: {} })
   const validRecordId = (id) => /^rec_[A-Za-z0-9_-]{8,90}$/.test(id)

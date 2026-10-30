@@ -44,7 +44,12 @@ export async function setupEncryptedFixture(page: Page, capture: boolean) {
       if (failBeforeCommit > 0) { failBeforeCommit--; return route.abort("failed") }
       const body = req.postDataJSON() as { idempotency_key: string; creates: { envelope: Record<string, unknown> }[]; updates: { envelope: Record<string, unknown>; expected_revision: number }[]; tombstones: { record_id: string; expected_revision: number }[] }
       let created = batches.get(body.idempotency_key)
-      if (!created) { created = [...body.creates, ...body.updates].map(item => ({ ...item.envelope, sync_sequence: String(++sequence), deleted: false })); for (const item of body.tombstones ?? []) created.push({ vault_id: "test-vault", record_id: item.record_id, envelope_version: 1, record_revision: item.expected_revision + 1, sync_sequence: String(++sequence), deleted: true }); batches.set(body.idempotency_key, created); records.push(...created) }
+      if (!created) {
+        const latest = (id: unknown) => records.findLast((record) => record.record_id === id)
+        const conflict = body.creates.some((item) => latest(item.envelope.record_id)) || body.updates.some((item) => { const current = latest(item.envelope.record_id); return !current || current.deleted || current.record_revision !== item.expected_revision }) || (body.tombstones ?? []).some((item) => { const current = latest(item.record_id); return !current || current.deleted || current.record_revision !== item.expected_revision })
+        if (conflict) return route.fulfill({ status: 409, json: { error: { code: "ENCRYPTED_RECORD_REVISION_CONFLICT", message: "Encrypted record revision conflict" } } })
+        created = [...body.creates, ...body.updates].map(item => ({ ...item.envelope, sync_sequence: String(++sequence), deleted: false })); for (const item of body.tombstones ?? []) created.push({ vault_id: "test-vault", record_id: item.record_id, envelope_version: 1, record_revision: item.expected_revision + 1, sync_sequence: String(++sequence), deleted: true }); batches.set(body.idempotency_key, created); records.push(...created)
+      }
       if (failRequests > 0) { failRequests--; return route.abort("failed") }
       return route.fulfill({ json: { records: created, idempotent: false } })
     }
@@ -68,4 +73,3 @@ export async function setupEncryptedFixture(page: Page, capture: boolean) {
   await expect(page.getByRole("navigation", { name: "Primary desktop" })).toBeVisible()
   return { records, bodies, failNext: (count: number) => { failRequests = count }, failBeforeNext: (count: number) => { failBeforeCommit = count } }
 }
-

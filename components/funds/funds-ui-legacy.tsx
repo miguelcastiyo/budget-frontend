@@ -72,7 +72,7 @@ import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { useAuth } from "@/components/auth/auth-provider"
-import { prepareSavingsContribution, savingsContributionConfirmed, submitSavingsContribution, type PreparedSavingsContribution } from "@/lib/privacy/encrypted-authority/fund-operations"
+import { eligibleSavingsTransactions, prepareLinkedSavingsContribution, prepareSavingsContribution, savingsContributionConfirmed, submitSavingsContribution, type PreparedSavingsContribution } from "@/lib/privacy/encrypted-authority/fund-operations"
 import type { EncryptedFinancialAuthority } from "@/lib/privacy/encrypted-authority/authority"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 import styles from "@/components/funds/v2-funds.module.css"
@@ -1558,7 +1558,10 @@ export function FundEntryDialog({
   const [error, setError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [cards, setCards] = useState<BudgetCard[]>([])
-  const [transactions] = useState<Transaction[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [transactionsLoading, setTransactionsLoading] = useState(false)
+  const [transactionSearch, setTransactionSearch] = useState("")
+  const [transactionReload, setTransactionReload] = useState(0)
 
   useEffect(() => {
     if (!open) {
@@ -1580,6 +1583,17 @@ export function FundEntryDialog({
     }).catch(() => { if (active) { setError("Unable to load Tags and Cards. Close and reopen to retry."); setReferencesLoading(false) } })
     return () => { active = false }
   }, [financialAuthority.authority, open, mode, intent])
+
+  useEffect(() => {
+    const authority = financialAuthority.authority
+    if (!open || mode !== "create" || intent !== "add" || values.budget_tracking !== "link_existing_transaction" || !authority) return
+    let active = true
+    setTransactionsLoading(true)
+    void eligibleSavingsTransactions({ authority, isAuthenticated: true }).then((items) => {
+      if (active) { setTransactions(items); setTransactionsLoading(false) }
+    }).catch((error) => { if (active) { setError(error instanceof Error ? error.message : "Unable to load savings transactions. Try again."); setTransactionsLoading(false) } })
+    return () => { active = false }
+  }, [financialAuthority.authority, open, mode, intent, values.budget_tracking, transactionReload])
 
   useEffect(() => {
     if (!open || !account || !financialAuthority.authority) return
@@ -1607,7 +1621,7 @@ export function FundEntryDialog({
     if (inFlight.current || (unresolved && (!preparedRef.current || preparedRef.current.authority !== financialAuthority.authority))) return
     if (!preparedRef.current && account) {
       try { if (sessionStorage.getItem(recoveryKey)) { setUnresolved(true); setError("Synchronize the previous contribution before continuing."); return } }
-      catch { if (isCreateTransactionMode) { setError("Recovery storage is unavailable. Unable to safely submit a contribution."); return } }
+      catch { if (isCreateTransactionMode || isLinkMode) { setError("Recovery storage is unavailable. Unable to safely submit a contribution."); return } }
     }
     if (!values.amount) {
       setError("Amount is required.")
@@ -1640,12 +1654,13 @@ export function FundEntryDialog({
 
     try {
       if (mode === "create") {
-        if (isCreateTransactionMode) {
+        if (isCreateTransactionMode || isLinkMode) {
           const authority = financialAuthority.authority
           if (!authority || !account) throw new Error("Unlock the Vault before saving.")
           let prepared = preparedRef.current
           if (!prepared) {
-            const value = await prepareSavingsContribution({ authority, isAuthenticated: true }, fund.id, buildEntryPayload(values, intent))
+            const input = buildEntryPayload(values, intent)
+            const value = isLinkMode ? await prepareLinkedSavingsContribution({ authority, isAuthenticated: true }, fund.id, input) : await prepareSavingsContribution({ authority, isAuthenticated: true }, fund.id, input)
             // Persist only opaque IDs before submitting; if storage is unavailable,
             // do not send a write that could be lost across a reload.
             sessionStorage.setItem(recoveryKey, JSON.stringify({ fundId: value.fundId, transactionId: value.transactionId, entryId: value.entryId }))
@@ -1658,6 +1673,7 @@ export function FundEntryDialog({
           } catch (err) {
             if (!prepared.uncertain && err instanceof ApiError && err.status >= 400 && err.status < 500) {
               sessionStorage.removeItem(recoveryKey); preparedRef.current = null; setUnresolved(false)
+              if (isLinkMode) setTransactionReload((current) => current + 1)
             } else { prepared.uncertain = true; setUnresolved(true) }
             throw err
           }
@@ -1676,7 +1692,7 @@ export function FundEntryDialog({
       onSaved()
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.error.message)
+        setError(isLinkMode && err.status === 409 ? "The transaction or Fund changed on another device. Refresh transactions and choose an available entry." : err.error.message)
       } else {
         setError(err instanceof Error ? err.message : "Unable to save fund entry")
       }
@@ -1711,7 +1727,7 @@ export function FundEntryDialog({
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="text-sm text-muted-foreground">{error ?? "Every fund move goes through the ledger."}</div>
           {unresolved ? <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => void synchronizeContribution()}>Synchronize</Button> : null}
-          <Button className="h-12 rounded-xl px-6" onClick={() => void submit()} disabled={isSubmitting || fund.status !== "active" || (unresolved && !preparedRef.current) || (isCreateTransactionMode && referencesLoading)}>
+          <Button className="h-12 rounded-xl px-6" onClick={() => void submit()} disabled={isSubmitting || fund.status !== "active" || (unresolved && !preparedRef.current) || (isCreateTransactionMode && referencesLoading) || (isLinkMode && transactionsLoading)}>
             {isSubmitting ? "Saving..." : unresolved ? "Retry original save" : mode === "create" ? "Save entry" : "Save changes"}
           </Button>
         </div>
@@ -1770,7 +1786,6 @@ export function FundEntryDialog({
                   <button
                     key={option.value}
                     type="button"
-                    disabled={option.value === "link_existing_transaction"}
                     className={cn(
                       "min-w-0 overflow-hidden rounded-2xl border px-4 py-4 text-left transition-colors",
                       isSelected
@@ -1780,7 +1795,7 @@ export function FundEntryDialog({
                     onClick={() => setValues((current) => ({ ...current, budget_tracking: option.value }))}
                   >
                     <p className="text-balance font-medium leading-tight text-foreground">{option.label}</p>
-                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.value !== "link_existing_transaction" ? option.helper : "Temporarily unavailable while transaction linking is being restored."}</p>
+                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.helper}</p>
                   </button>
                 )
               })}
@@ -1856,6 +1871,9 @@ export function FundEntryDialog({
 
         {mode === "create" && intent === "add" && isLinkMode ? (
           <div className="grid min-w-0 gap-2">
+            <p className="text-sm text-muted-foreground">Link a finalized Savings transaction to {fund.name}. Its amount and date will be used for the Fund entry.</p>
+            <Label htmlFor="fund-transaction-search">Search savings transactions</Label>
+            <Input id="fund-transaction-search" value={transactionSearch} onChange={(event) => setTransactionSearch(event.target.value)} placeholder="Search description or tag" />
             <Label htmlFor="fund-transaction-link">Savings transaction</Label>
             <Select
               value={values.transaction_id}
@@ -1866,6 +1884,7 @@ export function FundEntryDialog({
                   ...current,
                   transaction_id: transactionId,
                   amount: selectedTransaction?.amount ?? current.amount,
+                  entry_date: selectedTransaction?.date ?? current.entry_date,
                 }))
               }}
             >
@@ -1873,13 +1892,15 @@ export function FundEntryDialog({
                 <SelectValue placeholder="Choose a transaction" />
               </SelectTrigger>
               <SelectContent className={version === "v2" ? styles.portal : undefined}>
-                {transactions.map((transaction) => (
+                {transactions.filter((transaction) => transaction.id === values.transaction_id || `${transaction.expense} ${transaction.tag.name}`.toLocaleLowerCase().includes(transactionSearch.trim().toLocaleLowerCase())).map((transaction) => (
                   <SelectItem key={transaction.id} value={transaction.id}>
-                    {`${transaction.expense} • ${formatCurrency(transaction.amount)} • ${transaction.date}`}
+                    {`${transaction.expense} • ${formatCurrency(transaction.amount)} • ${transaction.date} • ${transaction.tag.name || "No tag"}`}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {transactionsLoading ? <p className="text-sm text-muted-foreground">Loading savings transactions...</p> : transactions.length === 0 ? <p className="text-sm text-muted-foreground">No eligible savings transactions found.</p> : null}
+            <Button type="button" variant="ghost" size="sm" disabled={transactionsLoading} onClick={() => setTransactionReload((current) => current + 1)}>Refresh transactions</Button>
           </div>
         ) : null}
 

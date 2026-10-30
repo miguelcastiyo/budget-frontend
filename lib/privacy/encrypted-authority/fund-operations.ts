@@ -1,7 +1,7 @@
-import type { CreateFundEntryRequest, CreateFundRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, UpdateFundEntryRequest, UpdateFundRequest } from "@/lib/api/types"
+import type { CreateFundEntryRequest, CreateFundRequest, FundDetail, FundEntriesPage, FundEntry, FundListItem, FundsListResponse, Transaction, UpdateFundEntryRequest, UpdateFundRequest } from "@/lib/api/types"
 import { formatMoneyCents, parseMoneyCents } from "@/lib/domain/financial/money"
-import { getCurrentMonthKey } from "@/lib/date-filters"
-import { fundVMFromState } from "@/lib/domain/financial/view-models"
+import { getCurrentMonthKey, getLocalDateKey } from "@/lib/date-filters"
+import { fundVMFromState, transactionsPageFromState } from "@/lib/domain/financial/view-models"
 import { ledgerBalance, sourceBreakdown, type Fund, type FundLedgerEntry } from "@/lib/domain/financial/funds"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
 import { fundEntryFromData, fundEntrySourceId, requireEncryptedAuthority, resolveFundEntryRecord, resolveRecord, sameReference, transactionData, type EncryptedOperationDependencies } from "./authority-adapters"
@@ -9,6 +9,53 @@ import { createTransaction } from "@/lib/domain/financial/transactions"
 import type { PreparedSourceBatch } from "./authority"
 
 export type PreparedSavingsContribution = { batch: PreparedSourceBatch; fundId: string; transactionId: string; entryId: string }
+
+function activeLinks(authority: ReturnType<typeof requireEncryptedAuthority>, record: NonNullable<ReturnType<typeof resolveRecord>>) {
+  const ids = [record.sourceId, record.envelope.record_id, String(record.data.id ?? "")].filter(Boolean)
+  const flag = (value: unknown) => value === true || value === 1 || value === "1"
+  return authority.store.values().filter((item) => item.family === "fund_ledger_entry" && !flag(item.data.is_voided) && !flag(item.data.is_deleted) && item.data.deleted_at == null && ids.some((id) => Boolean(item.data.source_transaction_id) && sameReference(String(item.data.source_transaction_id), id)))
+}
+
+/** Read all finalized Savings transactions; pending and projected records are not transaction sources. */
+export async function eligibleSavingsTransactions(deps: EncryptedOperationDependencies): Promise<Transaction[]> {
+  const authority = requireEncryptedAuthority(deps)
+  await authority.bootstrap()
+  const items: Transaction[] = []
+  for (let page = 1; ; page++) {
+    const result = transactionsPageFromState(authority.getState(), { categories: ["savings"], page, pageSize: 100 }, getLocalDateKey(), false)
+    for (const transaction of result.items) {
+      const record = resolveRecord(authority, "transaction", transaction.id)
+      if (record?.family !== "transaction") continue
+      const links = activeLinks(authority, record)
+      if (links.length > 1) throw new Error("Conflicting Fund links were found for a savings transaction. Synchronize and resolve them before linking another transaction.")
+      if (links.length === 0) items.push(transaction)
+    }
+    if (page * result.page_size >= result.total_items) break
+  }
+  return items
+}
+
+export async function prepareLinkedSavingsContribution(deps: EncryptedOperationDependencies, fundId: string, input: CreateFundEntryRequest): Promise<PreparedSavingsContribution> {
+  const authority = requireEncryptedAuthority(deps)
+  await authority.bootstrap()
+  const fund = fundRecord(authority, fundId)
+  if (!fund || (fund.data.status ?? "active") !== "active" || fund.data.is_deleted === true) throw new Error("An active fund is required.")
+  if (input.budget_tracking !== "link_existing_transaction" || input.entry_type !== "contribution" || input.direction !== "in" || !input.transaction_id || input.transaction) throw new Error("Choose a finalized savings transaction.")
+  const record = resolveRecord(authority, "transaction", input.transaction_id)
+  const transaction = authority.getState().transactions.find((item) => record && sameReference(item.id, record.sourceId))
+  if (!record || record.family !== "transaction" || !transaction || transaction.isDeleted || transaction.category !== "savings" || (transaction.source === "recurring" && transaction.date > getLocalDateKey())) throw new Error("This finalized savings transaction is no longer available.")
+  const links = activeLinks(authority, record)
+  if (links.length > 1) throw new Error("This transaction has conflicting Fund links. Synchronize and resolve them before continuing.")
+  if (links.length) throw new Error("This transaction is already linked to a Fund.")
+  if (transaction.amountCents <= 0 || parseMoneyCents(input.amount) !== transaction.amountCents) throw new Error("The contribution amount must match the savings transaction.")
+  const transactionId = record.envelope.record_id
+  const entryId = createEncryptedRecordId()
+  const entry = { id: entryId, fund_id: fundId, entry_date: transaction.date, entry_type: "contribution", direction: "in", amount_cents: transaction.amountCents, source_type: "transaction", source_transaction_id: transactionId, source_closeout_id: null, note: input.note ?? transaction.notes, is_voided: false, is_deleted: false }
+  // The unchanged transaction update is the compare-and-swap boundary for
+  // concurrent links and edits. Its decrypted fields remain authoritative.
+  const batch = await authority.prepareSourceDiff({ creates: [{ id: entryId, family: "fund_ledger_entry", data: entry }], updates: [{ id: transactionId, family: "transaction", data: record.data }, { id: fund.envelope.record_id, family: "fund", data: fund.data }], tombstones: [] })
+  return { batch, fundId, transactionId, entryId }
+}
 
 /** Prepare both financial effects together. The returned batch belongs to this authority instance. */
 export async function prepareSavingsContribution(deps: EncryptedOperationDependencies, fundId: string, input: CreateFundEntryRequest): Promise<PreparedSavingsContribution> {
@@ -37,7 +84,7 @@ export function savingsContributionConfirmed(deps: EncryptedOperationDependencie
   const authority = requireEncryptedAuthority(deps)
   const transaction = authority.store.get(ids.transactionId)
   const entry = authority.store.get(ids.entryId)
-  return transaction?.family === "transaction" && entry?.family === "fund_ledger_entry" && entry.data.source_transaction_id === ids.transactionId && String(entry.data.fund_id) === ids.fundId
+  return transaction?.family === "transaction" && entry?.family === "fund_ledger_entry" && entry.data.source_transaction_id === ids.transactionId && String(entry.data.fund_id) === ids.fundId && activeLinks(authority, transaction).length === 1
 }
 
 export async function submitSavingsContribution(deps: EncryptedOperationDependencies, prepared: PreparedSavingsContribution): Promise<void> {
