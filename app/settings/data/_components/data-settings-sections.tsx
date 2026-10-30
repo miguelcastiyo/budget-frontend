@@ -21,6 +21,8 @@ import type {
 import { formatDateTimeValue, formatDateValue, parseIsoDate, toIsoDate } from "@/lib/date-filters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "../../v2-settings.module.css"
 import {
   activityStatusClassName,
   activityStatusLabel,
@@ -38,6 +40,16 @@ import {
   profileForHeader,
   reviewSummarySentence,
 } from "../_lib/import-export"
+
+function DataSelectContent(props: React.ComponentProps<typeof SelectContent>) {
+  const { version } = useInterfacePreference()
+  return <SelectContent {...props} className={cn(props.className, version === "v2" && styles.portal)} />
+}
+
+function DataPopoverContent(props: React.ComponentProps<typeof PopoverContent>) {
+  const { version } = useInterfacePreference()
+  return <PopoverContent {...props} className={cn(props.className, version === "v2" && styles.portal)} />
+}
 
 export function ResultSummary({ result, mode }: { result: CsvImportResponse; mode: "review" | "complete" }) {
   const summarySentence = mode === "review" ? reviewSummarySentence(result) : completeSummarySentence(result)
@@ -341,14 +353,14 @@ export function MappingControls({
               <SelectTrigger className="h-10 w-full rounded-lg border-border/70">
                 <SelectValue placeholder="Choose CSV header" />
               </SelectTrigger>
-              <SelectContent>
+              <DataSelectContent>
                 <SelectItem value={NONE_VALUE}>Do not import</SelectItem>
                 {preview.headers.map((header) => (
                   <SelectItem key={header} value={header} disabled={usedHeaders.has(header) && header !== value}>
                     {header}
                   </SelectItem>
                 ))}
-              </SelectContent>
+              </DataSelectContent>
             </Select>
           </div>
         )
@@ -390,11 +402,11 @@ export function CategorySetup({
             <SelectTrigger className="h-10 rounded-lg border-border/70">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <DataSelectContent>
               <SelectItem value="value_map">Map imported labels</SelectItem>
               <SelectItem value="default">Use one budget group</SelectItem>
               <SelectItem value="exact_column">CSV has Budget groups</SelectItem>
-            </SelectContent>
+            </DataSelectContent>
           </Select>
         </div>
 
@@ -405,13 +417,13 @@ export function CategorySetup({
               <SelectTrigger className="h-10 rounded-lg border-border/70">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <DataSelectContent>
                 {CATEGORY_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}
-              </SelectContent>
+              </DataSelectContent>
             </Select>
           </div>
         ) : (
@@ -421,14 +433,14 @@ export function CategorySetup({
               <SelectTrigger className="h-10 rounded-lg border-border/70">
                 <SelectValue placeholder="Choose CSV header" />
               </SelectTrigger>
-              <SelectContent>
+              <DataSelectContent>
                 <SelectItem value={NONE_VALUE}>Choose source</SelectItem>
                 {preview.headers.map((header) => (
                   <SelectItem key={header} value={header}>
                     {header}
                   </SelectItem>
                 ))}
-              </SelectContent>
+              </DataSelectContent>
             </Select>
           </div>
         )}
@@ -513,13 +525,13 @@ export function DateSetup({
           <SelectTrigger className="h-10 rounded-lg border-border/70">
             <SelectValue placeholder="Year" />
           </SelectTrigger>
-          <SelectContent>
+          <DataSelectContent>
             {Array.from({ length: 8 }, (_, index) => currentImportYear() + 1 - index).map((year) => (
               <SelectItem key={year} value={String(year)}>
                 {year}
               </SelectItem>
             ))}
-          </SelectContent>
+          </DataSelectContent>
         </Select>
       </div>
       {examples.length > 0 && selectedYear && (
@@ -589,14 +601,14 @@ export function TagSetup({
                     <SelectTrigger className="h-10 rounded-lg border-border/70">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <DataSelectContent>
                       <SelectItem value="__new">Create "{item.value}"</SelectItem>
                       {tags.map((tag) => (
                         <SelectItem key={tag.id} value={`existing:${tag.id}`}>
                           Use {tag.name}
                         </SelectItem>
                       ))}
-                    </SelectContent>
+                    </DataSelectContent>
                   </Select>
                 </div>
               </div>
@@ -794,7 +806,7 @@ export function ExportDateFields({
               <span className="truncate">{selectedExportFromDate ? formatDateValue(exportCustomFrom, { month: "short", day: "numeric", year: "numeric" }) : "Select start date"}</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <DataPopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
               selected={selectedExportFromDate ?? undefined}
@@ -805,7 +817,7 @@ export function ExportDateFields({
               }}
               initialFocus
             />
-          </PopoverContent>
+          </DataPopoverContent>
         </Popover>
       </div>
       <div className="space-y-2">
@@ -817,7 +829,7 @@ export function ExportDateFields({
               <span className="truncate">{selectedExportToDate ? formatDateValue(exportCustomTo, { month: "short", day: "numeric", year: "numeric" }) : "Select end date"}</span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <DataPopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
               selected={selectedExportToDate ?? undefined}
@@ -828,7 +840,7 @@ export function ExportDateFields({
               }}
               initialFocus
             />
-          </PopoverContent>
+          </DataPopoverContent>
         </Popover>
       </div>
     </div>

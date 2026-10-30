@@ -1,0 +1,44 @@
+/* Scoped to the Settings and Data surfaces; portal classes are applied explicitly. */
+.settings, .data, .portal {
+  --background: #fbfbfa;
+  --foreground: #232426;
+  --card: #fff;
+  --card-foreground: #232426;
+  --popover: #fff;
+  --popover-foreground: #232426;
+  --secondary: #f1f1ef;
+  --secondary-foreground: #292a2c;
+  --muted: #f3f3f1;
+  --muted-foreground: #717277;
+  --border: #e7e7e4;
+  --input: #e7e7e4;
+}
+:global(.dark) .settings, :global(.dark) .data, :global(.dark) .portal {
+  --background: #16171a;
+  --foreground: #f4f4f2;
+  --card: #1e1f23;
+  --card-foreground: #f4f4f2;
+  --popover: #1e1f23;
+  --popover-foreground: #f4f4f2;
+  --secondary: #292a2e;
+  --secondary-foreground: #f4f4f2;
+  --muted: #26272b;
+  --muted-foreground: #a4a5aa;
+  --border: #34353a;
+  --input: #34353a;
+}
+.settings main, .data main { letter-spacing: -0.01em; }
+.settings main section > div:first-child h2 { color: var(--muted-foreground); font-size: .7rem; letter-spacing: .09em; text-transform: uppercase; }
+.settings main section [data-slot="card"] { border-color: var(--border); border-radius: .75rem; box-shadow: none; }
+.settings main section [data-slot="card"] a > div,
+.settings main section [data-slot="card"] [role="button"] > div { min-height: 68px; }
+.settings main section [data-slot="card"] svg { stroke-width: 1.7; }
+.data main [data-slot="card"] { border: 1px solid var(--border); border-radius: .85rem; box-shadow: none; }
+.data main h2 { letter-spacing: .07em; }
+.portal { background: var(--background); color: var(--foreground); border-color: var(--border); }
+.portal [data-slot="dialog-header"], .portal [data-slot="dialog-footer"] { background: var(--background); }
+.portal input, .portal button { min-height: 2.5rem; }
+@media (max-width: 639px) {
+  .settings main, .data main { padding-left: 1rem; padding-right: 1rem; }
+  .portal { max-width: 100vw; }
+}

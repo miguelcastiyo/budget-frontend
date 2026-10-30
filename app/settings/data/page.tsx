@@ -30,6 +30,8 @@ import {
 } from "./_components/data-settings-sections"
 import { useDataRuns } from "./_hooks/use-data-runs"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "../v2-settings.module.css"
 import {
   bestCategorySource,
   createEmptyImportState,
@@ -69,6 +71,7 @@ function parseCsvText(text: string): { headers: string[]; rows: Record<string, s
 }
 
 export default function DataSettingsPage() {
+  const { version } = useInterfacePreference()
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -100,6 +103,8 @@ export default function DataSettingsPage() {
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [importUncertain, setImportUncertain] = useState(false)
+  const [rollbackUncertain, setRollbackUncertain] = useState(false)
 
   const [exportDateMode, setExportDateMode] = useState<ExportDateMode>("all")
   const [exportCustomFrom, setExportCustomFrom] = useState("")
@@ -228,12 +233,12 @@ export default function DataSettingsPage() {
   }
 
   const openImportDialog = () => {
-    resetImportState()
+    if (!importFile || commitResult) resetImportState()
     setIsImportDialogOpen(true)
   }
 
   const closeImportDialog = () => {
-    if (isPreviewing || isValidating || isImporting) {
+    if (isPreviewing || isValidating || isImporting || importUncertain) {
       return
     }
     setIsImportDialogOpen(false)
@@ -350,11 +355,14 @@ export default function DataSettingsPage() {
 
     setIsImporting(true)
     setImportError(null)
+    let submitted = false
 
     try {
       if (authority.isUnlocked) {
         const plan = await buildEncryptedPlan()
+        submitted = true
         await authority.commitCsvImport(plan, importFile.name)
+        submitted = false
         setCommitResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV imported into encrypted authority", mode: "commit", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("done")
         await loadDataRuns()
@@ -362,10 +370,13 @@ export default function DataSettingsPage() {
       }
       throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (submitted) {
+        setImportUncertain(true)
+        setImportError("The import outcome could not be confirmed. Do not submit it again until its activity has been checked after synchronization.")
+      } else if (err instanceof ApiError) {
         setImportError(err.error.message)
       } else {
-        setImportError("Unable to import CSV file.")
+        setImportError("Unable to prepare CSV import.")
       }
     } finally {
       setIsImporting(false)
@@ -435,17 +446,23 @@ export default function DataSettingsPage() {
 
     setRollingBackImportId(rollbackTarget.id)
     setRollbackError(null)
+    let submitted = false
 
     try {
       if (authority.isUnlocked) {
+        submitted = true
         await authority.rollbackCsvImport(importRunId)
+        submitted = false
       } else {
         throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
       }
       setRollbackTarget(null)
       await loadDataRuns()
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (submitted) {
+        setRollbackUncertain(true)
+        setRollbackError("The rollback outcome could not be confirmed. Check activity after synchronization before attempting it again.")
+      } else if (err instanceof ApiError) {
         setRollbackError(err.error.message)
       } else {
         setRollbackError("Unable to rollback import.")
@@ -513,7 +530,7 @@ export default function DataSettingsPage() {
   const currentImportStepIndex = useMemo(() => importStepIndex(importStep), [importStep])
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={cn("min-h-screen bg-background pb-mobile-nav", version === "v2" && styles.data)}>
       <header className="sticky top-0 z-40 bg-background/80 pt-safe-header backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4 lg:max-w-6xl lg:px-8">
           <Link href="/settings">
@@ -553,7 +570,7 @@ export default function DataSettingsPage() {
 
               <Button type="button" className="mt-auto h-11 w-full rounded-lg" onClick={openImportDialog}>
                 <Upload className="size-4" />
-                Import CSV
+                {importFile && !commitResult ? "Resume import" : "Import CSV"}
               </Button>
             </div>
           </Card>
@@ -710,10 +727,10 @@ export default function DataSettingsPage() {
           </>
         }
         headerAccessory={<div className="md:w-[26rem]"><ImportStepper stepIndex={currentImportStepIndex} /></div>}
-        showCloseButton={!isPreviewing && !isValidating && !isImporting}
-        closeDisabled={isPreviewing || isValidating || isImporting}
+        showCloseButton={!isPreviewing && !isValidating && !isImporting && !importUncertain}
+        closeDisabled={isPreviewing || isValidating || isImporting || importUncertain}
         desktopClassName="sm:!max-w-5xl"
-        contentClassName="!max-w-none rounded-2xl sm:max-h-[min(820px,calc(100dvh-2rem))]"
+        contentClassName={cn("!max-w-none rounded-2xl sm:max-h-[min(820px,calc(100dvh-2rem))]", version === "v2" && styles.portal)}
         headerClassName="border-border/70 p-4 sm:p-5"
         bodyClassName="p-4 pb-28 sm:p-5 sm:pb-28"
         bodyMaxWidthClassName="mx-auto max-w-4xl space-y-4"
@@ -724,7 +741,7 @@ export default function DataSettingsPage() {
               type="button"
               variant="ghost"
               className="h-11 rounded-lg sm:w-auto"
-              disabled={importStep === "upload" || isPreviewing || isValidating || isImporting}
+              disabled={importStep === "upload" || isPreviewing || isValidating || isImporting || importUncertain}
               onClick={goToPreviousImportStep}
             >
               Back
@@ -752,7 +769,7 @@ export default function DataSettingsPage() {
                 <Button
                   type="button"
                   className="h-11 rounded-lg"
-                  disabled={!canCommitImport || isImporting}
+                  disabled={!canCommitImport || isImporting || importUncertain}
                   onClick={() => void handleCommitImport()}
                 >
                   {isImporting ? (
@@ -943,7 +960,7 @@ export default function DataSettingsPage() {
       <ResponsiveConfirmDialog
         open={!!rollbackTarget}
         onOpenChange={(open) => {
-          if (!open && !rollingBackImportId) {
+          if (!open && !rollingBackImportId && !rollbackUncertain) {
             setRollbackTarget(null)
             setRollbackError(null)
           }
@@ -952,8 +969,9 @@ export default function DataSettingsPage() {
         description="This will remove the transactions created by this import. Tags and cards will stay."
         confirmLabel={rollingBackImportId ? "Rolling back..." : "Rollback import"}
         confirmVariant="destructive"
-        confirmDisabled={!!rollingBackImportId}
-        closeDisabled={!!rollingBackImportId}
+        confirmDisabled={!!rollingBackImportId || rollbackUncertain}
+        closeDisabled={!!rollingBackImportId || rollbackUncertain}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onConfirm={() => void handleRollbackImport()}
       >
         <>
@@ -977,6 +995,7 @@ export default function DataSettingsPage() {
             setRepairError(null)
           }
         }}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         title="Repair rollback history?"
         description="This will restore the encrypted import markers needed to roll back this historical import. No transaction or taxonomy content will be changed."
         confirmLabel={repairingImportId ? "Repairing..." : "Repair history"}

@@ -29,6 +29,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "./v2-settings.module.css"
 
 interface SettingsItemProps {
   icon: React.ReactNode
@@ -217,7 +218,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={cn("min-h-screen bg-background pb-mobile-nav", interfacePreference.version === "v2" && styles.settings)}>
       <Header />
 
       <main className="mx-auto max-w-lg space-y-6 px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pt-8">
