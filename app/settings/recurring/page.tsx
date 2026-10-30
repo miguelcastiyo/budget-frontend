@@ -32,6 +32,8 @@ import {
 } from "./_components/recurring-sections"
 import { useRecurringData } from "./_hooks/use-recurring-data"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/settings/v2-recurring.module.css"
 import {
   emptyForm,
   formFromItem,
@@ -96,6 +98,7 @@ function formatRecurringCommandError(error: unknown, fallback: string): string {
 }
 
 export default function RecurringSettingsPage() {
+  const { version } = useInterfacePreference()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [month, setMonth] = useState(getCurrentMonthKey())
@@ -291,13 +294,13 @@ export default function RecurringSettingsPage() {
       name: name.trim(),
       icon_key: iconKey || null,
     })
-    setTags((previous) => [...previous, created])
+    setTags((previous) => [...previous.filter((tag) => tag.id !== created.id), created])
     return created
   }
 
   const handleCreateCard = async (name: string): Promise<CardType> => {
     const created = await authority.createCard({ name: name.trim() })
-    setCards((previous) => sortCards([...previous, created]))
+    setCards((previous) => sortCards([...previous.filter((card) => card.id !== created.id), created]))
     return created
   }
 
@@ -461,7 +464,7 @@ export default function RecurringSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={cn("min-h-screen bg-background pb-mobile-nav", version === "v2" && styles.root)} data-testid={version === "v2" ? "v2-recurring" : undefined}>
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
         <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3 lg:max-w-6xl lg:px-8 lg:py-4">
           <Link href="/settings">
@@ -469,7 +472,7 @@ export default function RecurringSettingsPage() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold flex-1">Monthly Commitments</h1>
+          <h1 className="text-xl font-bold flex-1">{version === "v2" ? "Recurring" : "Monthly Commitments"}</h1>
           <Button
             variant="ghost"
             className="h-9 rounded-full px-3 lg:hidden"
@@ -485,7 +488,7 @@ export default function RecurringSettingsPage() {
       <main className="mx-auto w-full max-w-full overflow-x-hidden px-4 pt-3 sm:max-w-lg lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            See what this month already owes you, what has been logged, and what is still coming up.
+            {version === "v2" ? "Manage monthly rules and see logged and upcoming transactions. Eligible transactions may be added automatically when a month is loaded." : "See what this month already owes you, what has been logged, and what is still coming up."}
           </p>
         </div>
 
@@ -500,7 +503,7 @@ export default function RecurringSettingsPage() {
 
         <div className="mt-3 grid gap-3 lg:mt-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
           <div className="space-y-3 lg:space-y-4">
-            <Card className="border-0 p-3 shadow-sm sm:p-5">
+            <Card className={cn("border-0 p-3 shadow-sm sm:p-5", version === "v2" && styles.summary)}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Label htmlFor="recurring-month" className="text-sm font-medium">Selected month</Label>
                 <MonthPicker
@@ -546,7 +549,7 @@ export default function RecurringSettingsPage() {
               />
             </div>
 
-            <Card className="overflow-hidden border-0 shadow-sm">
+            <Card className={cn("overflow-hidden border-0 shadow-sm", version === "v2" && styles.list)}>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-3 py-2.5 sm:px-5 sm:py-3">
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold">Commitments</h2>
@@ -629,7 +632,7 @@ export default function RecurringSettingsPage() {
           </div>
 
           <aside className="hidden space-y-4 lg:block">
-            <Card className="border-0 p-5 shadow-sm">
+            <Card className={cn("border-0 p-5 shadow-sm", version === "v2" && styles.aside)}>
               <h2 className="text-sm font-semibold">Summary</h2>
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
@@ -651,7 +654,7 @@ export default function RecurringSettingsPage() {
               </div>
             </Card>
 
-            <Card className="border-0 p-5 shadow-sm">
+            <Card className={cn("border-0 p-5 shadow-sm", version === "v2" && styles.aside)}>
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
                 <Repeat className="h-4 w-4 text-muted-foreground" />
               </div>
@@ -665,7 +668,7 @@ export default function RecurringSettingsPage() {
               </Button>
             </Card>
 
-            <Card className="border-0 p-5 shadow-sm">
+            <Card className={cn("border-0 p-5 shadow-sm", version === "v2" && styles.aside)}>
               <h2 className="text-sm font-semibold">Upcoming this month</h2>
               <div className="mt-4 space-y-3">
                 {upcomingItems.length === 0 && (
@@ -686,20 +689,22 @@ export default function RecurringSettingsPage() {
 
       <ResponsiveDialog
         open={showNew}
+        closeDisabled={version === "v2" && isMutating}
         onOpenChange={(open) => {
           if (open) {
             setShowNew(true)
-          } else {
+          } else if (version !== "v2" || !isMutating) {
             closeNewRecurringDialog()
           }
         }}
         title="New Commitment"
         description="Add a monthly commitment so it counts toward your budget upfront."
         desktopClassName="sm:max-w-2xl"
-        contentClassName="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]"
+        contentClassName={cn("max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]", version === "v2" && styles.portal)}
         headerClassName="relative z-10 px-5 pb-3 pt-2 sm:px-6 sm:pb-4 sm:pt-5"
         bodyClassName="min-w-0 overflow-x-hidden p-0"
       >
+        {version === "v2" && error ? <p role="alert" className="px-5 pt-3 text-sm text-destructive">{error}</p> : null}
         <RecurringForm
           form={newForm}
           tags={tagOptions}
@@ -716,18 +721,20 @@ export default function RecurringSettingsPage() {
 
       <ResponsiveDialog
         open={editingId !== null && editingForm !== null}
+        closeDisabled={version === "v2" && isMutating}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && (version !== "v2" || !isMutating)) {
             closeEditRecurringDialog()
           }
         }}
         title="Edit Commitment"
         description="Update the monthly rule for future budget planning."
         desktopClassName="sm:max-w-2xl"
-        contentClassName="max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]"
+        contentClassName={cn("max-h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] sm:max-h-[90vh]", version === "v2" && styles.portal)}
         headerClassName="relative z-10 px-5 pb-3 pt-2 sm:px-6 sm:pb-4 sm:pt-5"
         bodyClassName="min-w-0 overflow-x-hidden p-0"
       >
+        {version === "v2" && error ? <p role="alert" className="px-5 pt-3 text-sm text-destructive">{error}</p> : null}
         {editingForm && (
           <RecurringForm
             form={editingForm}
@@ -756,7 +763,7 @@ export default function RecurringSettingsPage() {
         isSeriesLoading={isSeriesLoading}
         open={detailId !== null && detailItem !== null}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && (version !== "v2" || !isMutating)) {
             setDetailId(null)
             setDetailTrayMode("details")
           }
@@ -791,6 +798,7 @@ export default function RecurringSettingsPage() {
 
       <ResponsiveConfirmDialog
         open={!!cancelScheduledChange}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onOpenChange={(open) => {
           if (!open && !isMutating) setCancelScheduledChange(null)
         }}
@@ -805,6 +813,7 @@ export default function RecurringSettingsPage() {
 
       <ResponsiveConfirmDialog
         open={!!deleteId}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onOpenChange={(open) => {
           if (!open && !isMutating) {
             setDeleteId(null)

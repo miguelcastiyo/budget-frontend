@@ -1,0 +1,20 @@
+.root,.portal { --background:#fbfbfa; --foreground:#292a2e; --card:#fff; --card-foreground:#292a2e; --popover:#fff; --popover-foreground:#292a2e; --primary:#292a2e; --primary-foreground:#fbfbfa; --secondary:#f0f0ee; --secondary-foreground:#292a2e; --muted:#f0f0ee; --muted-foreground:#727277; --accent:#ececea; --accent-foreground:#292a2e; --border:#e5e5e3; --input:#e5e5e3; --ring:#77777c; color:var(--foreground); font-family:Inter,system-ui,sans-serif; }
+:global(.dark) .root,:global(.dark) .portal { --background:#16171a; --foreground:#f0efed; --card:#202125; --card-foreground:#f0efed; --popover:#25262a; --popover-foreground:#f0efed; --primary:#f0efed; --primary-foreground:#16171a; --secondary:#292a2e; --secondary-foreground:#f0efed; --muted:#292a2e; --muted-foreground:#a2a2a4; --accent:#303136; --accent-foreground:#f0efed; --border:#36373c; --input:#36373c; --ring:#aaa; }
+.root { background:var(--background); min-height:100vh; padding-bottom:calc(6rem + env(safe-area-inset-bottom)); }
+.root > header { background:var(--background); border-bottom:1px solid var(--border); backdrop-filter:none; }
+.root h1 { font-size:1.25rem; font-weight:650; letter-spacing:-.03em; }
+.root > main > div:first-child { color:var(--muted-foreground); line-height:1.6; }
+.summary,.list,.aside { background:var(--card); border:1px solid var(--border); border-radius:1rem; box-shadow:none; color:var(--foreground); }
+.summary :global(.text-2xl) { letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.list > div:first-child { border-color:var(--border); }
+.row { min-height:4.5rem; color:var(--foreground); }
+.row > div:first-child { border-radius:.6rem; background:var(--secondary); }
+.row > div:first-child svg { color:var(--foreground); }
+.row p:last-child { color:var(--muted-foreground); }
+.row p { font-variant-numeric:tabular-nums; }
+.portal { background:var(--background); border-color:var(--border); }
+.portal :global([data-slot="dialog-header"]) { background:var(--background); border-color:var(--border); }
+.portal :global(input) { background:var(--card); border-color:var(--border); color:var(--foreground); }
+.root button:focus-visible,.root a:focus-visible,.portal button:focus-visible,.portal input:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+@media (max-width:639px) { .root button { min-height:2.75rem; }.row { min-height:4.75rem; } }
+@media (prefers-reduced-motion:reduce) { .root *,.portal * { animation-duration:0s !important; transition-duration:0s !important; } }

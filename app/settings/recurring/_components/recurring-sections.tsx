@@ -19,6 +19,8 @@ import type { Card as CardType, RecurringBillingType, RecurringExpense, Tag } fr
 import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/settings/v2-recurring.module.css"
 import { getRecurringDisplayStatus, getRecurringDisplayStatusLabel } from "../_lib/recurring-status"
 import {
   formatBillingSchedulePreview,
@@ -63,6 +65,7 @@ export function MonthPicker({
   disabled = false,
   minMonth,
 }: MonthPickerProps) {
+  const { version } = useInterfacePreference()
   const selectedMonth = parseMonthKey(value)
   const displayLabel = selectedMonth ? format(selectedMonth, "MMMM yyyy") : placeholder
   const currentMonthValue = getCurrentMonthKey()
@@ -93,6 +96,7 @@ export function MonthPicker({
 
       <ResponsiveDialog
         open={open}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onOpenChange={setOpen}
         title="Select month"
         description="Choose which month to view."
@@ -212,6 +216,9 @@ export function RecurringForm({
   onCancel,
   onSave,
 }: RecurringFormProps) {
+  const { version } = useInterfacePreference()
+  const formRef = useRef(form)
+  formRef.current = form
   const [touched, setTouched] = useState({
     amount: false,
     expense: false,
@@ -257,7 +264,7 @@ export function RecurringForm({
 
     try {
       const created = await onCreateTag(name, newTagIconKey)
-      onChange({ ...form, tag_id: created.id })
+      onChange({ ...formRef.current, tag_id: created.id })
       setShowNewTag(false)
       setNewTagName("")
       setNewTagIconKey("")
@@ -283,7 +290,7 @@ export function RecurringForm({
 
     try {
       const created = await onCreateCard(name)
-      onChange({ ...form, card_id: created.id })
+      onChange({ ...formRef.current, card_id: created.id })
       setShowNewCard(false)
       setNewCardName("")
     } catch (err) {
@@ -506,7 +513,7 @@ export function RecurringForm({
                 <SelectTrigger className="h-11 rounded-xl border-border/60 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={version === "v2" ? styles.portal : undefined}>
                   <SelectItem value="day_of_month">Specific day</SelectItem>
                   <SelectItem value="last_day">Last day</SelectItem>
                 </SelectContent>
@@ -566,7 +573,7 @@ export function RecurringForm({
 
       <div className="sticky bottom-0 z-10 shrink-0 border-t border-border/50 bg-background/95 px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur sm:px-6 sm:pb-4">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 sm:flex sm:justify-end">
-          <Button variant="ghost" className="h-12 rounded-xl px-4 sm:h-10" onClick={onCancel}>
+          <Button variant="ghost" className="h-12 rounded-xl px-4 sm:h-10" disabled={version === "v2" && (isMutating || isCreatingTag || isCreatingCard)} onClick={onCancel}>
             Cancel
           </Button>
           <Button
@@ -619,12 +626,13 @@ export function RecurringItemRow({
   showScheduledChange?: boolean
   onOpen: () => void
 }) {
+  const { version } = useInterfacePreference()
   const TagIcon = getTagIcon(item.tag.name, item.tag.icon_key)
 
   return (
     <button
       type="button"
-      className="group grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem] items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-5"
+      className={cn("group grid w-full cursor-pointer grid-cols-[2.5rem_minmax(0,1fr)_auto_1rem] items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:px-5", version === "v2" && styles.row)}
       aria-label={`Open details for ${item.expense}`}
       onClick={onOpen}
     >
@@ -675,6 +683,7 @@ export function RecurringDetailDialog({
   onCancelScheduledChange,
   onDelete,
 }: RecurringDetailDialogProps) {
+  const { version } = useInterfacePreference()
   if (!item) {
     return null
   }
@@ -698,6 +707,8 @@ export function RecurringDetailDialog({
   return (
     <ResponsiveDialog
       open={open}
+      contentClassName={version === "v2" ? styles.portal : undefined}
+      closeDisabled={version === "v2" && isMutating}
       onOpenChange={onOpenChange}
       title={title}
       description={description}
@@ -781,7 +792,7 @@ export function RecurringDetailDialog({
                 <SelectTrigger className="h-11 rounded-xl border-border/60 sm:h-10">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={version === "v2" ? styles.portal : undefined}>
                   <SelectItem value="day_of_month">Specific day</SelectItem>
                   <SelectItem value="last_day">Last day</SelectItem>
                 </SelectContent>
@@ -811,6 +822,7 @@ export function RecurringDetailDialog({
         </div>
       ) : (
         <div className="space-y-4 sm:space-y-6">
+          {version === "v2" ? <p className="text-sm text-muted-foreground">This is a monthly rule. Edit a logged transaction in Transactions to change a single occurrence.</p> : null}
           <div className="flex items-start gap-3 sm:gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-secondary sm:h-14 sm:w-14">
               <TagIcon className="h-5 w-5 text-foreground sm:h-6 sm:w-6" />
