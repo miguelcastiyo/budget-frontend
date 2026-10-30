@@ -38,6 +38,11 @@ async function mockDeviceApi(page: Page) {
       return
     }
 
+    if (path === "/api/v1/me/auth-methods" && request.method() === "GET") {
+      await route.fulfill({ json: { methods: [{ type: "password", provider_email: null, connected_at: null, last_used_at: null, can_remove: false }] } })
+      return
+    }
+
     if (path === "/api/v1/me/setup-status" && request.method() === "GET") {
       await route.fulfill({ json: setupStatus })
       return

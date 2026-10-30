@@ -14,6 +14,9 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { RecentAuthDialog } from "@/components/auth/recent-auth-dialog"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { clearBudgetDeviceId } from "@/lib/auth/device-id"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { cn } from "@/lib/utils"
+import styles from "@/components/privacy/v2-privacy.module.css"
 
 function sessionLabel(device: DeviceSession) {
   const client = device.client_type.replace(/[_-]+/g, " ").trim()
@@ -33,6 +36,7 @@ function activityLabel(device: DeviceSession) {
 }
 
 export default function VaultDevicesPage() {
+  const { version } = useInterfacePreference()
   const [devices, setDevices] = useState<DeviceSession[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +94,7 @@ export default function VaultDevicesPage() {
     : "This Vault session will be revoked. Quick Unlock on that device will stop working."
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={cn("min-h-screen bg-background pb-mobile-nav", version === "v2" && styles.root)}>
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
         <div className="mx-auto flex max-w-lg items-center gap-4 px-5 py-4">
           <Link href="/settings/vault">
@@ -144,6 +148,7 @@ export default function VaultDevicesPage() {
       </main>
 
       <ResponsiveConfirmDialog
+        contentClassName={version === "v2" ? styles.portal : undefined}
         open={removeId !== null}
         onOpenChange={(open) => !open && !busy && setRemoveId(null)}
         title="Remove this device?"
@@ -153,8 +158,11 @@ export default function VaultDevicesPage() {
         confirmDisabled={busy}
         closeDisabled={busy}
         onConfirm={() => void remove()}
-      />
+      >
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      </ResponsiveConfirmDialog>
       <RecentAuthDialog
+        contentClassName={version === "v2" ? styles.portal : undefined}
         open={reauthOpen}
         onOpenChange={setReauthOpen}
         onSuccess={retryAfterReauthentication}

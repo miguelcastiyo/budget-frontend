@@ -9,6 +9,8 @@ import { RecoveryCodeCeremony } from "./recovery-code-ceremony"
 import { useFinancialAuthority } from "./financial-authority-provider"
 import { useAuth } from "@/components/auth/auth-provider"
 import { RecentAuthDialog } from "@/components/auth/recent-auth-dialog"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "./v2-privacy.module.css"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { createVault, type CreatedVault, type VaultInitializationPayload, validateNewPassphrase } from "@/lib/privacy/vault-crypto"
 import { VaultManager } from "@/lib/privacy/vault-manager"
@@ -27,6 +29,7 @@ function payloadFromMetadata(metadata: Awaited<ReturnType<typeof apiClient.getVa
 }
 
 export function PrivacySetupFlow() {
+  const { version } = useInterfacePreference()
   const authority = useFinancialAuthority()
   const { signOut } = useAuth()
   const router = useRouter()
@@ -94,6 +97,6 @@ export function PrivacySetupFlow() {
     {step === "success" && <div className="space-y-3"><h2 className="font-semibold">You&apos;re ready</h2><p className="text-sm text-muted-foreground">Your financial data is now protected by your Vault.</p><Button type="button" onClick={() => router.push("/settings")}>Start budgeting</Button></div>}
     {step === "failure" && <div className="space-y-3"><h2 className="font-semibold">We couldn&apos;t finish setting up your Vault</h2><Button type="button" onClick={() => { setError(null); setStep("intro") }}>Try again</Button></div>}
     {error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{error}</p>{requiresRecentAuth && <p className="text-muted-foreground">For this security step, confirm your account sign-in again.</p>}</div>}
-    <RecentAuthDialog open={requiresRecentAuth} onOpenChange={setRequiresRecentAuth} onSuccess={retryRecovery} onFallback={fallbackReauthenticate} title="Confirm your sign-in" description="Vault setup requires a recent account sign-in. Your Vault passphrase remains separate." />
+    <RecentAuthDialog contentClassName={version === "v2" ? styles.portal : undefined} open={requiresRecentAuth} onOpenChange={setRequiresRecentAuth} onSuccess={retryRecovery} onFallback={fallbackReauthenticate} title="Confirm your sign-in" description="Vault setup requires a recent account sign-in. Your Vault passphrase remains separate." />
   </Card>
 }

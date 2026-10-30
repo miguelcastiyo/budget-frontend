@@ -1,0 +1,83 @@
+import { expect, test } from "@playwright/test"
+import { setupEncryptedFixture } from "./encrypted-fixture"
+
+test.skip(process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED !== "true", "Requires v2 availability")
+
+test("Vault unlock and interface switching retain the same unlocked authority", async ({ page }) => {
+  test.setTimeout(120000)
+  await setupEncryptedFixture(page, true)
+  await page.reload()
+  await page.getByRole("button", { name: "Use Vault passphrase" }).click()
+  const unlock = page.getByRole("dialog", { name: "Unlock your Vault" })
+  await unlock.getByLabel("Vault passphrase", { exact: true }).fill("wrong passphrase")
+  await unlock.getByRole("button", { name: "Unlock Vault" }).click()
+  await expect(unlock.getByRole("alert")).toContainText("couldn't unlock")
+  await expect(page.getByTestId("encrypted-vault-locked-boundary")).toBeVisible()
+  await unlock.getByLabel("Vault passphrase", { exact: true }).fill("test v2 vault password 2026")
+  await unlock.getByRole("button", { name: "Unlock Vault" }).click()
+  await expect(page.getByTestId("encrypted-vault-locked-boundary")).toHaveCount(0)
+  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  const toggle = page.getByRole("switch", { name: "Use v2 interface" })
+  await toggle.click()
+  await expect(toggle).not.toBeChecked()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+  await page.getByRole("link", { name: "Overview", exact: true }).first().click()
+  await expect(page.getByTestId("encrypted-vault-locked-boundary")).toHaveCount(0)
+})
+
+test("v2 Vault and device dialogs retain production controls across viewports", async ({ page }) => {
+  test.setTimeout(120000)
+  await setupEncryptedFixture(page, true)
+  let attempts = 0
+  await page.route("**/api/v1/me/devices", route => route.fulfill({ json: { items: [{ id: "old", device_id: "old", client_type: "web", label: "Old iPhone", created_at: "2026-01-01T00:00:00Z", last_seen_at: "2026-01-02T00:00:00Z", revoked_at: null, is_current: false, status: "active", quick_unlock: { status: "not_enabled" } }] } }))
+  await page.route("**/api/v1/me/devices/old", route => { attempts++; return route.fulfill({ status: 400, json: { error: { code: "REJECTED", message: "Device removal failed" } } }) })
+  await page.goto("/settings/vault")
+  for (const width of [375, 430, 1280]) {
+    await page.setViewportSize({ width, height: 844 })
+    for (const dark of [false, true]) {
+      await page.evaluate(value => document.documentElement.classList.toggle("dark", value), dark)
+      await page.getByRole("button", { name: /How your privacy works/ }).click()
+      const dialog = page.getByRole("dialog", { name: "How your privacy works" })
+      await expect(dialog).toHaveCSS("background-color", dark ? "rgb(22, 23, 26)" : "rgb(251, 251, 250)")
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await dialog.getByRole("button", { name: "Close" }).click()
+    }
+  }
+  await page.getByRole("link", { name: /Devices/ }).click()
+  await expect(page.getByText("Old iPhone")).toBeVisible()
+  await page.getByRole("button", { name: "Remove", exact: true }).click()
+  const confirmation = page.getByRole("dialog", { name: "Remove this device?" })
+  await expect(confirmation).toContainText("revoked")
+  await confirmation.getByRole("button", { name: "Remove device" }).click()
+  await expect(confirmation.getByRole("alert")).toContainText("Device removal failed")
+  await confirmation.getByRole("button", { name: "Cancel" }).click()
+  await expect(page.getByText("Old iPhone")).toBeVisible()
+  expect(attempts).toBe(1)
+})
+
+test("Classic and v2 scope their Vault page and portal styles separately", async ({ page }) => {
+  test.setTimeout(120000)
+  await setupEncryptedFixture(page, true)
+  await page.addInitScript(() => {
+    const version = sessionStorage.getItem("test-privacy-version")
+    if (version) localStorage.setItem("budget.interface-version", version)
+  })
+  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.evaluate(() => sessionStorage.setItem("test-privacy-version", "classic"))
+  await page.goto("/settings/vault")
+  const root = page.locator("header").first().locator("..")
+  await expect(root).not.toHaveClass(/v2-privacy/)
+  await page.getByRole("button", { name: /How your privacy works/ }).click()
+  const dialog = page.getByRole("dialog", { name: "How your privacy works" })
+  await expect(dialog).not.toHaveClass(/v2-privacy/)
+  await dialog.getByRole("button", { name: "Close" }).click()
+  await page.getByRole("button", { name: "Back to Settings" }).click()
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.evaluate(() => sessionStorage.setItem("test-privacy-version", "v2"))
+  await page.goto("/settings/vault")
+  await expect(root).toHaveClass(/v2-privacy/)
+  await page.getByRole("button", { name: /How your privacy works/ }).click()
+  await expect(dialog).toHaveClass(/v2-privacy/)
+})

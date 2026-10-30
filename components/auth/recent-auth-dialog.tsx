@@ -17,6 +17,7 @@ interface RecentAuthDialogProps {
   fallbackLabel?: string
   title?: string
   description?: string
+  contentClassName?: string
 }
 
 export function RecentAuthDialog({
@@ -27,6 +28,7 @@ export function RecentAuthDialog({
   description = "For your security, confirm your account sign-in before continuing.",
   onFallback,
   fallbackLabel = "Sign out and sign in again",
+  contentClassName,
 }: RecentAuthDialogProps) {
   const { authMethods } = useAuth()
   const hasPasswordMethod = authMethods.some((method) => method.type === "password")
@@ -98,6 +100,7 @@ export function RecentAuthDialog({
       onOpenChange={(nextOpen) => !busy && onOpenChange(nextOpen)}
       title={title}
       description={description}
+      contentClassName={contentClassName}
       mobileSize="compact"
       closeDisabled={busy}
       bodyClassName="px-4 py-5 sm:px-6"
