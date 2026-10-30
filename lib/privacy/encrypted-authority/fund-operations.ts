@@ -99,7 +99,7 @@ export async function getEncryptedFunds(deps: EncryptedOperationDependencies, fi
     const breakdown = sourceBreakdown(entries, fund.id)
     const balanceCents = ledgerBalance(entries, fund.id)
     const source = state.funds.find((item) => String(item.id ?? "") === fund.id)
-    return { id: view.id, name: view.name, fund_type: view.fundType as FundListItem["fund_type"], goal_amount: view.goalAmount, target_month: source?.target_month == null ? null : String(source.target_month), notes: source?.notes == null ? null : String(source.notes), status: view.status, sort_order: view.sortOrder, current_balance: view.balance, remaining_amount: view.remaining, percent_funded: view.goalAmount === null ? null : formatMoneyCents(Math.round((balanceCents * 10000) / (fund.goalAmountCents ?? 1))), is_goal_met: view.isGoalMet, created_at: "", updated_at: "", archived_at: null, entries_count: entries.filter((entry) => entry.fundId === fund.id).length, ...breakdown }
+    return { id: view.id, name: view.name, fund_type: view.fundType as FundListItem["fund_type"], goal_amount: view.goalAmount, target_month: source?.target_month == null ? null : String(source.target_month), notes: source?.notes == null ? null : String(source.notes), status: view.status, sort_order: view.sortOrder, current_balance: view.balance, remaining_amount: view.remaining, percent_funded: view.goalAmount === null ? null : formatMoneyCents(Math.round((balanceCents * 10000) / (fund.goalAmountCents ?? 1))), is_goal_met: view.isGoalMet, created_at: "", updated_at: "", archived_at: null, entries_count: entries.filter((entry) => entry.fundId === fund.id && !entry.isVoided && !entry.isDeleted).length, ...breakdown }
   })
   return { items }
 }
@@ -135,12 +135,12 @@ export async function getEncryptedFund(deps: EncryptedOperationDependencies, fun
   if (!item) throw new Error("FUND_NOT_FOUND")
   const state = authority.getState()
   const ledgerEntries = ledgerEntriesFromState(deps)
-  const entries = state.fundLedgerEntries.filter((raw) => String(raw.fund_id ?? "") === fundId).map((raw) => fundEntryFromData(raw, fundEntrySourceId(authority, raw), fundId))
+  const entries = state.fundLedgerEntries.filter((raw) => String(raw.fund_id ?? "") === fundId && raw.is_voided !== true && raw.is_deleted !== true).map((raw) => fundEntryFromData(raw, fundEntrySourceId(authority, raw), fundId))
   return { ...item, source_breakdown: sourceBreakdown(ledgerEntries, fundId), entries_count: entries.length, recent_entries: entries }
 }
 
 export async function getEncryptedFundEntries(deps: EncryptedOperationDependencies, fundId: string): Promise<FundEntriesPage> {
   const authority = requireEncryptedAuthority(deps)
-  const entries = authority.getState().fundLedgerEntries.filter((raw) => String(raw.fund_id ?? "") === fundId).map((raw) => fundEntryFromData(raw, fundEntrySourceId(authority, raw), fundId))
+  const entries = authority.getState().fundLedgerEntries.filter((raw) => String(raw.fund_id ?? "") === fundId && raw.is_voided !== true && raw.is_deleted !== true).map((raw) => fundEntryFromData(raw, fundEntrySourceId(authority, raw), fundId))
   return { items: entries, page: 1, page_size: entries.length, total_items: entries.length }
 }

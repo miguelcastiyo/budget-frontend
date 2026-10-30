@@ -51,7 +51,7 @@ function nextMonth(month: string): string {
 
 function sameValue(left: unknown, right: unknown): boolean { return JSON.stringify(left ?? null) === JSON.stringify(right ?? null) }
 
-export async function updateEncryptedRecurringTransaction(authority: EncryptedFinancialAuthority, transactionRecord: SourceRecord, nextTransactionData: Record<string, unknown>): Promise<void> {
+export async function updateEncryptedRecurringTransaction(authority: EncryptedFinancialAuthority, transactionRecord: SourceRecord, nextTransactionData: Record<string, unknown>, linked?: { previous: SourceRecord; next: SourceRecord } | null): Promise<void> {
   const recurringId = String(transactionRecord.data.recurring_expense_id ?? "")
   const currentRecurring = recurringId ? recurringRecord(authority, recurringId) : undefined
   if (!currentRecurring) throw new FinancialDomainError("RECURRING_SOURCE_NOT_FOUND")
@@ -64,7 +64,7 @@ export async function updateEncryptedRecurringTransaction(authority: EncryptedFi
   const changed = templateFields.filter(([, key]) => !sameValue(transactionRecord.data[key], nextTransactionData[key]))
   if (changed.length === 0) throw new FinancialDomainError("RECURRING_NO_TEMPLATE_CHANGES")
   const patch = Object.fromEntries(changed.map(([ruleKey, transactionKey]) => [ruleKey, nextTransactionData[transactionKey] ?? null]))
-  const transactionDiff = transactionFundDiff(transactionFundState(transactionRecord), transactionFundState({ ...transactionRecord, data: nextTransactionData }))
+  const transactionDiff = transactionFundDiff(transactionFundState(transactionRecord, linked?.previous), transactionFundState({ ...transactionRecord, data: nextTransactionData }, linked?.next))
   const updates: SourceRecord[] = [...transactionDiff.updates]
   const creates: SourceRecord[] = [...transactionDiff.creates]
   if (future) {

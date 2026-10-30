@@ -99,8 +99,18 @@ function makeAuthority(initialRecords = []) {
   await require("node:assert/strict").rejects(() => deleteEncryptedFundEntry(deps(created.authority), "fund_1", linkedEntry))
   const linkedTransaction = await createEncryptedTransaction(deps(created.authority), { date: "2026-08-01", expense: "Transfer", amount: "5.00", category: "savings", is_split: false, tag_id: "tag_1" })
   linked.data.source_transaction_id = linkedTransaction.id
-  await require("node:assert/strict").rejects(() => updateEncryptedTransaction(deps(created.authority), linkedTransaction, { amount: "10.00" }))
-  assert(created.records.get(linkedTransaction.id).data.amount_cents === 500, "linked transaction edits must not silently desynchronize the fund ledger")
+  created.records.get(linkedTransaction.id).data.pending_transaction_id = "original_pending"
+  created.records.get(linkedTransaction.id).data.import_fingerprint = "original_fingerprint"
+  const linkedUpdated = await updateEncryptedTransaction(deps(created.authority), linkedTransaction, { amount: "10.00", date: "2026-08-02", notes: "Changed" })
+  assert(created.records.get(linkedTransaction.id).data.amount_cents === 1000 && linked.data.amount_cents === 500 && created.records.get("linked_1").data.amount_cents === 1000 && created.records.get("linked_1").data.entry_date === "2026-08-02", "linked transaction edits update the fund ledger atomically")
+  assert(created.records.get("linked_1").data.note === "Changed" && created.records.get(linkedTransaction.id).data.pending_transaction_id === "original_pending" && created.records.get(linkedTransaction.id).data.import_fingerprint === "original_fingerprint", "linked notes follow transaction notes and unrelated transaction fields survive")
+  created.records.get("linked_1").data.note = "Custom"
+  const editedAgain = await updateEncryptedTransaction(deps(created.authority), linkedUpdated, { notes: "New transaction note" })
+  assert(created.records.get("linked_1").data.note === "Custom", "custom fund notes are preserved")
+  await require("node:assert/strict").rejects(() => updateEncryptedTransaction(deps(created.authority), editedAgain, { category: "needs" }))
+  await deleteEncryptedTransaction(deps(created.authority), editedAgain)
+  assert(created.records.get("linked_1").data.is_voided === true && !created.records.has(linkedTransaction.id), "deletion voids the linked entry")
+  assert(!(await getEncryptedFundEntries(deps(created.authority), "fund_1")).items.some((item) => item.id === "linked_1"), "voided entries are excluded from the visible ledger")
 
   const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Imported tag", card: "Imported card", context: "Imported context" }], { year: 2026, tagValueMap: {} })
   const validRecordId = (id) => /^rec_[A-Za-z0-9_-]{8,90}$/.test(id)
