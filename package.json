@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test:budget-helpers": "node scripts/smoke-budget-helpers.cjs",
     "test:fast": "node scripts/test-fast.cjs",
+    "test:v2-overview": "node scripts/test-v2-overview.cjs",
     "test:value-helpers": "node scripts/test-value-helpers.cjs",
     "test:interaction": "playwright test",
     "test:browser": "npm run test:interaction",

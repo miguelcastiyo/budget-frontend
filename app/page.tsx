@@ -26,11 +26,14 @@ import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { FundsCta } from "@/components/funds/funds-cta"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { V2Overview } from "@/components/budget/v2-overview"
 
 const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismissed"
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { version } = useInterfacePreference()
   const { setupStatus, refreshProfile } = useAuth()
   const authority = useFinancialAuthority()
   const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
@@ -224,6 +227,28 @@ export default function DashboardPage() {
           </Card>
         )}
 
+        {version === "v2" ? <V2Overview
+          month={currentMonth}
+          onMonthChange={setCurrentMonth}
+          overview={overview}
+          closeout={closeout}
+          closeoutLoading={isCloseoutLoading}
+          loading={isLoading}
+          pending={reviewEnabled && authority.isUnlocked && !authority.isLoading ? authority.getPendingMonthSummary(currentMonth) : null}
+          onboarding={(shouldShowFirstMonthActionCard || (shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed)) ? <>
+            {shouldShowFirstMonthActionCard && <FirstMonthActionCard month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth} isDismissing={isDismissingFirstRun} onAddTransaction={() => setShowAddTransaction(true)} onDismiss={() => void handleDismissFirstRun()} />}
+            {shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed && <FirstMonthProgressCard setupStatus={setupStatus} isDismissing={false} onDismiss={handleDismissProgressCard} onTaskSelect={handleProgressTaskSelect} />}
+          </> : null}
+          onClose={() => openCloseoutTray("close")}
+          onViewCloseout={() => openCloseoutTray("view")}
+          onReviewCloseout={() => openCloseoutTray("review")}
+          onSetBudget={() => router.push(`/settings/budget?${new URLSearchParams({ month: currentMonth, edit: "1" })}`)}
+          onAdd={() => setShowAddTransaction(true)}
+          onCategory={(category) => router.push(`/transactions?${new URLSearchParams({ category, month: currentMonth })}`)}
+          onTag={(tagId) => router.push(`/transactions?${new URLSearchParams({ tag_id: tagId, month: currentMonth })}`)}
+          onTransaction={setEditingTransaction}
+          onViewAll={() => router.push(`/transactions?${new URLSearchParams({ month: currentMonth })}`)}
+        /> : <>
         <div className="mb-4 lg:mb-3">
           <MonthSelector
             currentMonth={currentMonth}
@@ -347,6 +372,7 @@ export default function DashboardPage() {
             </TabsContent>
           </Tabs>
         </div>
+        </>}
       </main>
 
       <FloatingAddButton

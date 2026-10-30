@@ -2,6 +2,7 @@ const { spawnSync } = require("node:child_process")
 
 const checks = [
   ["Typecheck", "typecheck"],
+  ["v2 Overview", "test:v2-overview"],
   ["Budget helpers", "test:budget-helpers"],
   ["Value helpers", "test:value-helpers"],
   ["Client fixture loader", "test:client-fixture-loader"],
