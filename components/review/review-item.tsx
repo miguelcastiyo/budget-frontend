@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ApiError } from "@/lib/api/core"
 import { isClosedCloseout } from "@/lib/privacy/encrypted-authority/pending-summary"
 import { PendingReviewSession } from "@/lib/privacy/encrypted-authority/pending-lifecycle"
@@ -11,9 +11,16 @@ import type { EncryptedFinancialAuthority, PreparedSourceBatch } from "@/lib/pri
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { ReviewSwipeCard } from "./review-swipe-card"
 import { field, button, secondary, message } from "./review-ui"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { V2ReviewItem } from "./v2-review-item"
 
-type ReviewProps = { item: PendingTransaction; authority: EncryptedFinancialAuthority; session: PendingReviewSession; references: { tags: Tag[]; cards: Card[]; contexts: Context[] }; busy: boolean; setBusy: (value: boolean) => void; onSkip: () => void; onDone: () => void; onError: (value: string) => void; onTagCreated: (tag: Tag) => void; getSuggestions: ReturnType<typeof useFinancialAuthority>["getTransactionSuggestions"]; createTag: ReturnType<typeof useFinancialAuthority>["createTag"]; reopen: ReturnType<typeof useFinancialAuthority>["reopenMonth"] }
-export function ReviewItem({ item, authority, session, references, busy, setBusy, onSkip, onDone, onError, onTagCreated, getSuggestions, createTag, reopen }: ReviewProps) {
+type ReviewProps = { item: PendingTransaction; authority: EncryptedFinancialAuthority; session: PendingReviewSession; references: { tags: Tag[]; cards: Card[]; contexts: Context[] }; busy: boolean; setBusy: (value: boolean) => void; onSkip: () => void; onDone: () => void; onError: (value: string) => void; onTagCreated: (tag: Tag) => void; getSuggestions: ReturnType<typeof useFinancialAuthority>["getTransactionSuggestions"]; createTag: ReturnType<typeof useFinancialAuthority>["createTag"]; reopen: ReturnType<typeof useFinancialAuthority>["reopenMonth"]; onReload: () => void; onPreparedChange: (value: boolean) => void }
+export function ReviewItem({ item, authority, session, references, busy, setBusy, onSkip, onDone, onError, onTagCreated, getSuggestions, createTag, reopen, onReload, onPreparedChange }: ReviewProps) {
+  const { version } = useInterfacePreference()
+  const api = useFinancialAuthority()
+  const [stage, setStage] = useState<"category" | "tag">("category")
+  const uncertain = useRef(false)
+  const operationInFlight = useRef(false)
   const [amount, setAmount] = useState(item.amountCents === null ? "" : formatMoneyCents(item.amountCents))
   const [description, setDescription] = useState(item.description ?? "")
   const [date, setDate] = useState(item.date)
@@ -26,26 +33,31 @@ export function ReviewItem({ item, authority, session, references, busy, setBusy
   const [notes, setNotes] = useState(item.notes ?? "")
   const [tagName, setTagName] = useState("")
   const [suggested, setSuggested] = useState<Tag | null>(null)
+  const [suggestedAlternatives, setSuggestedAlternatives] = useState<Tag[]>([])
   const [prepared, setPrepared] = useState<Awaited<ReturnType<PendingReviewSession["prepareFinalization"]>> | null>(null)
   const [revision] = useState(() => authority.store.get(item.id)?.envelope.record_revision)
+  const revisionChanged = authority.store.get(item.id)?.envelope.record_revision !== revision
   const closed = authority.getState().closeouts.some((c) => String(c.month ?? "").slice(0, 7) === date.slice(0, 7) && isClosedCloseout(c))
-  useEffect(() => { let active = true; if (!description.trim() || !category) { setSuggested(null); return } void getSuggestions(description, 10).then((result) => { if (!active) return; const found = result.items.find((x) => x.category === category && references.tags.some((t) => t.id === x.tag.id)) ?? result.items.find((x) => references.tags.some((t) => t.id === x.tag.id)); setSuggested(found?.tag ?? null) }).catch(() => { if (active) setSuggested(null) }); return () => { active = false } }, [description, category, getSuggestions, references.tags])
+  useEffect(() => { let active = true; if (!description.trim()) { setSuggested(null); setSuggestedAlternatives([]); return } void getSuggestions(description, 10).then((result) => { if (!active) return; const valid = result.items.filter((x) => references.tags.some((t) => t.id === x.tag.id)); const ranked = [...valid.filter((x) => x.category === category), ...valid.filter((x) => x.category !== category)]; setSuggested(ranked[0]?.tag ?? null); setSuggestedAlternatives(ranked.map((x) => x.tag).filter((tag, index, tags) => tags.findIndex((other) => other.id === tag.id) === index)) }).catch(() => { if (active) { setSuggested(null); setSuggestedAlternatives([]) } }); return () => { active = false } }, [description, category, getSuggestions, references.tags])
   async function finalize(event: React.FormEvent) {
-    event.preventDefault(); if (busy) return
-    if (!confirmed || !references.tags.some((t) => t.id === tag)) { onError("Choose and confirm an active tag."); return }
-    setBusy(true); onError("")
+    event.preventDefault(); if (busy || operationInFlight.current) return
+    if ((version !== "v2" && !confirmed) || !references.tags.some((t) => t.id === tag)) { onError("Choose and confirm an active tag."); return }
+    if (version === "v2") setConfirmed(true)
+    operationInFlight.current = true; setBusy(true); onError("")
     try {
       let final = prepared
       if (!final) {
         final = await session.prepareFinalization(item.id, { amount, description, date, category: category as PendingTransaction["category"], tagId: tag, cardId: card || null, contextId: context || null, isSplit: split, notes }, revision)
         setPrepared(final)
+        onPreparedChange(true)
       }
-      try { await session.finalizePendingTransaction(final) } catch (err) { if (err instanceof ApiError && err.status >= 400 && err.status < 500) throw err; if (err instanceof Error && /409|CONFLICT|VALIDATION|CLOSED|DISABLED/.test(err.message)) throw err; await session.finalizePendingTransaction(final) }
+      try { await session.finalizePendingTransaction(final) } catch (err) { if (err instanceof ApiError && err.status >= 400 && err.status < 500) throw err; if (err instanceof Error && /409|CONFLICT|VALIDATION|CLOSED|DISABLED/.test(err.message)) throw err; uncertain.current = true; await session.finalizePendingTransaction(final) }
       onDone()
-    } catch (err) { if ((err instanceof ApiError && err.status >= 400 && err.status < 500) || (err instanceof Error && /409|CONFLICT|VALIDATION|CLOSED/.test(err.message))) setPrepared(null); onError(message(err)) } finally { setBusy(false) }
+    } catch (err) { if (!uncertain.current && ((err instanceof ApiError && err.status >= 400 && err.status < 500) || (err instanceof Error && /409|CONFLICT|VALIDATION|CLOSED/.test(err.message)))) { setPrepared(null); onPreparedChange(false) } onError(message(err)) } finally { operationInFlight.current = false; setBusy(false) }
   }
-  async function addTag() { if (!tagName.trim() || busy) return; setBusy(true); try { const created = await createTag({ name: tagName.trim() }); onTagCreated(created); setTag(created.id); setConfirmed(true); setTagName("") } catch (err) { onError(message(err)) } finally { setBusy(false) } }
+  async function addTag() { if (!tagName.trim() || busy || operationInFlight.current) return; operationInFlight.current = true; setBusy(true); try { const created = await createTag({ name: tagName.trim() }); onTagCreated(created); setTag(created.id); setConfirmed(true); setTagName("") } catch (err) { onError(message(err)) } finally { operationInFlight.current = false; setBusy(false) } }
   const selectCategory = (value: PendingTransaction["category"]) => { if (value) { setCategory(value); setConfirmed(false) } }
+  if (version === "v2") return <><V2ReviewItem amount={amount} setAmount={setAmount} description={description} setDescription={setDescription} date={date} setDate={setDate} category={category} selectCategory={selectCategory} tag={tag} setTag={setTag} card={card} setCard={setCard} context={context} setContext={setContext} split={split} setSplit={setSplit} notes={notes} setNotes={setNotes} tagName={tagName} setTagName={setTagName} references={references} suggested={suggested} suggestedAlternatives={suggestedAlternatives} stage={stage} setStage={setStage} busy={busy} recoveryEnabled={api.pendingRecoveryEnabled} prepared={Boolean(prepared)} closed={closed} revisionChanged={revisionChanged} addTag={() => void addTag()} onSkip={onSkip} onFinalize={finalize} onReopen={() => { setBusy(true); void reopen(date.slice(0, 7)).catch((err) => onError(message(err))).finally(() => setBusy(false)) }} createCard={async (name) => { setBusy(true); try { const created = await api.createCard({ name }); setCard(created.id) } catch (err) { onError(message(err)); throw err } finally { setBusy(false) } }} createContext={async (name) => { setBusy(true); try { const created = await api.createContext({ name }); setContext(created.id) } catch (err) { onError(message(err)); throw err } finally { setBusy(false) } }} />{revisionChanged && !prepared && <button type="button" onClick={() => { if (window.confirm("Discard this review draft and reload the updated item?")) onReload() }}>Reload updated item</button>}</>
   return <form onSubmit={finalize} className="space-y-4 motion-safe:animate-[review-enter_180ms_ease-out]" aria-label="Review transaction">
     <ReviewSwipeCard amount={amount} description={description} date={date} category={category} disabled={busy || Boolean(prepared)} onSelect={selectCategory} />
     <fieldset disabled={busy || Boolean(prepared)} className="space-y-4">
