@@ -43,7 +43,7 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
     let date: string; let amountCents: number; let category: "needs" | "wants" | "savings"
     try { date = normalizeCsvDate(row.date, options.year) } catch { errors.push({ row: row.row, field: "date", message: "must be a valid date" }); continue }
     try { amountCents = parseMoneyCents(row.amount.trim().replace(/^\$\s*/, "")) } catch { errors.push({ row: row.row, field: "amount", message: "must be a decimal number" }); continue }
-    try { category = mapCategory(row.externalCategory) } catch { errors.push({ row: row.row, field: "category", message: "must be a supported category" }); continue }
+    try { category = mapCategory(row.externalCategory) } catch { errors.push({ row: row.row, field: "category", message: "Choose a valid Needs, Wants, or Savings category for this value" }); continue }
     if (amountCents <= 0) { errors.push({ row: row.row, field: "amount", message: "must be greater than 0" }); continue }
     const tagMapping = row.tag?.trim() ? options.tagValueMap?.[row.tag] : undefined
     const tagName = tagMapping?.mode === "new" ? tagMapping.name : row.tag

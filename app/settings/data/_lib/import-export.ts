@@ -17,6 +17,13 @@ export type ImportStep = "upload" | "map" | "dates" | "categories" | "tags" | "r
 export type CategorySetupMode = "value_map" | "default" | "exact_column"
 export type HeaderImportField = Exclude<CsvImportField, "category">
 
+/** Resolve category setup without treating a missing mapping as a default. */
+export function resolveImportCategory(mode: CategorySetupMode, sourceValue: string | undefined, valueMap: Record<string, Category>, defaultCategory: Category): string | undefined {
+  if (mode === "exact_column") return sourceValue
+  const category = mode === "default" ? defaultCategory : sourceValue === undefined ? undefined : valueMap[sourceValue]
+  return category === "needs" || category === "wants" || category === "savings" ? category : undefined
+}
+
 export const HEADER_IMPORT_FIELDS: Array<{ key: HeaderImportField; label: string; required: boolean; hint: string }> = [
   { key: "date", label: "Date", required: true, hint: "Transaction date" },
   { key: "expense", label: "Expense", required: true, hint: "Merchant or description" },

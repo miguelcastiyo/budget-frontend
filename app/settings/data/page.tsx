@@ -13,6 +13,8 @@ import { ApiError } from "@/lib/api/client"
 import type { Category, CsvImportAmountStrategy, CsvImportMapping, CsvImportPreviewResponse, CsvImportResponse, CsvImportTagStrategyEntry, DataRunItem, Tag } from "@/lib/api/types"
 import { formatDateTimeValue } from "@/lib/date-filters"
 import { cn } from "@/lib/utils"
+import { formatMoneyCents } from "@/lib/domain/financial/money"
+import type { CsvImportPlan } from "@/lib/domain/financial/csv"
 import {
   ActivityRow,
   CategorySetup,
@@ -47,6 +49,7 @@ import {
   previousImportStep,
   pluralize,
   profileForHeader,
+  resolveImportCategory,
   type CategorySetupMode,
   type ExportDateMode,
   type HeaderImportField,
@@ -68,6 +71,10 @@ function parseCsvText(text: string): { headers: string[]; rows: Record<string, s
     .filter(({ header }) => header.length > 0)
   const headers = namedColumns.map(({ header }) => header)
   return { headers, rows: rows.map((values) => Object.fromEntries(namedColumns.map(({ header, index }) => [header, values[index] ?? ""]))) }
+}
+
+function importPlanSignature(plan: CsvImportPlan): string {
+  return JSON.stringify({ accepted: plan.accepted.map((item) => item.importFingerprint).sort(), errors: plan.errors, duplicates: plan.duplicates.map((item) => item.row), skipped: plan.skippedBlankAmountRows })
 }
 
 export default function DataSettingsPage() {
@@ -98,6 +105,7 @@ export default function DataSettingsPage() {
   const [defaultCategory, setDefaultCategory] = useState<Category>("needs")
   const [amountStrategy, setAmountStrategy] = useState<CsvImportAmountStrategy>({ blank_mapped_amount: "skip" })
   const [validationResult, setValidationResult] = useState<CsvImportResponse | null>(null)
+  const [validatedPlan, setValidatedPlan] = useState<CsvImportPlan | null>(null)
   const [commitResult, setCommitResult] = useState<CsvImportResponse | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
@@ -332,6 +340,7 @@ export default function DataSettingsPage() {
     try {
       if (authority.isUnlocked) {
         const plan = await buildEncryptedPlan()
+        setValidatedPlan(plan)
         setValidationResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV validated locally", mode: "dry_run", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: 0, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("review")
         return
@@ -360,6 +369,12 @@ export default function DataSettingsPage() {
     try {
       if (authority.isUnlocked) {
         const plan = await buildEncryptedPlan()
+        if (!validatedPlan || importPlanSignature(plan) !== importPlanSignature(validatedPlan)) {
+          setValidationResult(null)
+          setImportError("Import data changed since validation. Validate again before importing.")
+          setImportStep("tags")
+          return
+        }
         submitted = true
         await authority.commitCsvImport(plan, importFile.name)
         submitted = false
@@ -521,12 +536,12 @@ export default function DataSettingsPage() {
     if (!importFile || !authority.isUnlocked) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
     const parsed = parseCsvText(await importFile.text())
     const contextHeader = effectiveImportMapping.context ?? parsed.headers.find((header) => header.trim().toLowerCase() === "context")
-    const rows = parsed.rows.map((item, index) => ({ row: index + 2, date: item[effectiveImportMapping.date ?? ""] ?? "", expense: item[effectiveImportMapping.expense ?? ""] ?? "", amount: item[effectiveImportMapping.amount ?? ""] ?? "", externalCategory: item[effectiveImportMapping.category ?? categorySourceHeader] ?? defaultCategory, tag: item[effectiveImportMapping.tag ?? ""] ?? "", card: item[effectiveImportMapping.card ?? ""] ?? "", context: contextHeader ? item[contextHeader] ?? "" : "", notes: item[effectiveImportMapping.notes ?? ""] ?? "", isSplit: (item[effectiveImportMapping.is_split ?? ""] ?? "").toLowerCase() === "true" }))
+    const rows = parsed.rows.map((item, index) => ({ row: index + 2, date: item[effectiveImportMapping.date ?? ""] ?? "", expense: item[effectiveImportMapping.expense ?? ""] ?? "", amount: item[effectiveImportMapping.amount ?? ""] ?? "", externalCategory: resolveImportCategory(categoryMode, item[categorySourceHeader], categoryValueMap, defaultCategory), tag: item[effectiveImportMapping.tag ?? ""] ?? "", card: item[effectiveImportMapping.card ?? ""] ?? "", context: contextHeader ? item[contextHeader] ?? "" : "", notes: item[effectiveImportMapping.notes ?? ""] ?? "", isSplit: (item[effectiveImportMapping.is_split ?? ""] ?? "").toLowerCase() === "true" }))
     return authority.planCsvImport(rows, { year: Number(dateYear) || currentImportYear(), tagValueMap })
   }
   const amountProfile = profileForHeader(importPreview, importMapping.amount ?? "")
   const canValidateImport = Boolean(importFile && importPreview && requiredMappingComplete && dateSetupComplete && categorySetupComplete && (authority.isUnlocked || tagSetupComplete) && !hasDuplicateMapping)
-  const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed")
+  const canCommitImport = Boolean(validationResult && validationResult.valid_rows > 0 && validationResult.status !== "failed" && !validationResult.errors.some((error) => error.field === "category"))
   const currentImportStepIndex = useMemo(() => importStepIndex(importStep), [importStep])
 
   return (
@@ -932,7 +947,20 @@ export default function DataSettingsPage() {
                     <p className="text-xs text-muted-foreground">Nothing is written yet. Only valid, non-duplicate rows will be imported.</p>
                   </div>
                   {validationResult ? (
+                    <>
                     <ResultSummary result={validationResult} mode="review" />
+                    {validatedPlan && <div className="rounded-xl border border-border/70 p-4" aria-label="Budget group preview">
+                      <h4 className="text-sm font-semibold">Budget group preview</h4>
+                      <p className="text-xs text-muted-foreground">Valid transactions to be imported; duplicates are excluded.</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {(["needs", "wants", "savings"] as const).map((category) => {
+                          const records = validatedPlan.accepted.filter((item) => item.category === category)
+                          return <div key={category} className="rounded-lg bg-muted/20 p-2 text-sm"><span className="capitalize">{category}</span><p>{records.length} {records.length === 1 ? "transaction" : "transactions"} · ${formatMoneyCents(records.reduce((sum, item) => sum + item.amountCents, 0))}</p></div>
+                        })}
+                      </div>
+                    </div>}
+                    {validationResult.errors.some((error) => error.field === "category") && <p className="text-sm text-destructive">Fix the category mappings before importing.</p>}
+                    </>
                   ) : (
                     <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
                       Validate the import to see what will be imported, skipped, or created.
