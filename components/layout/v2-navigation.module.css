@@ -17,8 +17,8 @@
   --v2-active: #292a2d;
 }
 .mobile { position: fixed; inset: auto 0 0; z-index: 40; border-top: 1px solid var(--v2-border); padding-bottom: env(safe-area-inset-bottom); }
-.items { display: flex; align-items: center; max-width: 32rem; margin: auto; }
-.item { position: relative; display: flex; flex: 1; min-width: 0; height: 3.75rem; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; color: var(--v2-muted); font-size: .65rem; text-decoration: none; }
+.items { display: flex; align-items: center; max-width: 28rem; margin: auto; }
+.item { position: relative; display: flex; flex: 1; min-width: 0; height: 3.5rem; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; color: var(--v2-muted); font-size: .65rem; text-decoration: none; }
 .item[aria-current="page"] { color: var(--v2-fg); font-weight: 600; }
 .icon { width: 1.2rem; height: 1.2rem; }
 .badge { position: absolute; top: .1rem; margin-left: 1.8rem; border-radius: 999px; background: var(--v2-fg); color: var(--v2-bg); padding: 0 .3rem; font-size: .6rem; }
@@ -31,8 +31,8 @@
   .sidebar { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40; width: 14rem; flex-direction: column; gap: 1.5rem; padding: 1.5rem .75rem; border-right: 1px solid var(--v2-border); }
   .brand { padding: .5rem .75rem; font-weight: 600; }
   .sidebar .items { display: flex; flex-direction: column; align-items: stretch; margin: 0; gap: .25rem; }
-  .sidebar .item { flex: none; width: 100%; height: 2.5rem; flex-direction: row; justify-content: flex-start; gap: .75rem; padding: 0 .75rem; border-radius: .5rem; font-size: .875rem; }
+  .sidebar .item { flex: none; width: 100%; height: 2.25rem; flex-direction: row; justify-content: flex-start; gap: .75rem; padding: 0 .75rem; border-radius: .5rem; font-size: .875rem; }
   .sidebar .item[aria-current="page"] { background: var(--v2-active); }
   .sidebar .badge { position: static; margin-left: auto; }
-  .sidebar .action { width: 100%; height: 2.5rem; gap: .5rem; font-size: .875rem; font-weight: 600; }
+  .sidebar .action { width: 100%; height: 2.25rem; gap: .5rem; font-size: .875rem; font-weight: 600; }
 }

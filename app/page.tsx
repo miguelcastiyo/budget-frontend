@@ -244,17 +244,10 @@ export default function DashboardPage() {
           closeoutLoading={isCloseoutLoading}
           loading={isLoading}
           pending={reviewEnabled && authority.isUnlocked && !authority.isLoading ? authority.getPendingMonthSummary(currentMonth) : null}
-          onboarding={(shouldShowFirstMonthActionCard || (shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed)) ? <>
-            {shouldShowFirstMonthActionCard && <FirstMonthActionCard month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth} isDismissing={isDismissingFirstRun} onAddTransaction={() => openCreate()} onDismiss={() => void handleDismissFirstRun()} />}
-            {shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed && <FirstMonthProgressCard setupStatus={setupStatus} isDismissing={false} onDismiss={handleDismissProgressCard} onTaskSelect={handleProgressTaskSelect} />}
-          </> : null}
           onClose={() => openCloseoutTray("close")}
           onViewCloseout={() => openCloseoutTray("view")}
           onReviewCloseout={() => openCloseoutTray("review")}
           onSetBudget={() => router.push(`/settings/budget?${new URLSearchParams({ month: currentMonth, edit: "1" })}`)}
-          onAdd={() => openCreate()}
-          onCategory={(category) => router.push(`/transactions?${new URLSearchParams({ category, month: currentMonth })}`)}
-          onTag={(tagId) => router.push(`/transactions?${new URLSearchParams({ tag_id: tagId, month: currentMonth })}`)}
           onTransaction={setEditingTransaction}
           onViewAll={() => router.push(`/transactions?${new URLSearchParams({ month: currentMonth })}`)}
         /> : <>

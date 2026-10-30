@@ -1,11 +1,10 @@
 "use client"
 
-import type { ReactNode } from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Receipt } from "lucide-react"
 import { MonthCloseoutBackFace, getMonthCardFlipHint } from "./month-closeout-back-face"
 import { formatCurrency, formatCategory } from "@/lib/formatters"
-import { parseDisplayMoney, formatMoneyCents } from "@/lib/domain/financial/money"
+import { parseDisplayMoney } from "@/lib/domain/financial/money"
 import { compareMonthKeys, formatMonthLabel, formatRelativeDateValue, getCurrentMonthKey, getNextMonthKey, getPreviousMonthKey } from "@/lib/date-filters"
 import type { MonthCloseoutResponse, MonthOverviewResponse, Transaction } from "@/lib/api/types"
 import type { PendingMonthSummary } from "@/lib/privacy/encrypted-authority/pending-summary"
@@ -19,19 +18,15 @@ type Props = {
   closeoutLoading: boolean
   loading: boolean
   pending: PendingMonthSummary | null
-  onboarding: ReactNode
   onClose: () => void
   onViewCloseout: () => void
   onReviewCloseout: () => void
   onSetBudget: () => void
-  onAdd: () => void
-  onCategory: (category: string) => void
-  onTag: (tagId: string) => void
   onTransaction: (transaction: Transaction) => void
   onViewAll: () => void
 }
 
-export function V2Overview({ month, onMonthChange, overview, closeout, closeoutLoading, loading, pending, onboarding, onClose, onViewCloseout, onReviewCloseout, onSetBudget, onAdd, onCategory, onTag, onTransaction, onViewAll }: Props) {
+export function V2Overview({ month, onMonthChange, overview, closeout, closeoutLoading, loading, pending, onClose, onViewCloseout, onReviewCloseout, onSetBudget, onTransaction, onViewAll }: Props) {
   const hasBudget = Boolean(overview?.budget.has_budget)
   const left = overview?.summary.left_this_month == null ? null : parseDisplayMoney(overview.summary.left_this_month)
   const totalBudget = overview?.summary.total_budget == null ? null : parseDisplayMoney(overview.summary.total_budget)
@@ -57,7 +52,7 @@ export function V2Overview({ month, onMonthChange, overview, closeout, closeoutL
       {closeout?.status === "closed" && <span className={styles.muted}>Closed</span>}
     </header>
     {loading && <p role="status" className={styles.muted}>Loading {formatMonthLabel(month) ?? month}...</p>}
-    {onboarding && <div className={styles.onboarding}>{onboarding}</div>}
+
     <div className={styles.grid}>
       <div className={styles.column}>
         <section aria-label="Month summary">
@@ -80,17 +75,16 @@ export function V2Overview({ month, onMonthChange, overview, closeout, closeoutL
             const target = parseDisplayMoney(category.budget_amount)
             const remaining = parseDisplayMoney(category.remaining_amount)
             const percent = target > 0 ? Math.max(0, Math.min(100, amount / target * 100)) : 0
-            return <button type="button" key={category.category} className={styles.category} onClick={() => onCategory(category.category)}>
-              <span className={styles.categoryTop}><span><i className={styles[category.category]} />{formatCategory(category.category)}</span><span className={remaining < 0 ? styles.over : ""}>{hasBudget ? remaining < 0 ? `${formatCurrency(Math.abs(remaining))} over` : `${formatCurrency(remaining)} left` : "No budget"}</span></span>
+            return <div key={category.category} className={styles.category}>
+              <span className={styles.categoryTop}><span><i className={styles[category.category]} />{formatCategory(category.category)}</span><span className={remaining < 0 && category.category !== "savings" ? styles.over : ""}>{hasBudget ? category.category === "savings" ? remaining > 0 ? `${formatCurrency(remaining)} to go` : "Done" : remaining < 0 ? `${formatCurrency(Math.abs(remaining))} over` : `${formatCurrency(remaining)} left` : "No budget"}</span></span>
               <span className={styles.categoryAmount}>{formatCurrency(amount)}{hasBudget ? ` of ${formatCurrency(target)}` : " spent"}</span>
-              <span className={styles.track} role="progressbar" aria-label={`${formatCategory(category.category)} spent`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} aria-valuetext={`${formatCurrency(amount)} spent${hasBudget ? ` of ${formatCurrency(target)}` : "; no budget"}`}><span className={remaining < 0 ? styles.overBar : styles[category.category]} style={{ width: `${percent}%` }} /></span>
-            </button>
+              <span className={styles.track} role="progressbar" aria-label={`${formatCategory(category.category)} spent`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} aria-valuetext={`${formatCurrency(amount)} spent${hasBudget ? ` of ${formatCurrency(target)}` : "; no budget"}`}><span className={remaining < 0 && category.category !== "savings" ? styles.overBar : styles[category.category]} style={{ width: `${percent}%` }} /></span>
+            </div>
           })}
         </section>
-        <section className={styles.links} aria-label="Month actions">
-          {pending && pending.count > 0 && <Link href="/review"><span>Review</span><span>{pending.count} pending · {formatCurrency(Number(formatMoneyCents(pending.knownAmountCents)))} known{pending.unknownAmountCount > 0 ? ` · ${pending.unknownAmountCount} without amount` : ""}</span><ChevronRight size={16} /></Link>}
-          <Link href="/insights/funds"><span>Funds</span><span>View savings goals</span><ChevronRight size={16} /></Link>
-        </section>
+        {pending && pending.count > 0 && <section className={styles.links} aria-label="Month actions">
+          <Link href="/review"><span>Review</span><span>{pending.count} to sort</span><ChevronRight size={16} /></Link>
+        </section>}
         {(hasBudget || closeout) && <details className={styles.closeout}>
           <summary>{closeoutLoading ? "Loading month status..." : hint?.label ?? "Month details"}<ChevronRight size={16} /></summary>
           <MonthCloseoutBackFace overview={overview} closeout={closeout} isLoading={closeoutLoading} onCloseMonth={onClose} onViewCloseout={onViewCloseout} onReviewCloseout={onReviewCloseout} onSetBudget={onSetBudget} />
@@ -99,18 +93,14 @@ export function V2Overview({ month, onMonthChange, overview, closeout, closeoutL
       <div className={styles.column}>
         <section aria-label="Recent transactions">
           <div className={styles.sectionHeading}><h2>Recent</h2><button type="button" onClick={onViewAll}>See all</button></div>
-          {grouped.size === 0 ? <div className={styles.empty}><p>No transactions this month.</p><button type="button" onClick={onAdd}>Add transaction</button></div> : [...grouped].map(([date, transactions]) => <div key={date} className={styles.group}>
+          {grouped.size === 0 ? <div className={styles.empty}><p>No transactions this month.</p></div> : [...grouped].map(([date, transactions]) => <div key={date} className={styles.group}>
             <p className={styles.date}>{formatRelativeDateValue(date)}</p>
             {transactions.map(transaction => <button type="button" key={transaction.id} className={styles.transaction} onClick={() => onTransaction(transaction)}>
-              <span className={`${styles.dot} ${styles[transaction.category]}`} aria-hidden="true" />
-              <span className={styles.transactionText}><span>{transaction.expense}</span><small>{[transaction.tag?.name, transaction.context?.name, transaction.card?.name].filter(Boolean).join(" · ")}</small></span>
+              <Receipt className={styles.transactionIcon} size={18} strokeWidth={1.5} aria-hidden="true" />
+              <span className={styles.transactionText}><span>{transaction.expense}</span><small>{[transaction.tag?.name, transaction.context?.name].filter(Boolean).join(" · ")}</small></span>
               <span>{formatCurrency(transaction.amount)}</span>
             </button>)}
           </div>)}
-        </section>
-        <section aria-label="Spending by tag">
-          <div className={styles.sectionHeading}><h2>Where the money went</h2></div>
-          {(overview?.tags ?? []).length === 0 ? <div className={styles.empty}><p>Your spending patterns will appear here.</p><button type="button" onClick={onAdd}>Add transaction</button></div> : overview?.tags.map(tag => <button type="button" className={styles.tag} key={tag.tag_id} onClick={() => onTag(tag.tag_id)}><span>{tag.tag_name}</span><span>{formatCurrency(tag.spend)}</span><ChevronRight size={16} /></button>)}
         </section>
       </div>
     </div>

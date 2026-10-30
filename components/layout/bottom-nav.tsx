@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X, ListChecks } from "lucide-react"
+import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X, ListChecks, House, ListFilter, Layers, Ellipsis } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -143,9 +143,15 @@ export function BottomNav({
   }
 
   if (version === "v2") {
-    const items: MobileNavItem[] = reviewEnabled
-      ? [...mobileNavItems.slice(0, 2), { type: "route", href: "/review", icon: ListChecks, label: "Review" }, ...mobileNavItems.slice(2)]
-      : mobileNavItems
+    // The prototype uses Home, Activity, Add, Review and More in this order.
+    // More currently routes to the production Settings screen until its own pass.
+    const items: MobileNavItem[] = [
+      { type: "route", href: "/", icon: House, label: "Home" },
+      { type: "route", href: "/transactions", icon: ListFilter, label: "Activity" },
+      { type: "action", action: "log-transaction", icon: Plus, label: "Add" },
+      ...(reviewEnabled ? [{ type: "route" as const, href: "/review", icon: Layers, label: "Review" }] : []),
+      { type: "route", href: "/settings", icon: Ellipsis, label: "More" },
+    ]
     const renderRoutes = (includeAction: boolean) => items.map((item) => {
       if (item.type === "action") return includeAction ? <button key={item.action} type="button" className={styles.item} onClick={handleAddClick} aria-label="Log transaction"><span className={styles.action}><Plus className={styles.icon} aria-hidden="true" /></span></button> : null
       const Icon = item.icon

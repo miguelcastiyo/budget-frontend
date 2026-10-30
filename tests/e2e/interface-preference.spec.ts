@@ -37,7 +37,7 @@ test("interface availability, persistence and navigation", async ({ page }) => {
   const nav = page.getByRole("navigation", { name: "Primary desktop" })
   await expect(nav).toBeVisible()
   await expect(nav.getByRole("link", { name: "Review" })).toBeVisible()
-  await expect(nav.getByRole("link", { name: "Transactions" })).toHaveAttribute("href", /\/transactions\?month=/)
+  await expect(nav.getByRole("link", { name: "Activity" })).toHaveAttribute("href", /\/transactions\?month=/)
   await page.reload()
   await expect(toggle).toBeChecked()
   await nav.getByRole("link", { name: "Review" }).click()
@@ -79,7 +79,7 @@ test("invalid preference falls back to Classic and Review remains capability gat
     await expect(page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "Review" })).toHaveCount(0)
     await page.setViewportSize({ width: 390, height: 844 })
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible()
-    await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Settings" })).toBeVisible()
+    await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" })).toBeVisible()
   }
 })
 
