@@ -10,9 +10,13 @@ import { MonthSelector } from "@/components/budget/month-selector"
 import { formatSavingsCurrency } from "@/lib/formatters"
 import { formatMonthLabel, formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
 import { useReplaceSavingsPlan, useSavingsPlan } from "@/lib/savings-plan"
-import type { SavingsPlanFundItem } from "@/lib/api/types"
+import type { SavingsPlanFundItem, SavingsPlanResponse } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { Header } from "@/components/layout/header"
+import { BottomNav } from "@/components/layout/bottom-nav"
+import styles from "./v2-savings-plan.module.css"
 
 function amount(value: string | null | undefined) {
   return Number.parseFloat(value ?? "0") || 0
@@ -103,6 +107,7 @@ export function SavingsPlanFundContext({ fundId, month = getCurrentMonthKey() }:
 }
 
 export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {
+  const { version } = useInterfacePreference()
   const [month, setMonth] = useState(initialMonth || getCurrentMonthKey())
   const { data, isLoading, error, refetch } = useSavingsPlan(month)
   const { replace, isSaving, error: saveError } = useReplaceSavingsPlan(month)
@@ -130,6 +135,8 @@ export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {
     setShowAdd(true)
   }
 
+  if (version === "v2") return <V2SavingsPlan month={month} onMonth={(next) => { setEditing(false); setMonth(next) }} data={data} isLoading={isLoading} error={error} refetch={refetch} editing={editing} startEditing={startEditing} draft={draft} setDraft={setDraft} activeFunds={activeFunds} showAdd={showAdd} setShowAdd={setShowAdd} openAdd={openAdd} draftTotal={draftTotal} budget={budget} overBy={overBy} isSaving={isSaving} saveError={saveError} save={save} cancel={() => setEditing(false)} />
+
   return <div className="min-h-screen bg-background pb-mobile-nav"><main className="mx-auto max-w-lg px-5 pb-10 pt-standalone-safe-top lg:max-w-3xl lg:px-8">
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3"><Button variant="ghost" size="sm" className="rounded-full px-3" asChild><Link href="/insights/funds"><ArrowLeft className="size-4" />Funds</Link></Button>{data?.is_editable && data.has_plan && !editing ? <Button variant="outline" className="rounded-full" onClick={startEditing}><Pencil className="size-4" />Edit plan</Button> : null}</div>
@@ -148,4 +155,27 @@ export function SavingsPlanPage({ initialMonth }: { initialMonth?: string }) {
       </>}
     </div>
   </main></div>
+}
+
+function V2SavingsPlan({ month, onMonth, data, isLoading, error, refetch, editing, startEditing, draft, setDraft, activeFunds, showAdd, setShowAdd, openAdd, draftTotal, budget, overBy, isSaving, saveError, save, cancel }: {
+  month: string; onMonth: (month: string) => void; data: SavingsPlanResponse | null; isLoading: boolean; error: string | null; refetch: () => Promise<unknown>; editing: boolean; startEditing: () => void; draft: Record<string, string>; setDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>; activeFunds: SavingsPlanFundItem[]; showAdd: boolean; setShowAdd: (show: boolean) => void; openAdd: () => Promise<void>; draftTotal: number; budget: number; overBy: number; isSaving: boolean; saveError: string | null; save: () => Promise<void>; cancel: () => void
+}) {
+  const [addError, setAddError] = useState<string | null>(null)
+  const planned = data?.funds.filter((item) => amount(item.planned_amount) > 0) ?? []
+  const other = data?.funds.filter((item) => amount(item.planned_amount) === 0 && amount(item.progress_amount) > 0) ?? []
+  return <div className="min-h-screen bg-background pb-mobile-nav"><Header /><main className={styles.root} data-testid="v2-savings-plan">
+    <div className={styles.top}><Link href="/insights/funds" className={styles.back}><ArrowLeft size={16} /> Funds</Link>{data?.is_editable && data.has_plan && !editing ? <button type="button" className={styles.secondary} onClick={startEditing}><Pencil size={15} /> Edit plan</button> : null}</div>
+    <div className={styles.heading}><div><p className={styles.eyebrow}>Monthly allocation</p><h1>Savings Plan</h1><p>Choose where your Savings budget goes.</p></div><fieldset className={styles.month} disabled={editing || isSaving}><MonthSelector currentMonth={month} onChange={onMonth} allowFuture /></fieldset></div>
+    {isLoading ? <div className={styles.state} role="status"><Spinner className="size-5" /> Loading Savings Plan…</div> : error || !data ? <div className={styles.state}><p>{error ?? "Unable to load Savings Plan"}</p><button type="button" className={styles.secondary} onClick={() => void refetch()}>Retry</button></div> : !data.budget.has_budget ? <div className={styles.state}><h2>{formatMonthLabel(month) ?? month} doesn’t have a budget yet.</h2><p>Set your monthly Savings amount first, then decide where you want it to go.</p><Link className={styles.primary} href="/settings/budget">Set monthly budget</Link></div> : editing ? <div className={styles.layout}>
+      <section className={styles.panel}><div className={styles.sectionHead}><div><p className={styles.eyebrow}>Allocation</p><h2>Edit your plan</h2></div><span>{formatSavingsCurrency(data.budget.savings_budget ?? "0")} available</span></div>
+        {Object.keys(draft).length === 0 ? <p className={styles.muted}>No Funds selected yet.</p> : Object.entries(draft).map(([id, value]) => { const item = data.funds.find((entry) => entry.fund.id === id) ?? activeFunds.find((entry) => entry.fund.id === id); return item ? <FundPlanRow key={id} item={item} editing value={value} onChange={(next) => setDraft((current) => ({ ...current, [id]: next }))} onRemove={() => setDraft((current) => { const next = { ...current }; delete next[id]; return next })} /> : null })}
+        <button type="button" className={styles.textButton} onClick={() => { setAddError(null); void openAdd().catch(() => setAddError("Unable to load Funds. Try again.")) }}><Plus size={16} /> Add a fund</button>{addError ? <p className={styles.error} role="alert">{addError}</p> : null}
+        {showAdd ? <div className={styles.chooser}><h3>Add to Savings Plan</h3>{activeFunds.filter((item) => !draft[item.fund.id]).map((item) => <button key={item.fund.id} type="button" onClick={() => { setDraft((current) => ({ ...current, [item.fund.id]: "0.00" })); setShowAdd(false) }}>{item.fund.name}<Plus size={16} /></button>)}{activeFunds.filter((item) => !draft[item.fund.id]).length === 0 ? <p>All active Funds are already in this draft.</p> : null}</div> : null}
+      </section><aside className={styles.panel}><p className={styles.eyebrow}>Plan summary</p><div className={styles.summaryLine}><span>Planned</span><strong>{formatSavingsCurrency(draftTotal)}</strong></div><div className={styles.summaryLine}><span>{overBy > 0 ? "Over budget" : "Unassigned"}</span><strong>{formatSavingsCurrency(overBy > 0 ? overBy : Math.max(budget - draftTotal, 0))}</strong></div>{overBy > 0 ? <p className={styles.error}>{formatSavingsCurrency(overBy)} over your {formatMonthLabel(month) ?? month} Savings budget</p> : null}<div className={styles.actions}><button type="button" className={styles.primary} disabled={isSaving || overBy > 0} onClick={() => void save()}>{isSaving ? "Saving…" : "Save plan"}</button><button type="button" className={styles.secondary} onClick={cancel}>Cancel</button></div>{saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}</aside>
+    </div> : <div className={styles.layout}><div className={styles.stack}>
+      <section className={styles.hero}><p className={styles.eyebrow}>Saved this month</p><p className={styles.total}>{formatSavingsCurrency(data.summary.saved_amount)}</p><p className={styles.muted}>of {formatSavingsCurrency(data.budget.savings_budget ?? "0")} Savings budget</p><MoneyProgress value={data.summary.saved_amount} target={data.budget.savings_budget ?? "0"} label={data.summary.over_saved_amount !== "0.00" ? `${formatSavingsCurrency(data.summary.over_saved_amount)} above budget` : `${formatSavingsCurrency(data.summary.remaining_to_save)} left to save`} />{data.summary.is_overallocated ? <p className={styles.error}>Plan needs review · {formatSavingsCurrency(data.summary.overallocation_amount)} over budget</p> : null}</section>
+      {data.goal_pacing.status === "available" && data.goal_pacing.recommended_total && data.goal_pacing.gap_to_savings_budget && amount(data.goal_pacing.gap_to_savings_budget) > 0 ? <section className={styles.panel}><p className={styles.eyebrow}>Goal pace</p><p className={styles.muted}>Your target-date goals need about {formatSavingsCurrency(data.goal_pacing.recommended_total)} this month to stay on pace — {formatSavingsCurrency(data.goal_pacing.gap_to_savings_budget)} more than your {formatSavingsCurrency(data.budget.savings_budget ?? "0")} Savings budget.</p></section> : null}
+      {other.length ? <section className={styles.panel}><p className={styles.eyebrow}>Other Fund activity</p>{other.map((item) => <div key={item.fund.id} className={styles.summaryLine}><span>{item.fund.name}<small>No {formatMonthLabel(month) ?? month} allocation</small></span><strong>{formatSavingsCurrency(item.progress_amount)} directed</strong></div>)}</section> : null}
+    </div><section className={styles.panel}><div className={styles.sectionHead}><div><p className={styles.eyebrow}>Your plan</p><h2>Fund allocations</h2></div>{data.status === "closed" ? <span>Closed</span> : null}</div>{data.has_plan ? <>{planned.map((item) => <FundPlanRow key={item.fund.id} item={item} />)}<div className={styles.summaryLine}><span>Planned</span><strong>{formatSavingsCurrency(data.summary.planned_to_funds)}</strong></div><div className={styles.summaryLine}><span>Unassigned</span><strong>{formatSavingsCurrency(data.summary.unassigned_budget)}</strong></div></> : <div className={styles.empty}><p>You haven’t assigned {formatMonthLabel(month) ?? month}’s Savings budget to Funds yet.</p><strong>{formatSavingsCurrency(data.budget.savings_budget ?? "0")} available to assign</strong>{data.is_editable ? <button type="button" className={styles.primary} onClick={startEditing}>Plan savings</button> : null}</div>}</section></div>}
+  </main><BottomNav /></div>
 }
