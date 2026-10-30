@@ -10,3 +10,49 @@
 .actions button:first-child { background:var(--primary); color:var(--primary-foreground); }
 .actions button:disabled, .switch:disabled { opacity:.45; }
 .switch { margin-top:.5rem; font-size:.8rem; text-decoration:underline; }
+
+.capture { display:flex; flex:1; min-height:0; flex-direction:column; gap:0; width:100%; overflow:hidden; }
+.captureHeader { display:flex; flex:none; align-items:flex-start; justify-content:space-between; padding:1.25rem 1.25rem .5rem; font-size:1rem; font-weight:600; }
+.captureHeader p { margin-top:.25rem; color:var(--muted-foreground); font-size:.8rem; font-weight:400; }
+.captureBody { display:flex; flex:1; min-height:0; flex-direction:column; gap:.85rem; overflow-y:auto; overscroll-behavior:contain; padding:1rem 1.25rem; }
+.amountLabel { color:var(--muted-foreground); text-align:center; font-size:.75rem; }
+.captureAmount { margin:0; padding:.35rem 0; border:0; background:transparent; }
+.captureAmount > label { display:none; }
+.captureAmount input { max-width:76vw; min-height:0; border:0; background:transparent; padding:0; text-align:center; font-size:2.75rem!important; }
+.captureDescription { display:flex; flex-direction:column; gap:.4rem; font-size:.8rem; font-weight:500; }
+.captureDescription input, .pickerPanel input { min-height:2.9rem; width:100%; border:1px solid var(--border); border-radius:.65rem; background:var(--muted); padding:.65rem .8rem; color:var(--foreground); font-size:1rem; outline:none; }
+.captureDescription input:focus, .pickerPanel input:focus { box-shadow:0 0 0 2px color-mix(in srgb,var(--ring),transparent 55%); }
+.quickDates { display:flex; gap:.5rem; }
+.quickDates button, .dateOther { display:flex; min-height:2.5rem; flex:1; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:.65rem; background:var(--card); padding:.5rem .7rem; font-size:.85rem; }
+.quickDates button[aria-pressed="true"], .dateOther:focus-within { border-color:var(--foreground); background:var(--secondary); }
+.dateOther { position:relative; overflow:hidden; }
+.dateOther input { position:absolute; inset:0; width:100%; opacity:0; }
+.captureKeypad { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)) 4.25rem; grid-template-rows:repeat(4,minmax(2.6rem,auto)); gap:.4rem; padding-top:.25rem; }
+.captureKeypad button { min-height:2.6rem; border-radius:.65rem; background:var(--muted); font-size:1.1rem; }
+.captureKeypad button:active { background:var(--border); }
+.captureKeypad .keypadDone { grid-column:4; grid-row:1 / span 4; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; background:color-mix(in srgb,var(--border),transparent 30%); font-size:.8rem; font-weight:600; }
+.modeSwitch > span[aria-current="page"] { min-height:2rem; display:flex; align-items:center; border-radius:.45rem; background:var(--card); padding:.3rem .65rem; color:var(--foreground); box-shadow:0 1px 3px #0002; font-size:.78rem; }
+.actions { display:flex; flex:none; flex-wrap:wrap; gap:.5rem; margin-top:auto; border-top:1px solid var(--border); background:var(--background); padding: .75rem 1.25rem calc(.75rem + env(safe-area-inset-bottom)); }
+.actions button { min-height:2.8rem; flex:1 1 30%; padding:.55rem .65rem; border:1px solid var(--border); border-radius:.65rem; background:var(--card); font-size:.85rem; font-weight:600; }
+.actions button:first-child { background:var(--primary); color:var(--primary-foreground); }
+.actions button:disabled { opacity:.45; }
+.hint { color:var(--muted-foreground); font-size:.78rem; }
+.error { color:#b54a42; font-size:.82rem; }
+.notice { color:#49856c; font-size:.82rem; }
+.modeSwitch { display:flex; width:max-content; gap:.15rem; margin-top:.65rem; padding:.2rem; border-radius:.6rem; background:var(--muted); }
+.modeSwitch button { min-height:2rem; border-radius:.45rem; padding:.3rem .65rem; color:var(--muted-foreground); font-size:.78rem; }
+.modeSwitch button[aria-pressed="true"] { background:var(--card); color:var(--foreground); box-shadow:0 1px 3px #0002; }
+.fullEntry { --v2-entry-gap:.8rem; }
+.fullEntry > div:first-child { border-bottom-color:var(--border); background:var(--background); padding:1rem 1.25rem .75rem; }
+.fullEntry > div:nth-child(2) { padding:1rem 1.25rem; }
+.fullEntry input:not([type="date"]), .fieldPicker > button { border-radius:.65rem!important; }
+.fieldPicker { position:relative; }
+.fieldPicker > button { display:flex; min-height:2.9rem; width:100%; align-items:center; justify-content:space-between; gap:.75rem; border:1px solid var(--border); background:var(--card); padding:.65rem .8rem; text-align:left; font-size:.92rem; }
+.fieldPicker > button span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pickerPanel { position:absolute; z-index:20; top:calc(100% + .35rem); left:0; right:0; display:flex; max-height:16rem; flex-direction:column; gap:.2rem; overflow:auto; border:1px solid var(--border); border-radius:.75rem; background:var(--popover); padding:.5rem; box-shadow:0 12px 30px #0002; }
+.pickerPanel > button { display:flex; min-height:2.65rem; flex:none; align-items:center; justify-content:space-between; gap:.5rem; border-radius:.5rem; padding:.45rem .6rem; text-align:left; }
+.pickerPanel > button:hover { background:var(--muted); }
+@media (max-height:700px) { .captureKeypad button { min-height:2.15rem; } .captureBody { gap:.55rem; padding-block:.75rem; } }
+@media (prefers-reduced-motion:reduce) { .capture *, .fullEntry * { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+
+.categoryPicker button { min-height:2.75rem; height:2.75rem; border-radius:.65rem!important; }

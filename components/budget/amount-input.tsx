@@ -36,6 +36,7 @@ interface AmountInputProps {
   label?: string
   maxDigits?: number
   required?: boolean
+  readOnly?: boolean
   ariaInvalid?: boolean
   ariaDescribedBy?: string
   onBlur?: () => void
@@ -52,6 +53,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
     label = "Amount",
     maxDigits = DEFAULT_MAX_AMOUNT_DIGITS,
     required,
+    readOnly = false,
     ariaInvalid,
     ariaDescribedBy,
     onBlur,
@@ -211,6 +213,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
               amountTextClassName
             )}
             required={required}
+            readOnly={readOnly}
           />
         </div>
       </div>

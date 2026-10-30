@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon, ChevronDown, CreditCard, Plus, Star, X } from "lucide-react"
+import { CalendarIcon, Check, ChevronDown, CreditCard, Delete, Plus, Star, X } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError } from "@/lib/api/client"
@@ -54,6 +54,8 @@ import { clearRememberedCapture, getRememberedCapture } from "@/components/revie
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 
 import type { AddTransactionSheetProps } from "./transaction-editor-types"
+
+function getYesterdayKey() { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); return format(yesterday, "yyyy-MM-dd") }
 export function TransactionEditorForm({
   open,
   onOpenChange,
@@ -87,6 +89,9 @@ export function TransactionEditorForm({
     canCreateRecurringRule,
   } = editor
   const [captureMode, setCaptureMode] = useState(initialCapture)
+  const [captureKeypadOpen, setCaptureKeypadOpen] = useState(true)
+  const [v2Picker, setV2Picker] = useState<"tag" | "card" | null>(null)
+  const [v2PickerQuery, setV2PickerQuery] = useState("")
   const [captureBusy, setCaptureBusy] = useState(false)
   const [captureError, setCaptureError] = useState("")
   const [captureNotice, setCaptureNotice] = useState("")
@@ -102,6 +107,16 @@ export function TransactionEditorForm({
     onSaved: () => { if (!saveAndNew.current) onOpenChange(false) },
     accountId: v2Create ? profile?.id : undefined,
   })
+  const enterCaptureDigit = (key: string) => {
+    if (key === "back") { setAmount(amount.slice(0, -1)); return }
+    if (key === ".") { if (!amount.includes(".")) setAmount(`${amount || "0"}.`); return }
+    const [whole = "", fraction = ""] = amount.split(".")
+    if (fraction.length >= 2 || amount.replace(/\D/g, "").length >= 9) return
+    setAmount(amount.includes(".") ? `${whole}.${fraction}${key}` : `${whole}${key}`)
+  }
+  const closeV2Picker = () => { setV2Picker(null); setV2PickerQuery("") }
+  const filteredV2Tags = tags.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
+  const filteredV2Cards = cards.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
   const transitionBlocked = isSubmitting || isCreatingTag || isCreatingCard || isCreatingContext || captureBusy || Boolean(quick.captureBatch)
   const dirty = Boolean(amount || expense || category !== "needs" || tagId || cardId || contextId || notes || isSplit || makeRecurring || showNewTag || newTagName || newTagIconKey || showNewCard || newCardName || format(date, "yyyy-MM-dd") !== getLocalDateKey())
   const requestOpenChange = (next: boolean) => {
@@ -637,17 +652,24 @@ export function TransactionEditorForm({
         )}
       >
         {v2Create && captureMode && <form onSubmit={quick.capture} className={styles.capture} aria-label="Quick Capture">
-          <div className={styles.captureHeader}><DialogTitle>Quick Capture</DialogTitle><DialogClose aria-label="Close" disabled={transitionBlocked}><X size={20} /></DialogClose></div>
-          <p className={styles.hint}>Capture now, organize later.</p>
-          <label>Amount<input inputMode="decimal" ref={quick.amountRef} value={amount} disabled={Boolean(quick.captureBatch)} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" /></label>
-          <label>Description<input value={expense} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" /></label>
-          <label>Date<input type="date" value={format(date, "yyyy-MM-dd")} disabled={Boolean(quick.captureBatch)} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
-          <p className={styles.hint}>{quick.captureBatch ? "The save outcome is uncertain. Retry to confirm it." : "Enter an amount, a description, or both."}</p>
-          {captureError && <p role="alert">{captureError}</p>}{captureNotice && <p role="status">{captureNotice}</p>}
-          {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}
-          <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button><button type="button" disabled={transitionBlocked} onClick={() => setCaptureMode(false)}>Full Entry</button></div>
+          <div className={styles.captureHeader}><div><DialogTitle>Quick Capture</DialogTitle><p>Capture now, organize later.</p></div><DialogClose aria-label="Close" disabled={transitionBlocked}><X size={20} /></DialogClose></div>
+          <div className={styles.captureBody}>
+            <label className={styles.amountLabel} htmlFor="quick-capture-amount">Amount</label>
+            <AmountInput ref={quick.amountRef} id="quick-capture-amount" name="capture_amount" value={amount} onValueChange={setAmount} label="" readOnly className={styles.captureAmount} />
+            <label className={styles.captureDescription}>Description<input value={expense} onFocus={() => setCaptureKeypadOpen(false)} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" enterKeyHint="done" /></label>
+            <div className={styles.quickDates} role="group" aria-label="Date">
+              <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getLocalDateKey()} onClick={() => setDate(new Date())}>Today</button>
+              <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getYesterdayKey()} onClick={() => { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); setDate(yesterday) }}>Yesterday</button>
+              <label className={styles.dateOther}>{format(date, "yyyy-MM-dd") !== getLocalDateKey() && format(date, "yyyy-MM-dd") !== getYesterdayKey() ? format(date, "MMM d") : "Other"}<input aria-label="Choose date" type="date" max={getLocalDateKey()} value={format(date, "yyyy-MM-dd")} disabled={Boolean(quick.captureBatch)} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
+            </div>
+            {captureKeypadOpen && !quick.captureBatch && <div className={styles.captureKeypad} role="group" aria-label="Amount keypad">{["1","2","3","4","5","6","7","8","9",".","0","back"].map((key, index) => <button key={key} type="button" style={{ gridColumn: index % 3 + 1, gridRow: Math.floor(index / 3) + 1 }} aria-label={key === "back" ? "Delete amount digit" : key === "." ? "Decimal point" : key} onClick={() => enterCaptureDigit(key)}>{key === "back" ? <Delete size={18} /> : key}</button>)}<button type="button" className={styles.keypadDone} onClick={() => setCaptureKeypadOpen(false)}>Done <Check size={16} /></button></div>}
+            <p className={styles.hint}>{quick.captureBatch ? "The save outcome is uncertain. Retry the same save or synchronize." : "Enter an amount, a description, or both."}</p>
+            {captureError && <p role="alert" className={styles.error}>{captureError}</p>}{captureNotice && <p role="status" className={styles.notice}>{captureNotice}</p>}
+            {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}
+          </div>
+          <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button><button type="button" disabled={transitionBlocked} onClick={() => { setCaptureMode(false); setCaptureKeypadOpen(false) }}>Full Entry</button></div>
         </form>}
-        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && captureMode && "hidden")} autoComplete="off" data-form-type="other">
+        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && styles.fullEntry, v2Create && captureMode && "hidden")} autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
@@ -655,10 +677,8 @@ export function TransactionEditorForm({
                 <DialogTitle className="truncate text-lg font-semibold sm:text-xl">
                   {isEditMode ? "Edit Transaction" : "New Transaction"}
                 </DialogTitle>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {format(date, "EEE, MMM d")} · {categoryConfig[category].label}
-                </p>
-                {v2Create && financialAuthority.pendingCaptureEnabled && <button type="button" disabled={transitionBlocked} className={styles.switch} onClick={() => setCaptureMode(true)}>Quick Capture</button>}
+                {!v2Create && <p className="mt-0.5 truncate text-xs text-muted-foreground">{format(date, "EEE, MMM d")} · {categoryConfig[category].label}</p>}
+                {v2Create && financialAuthority.pendingCaptureEnabled && <div className={styles.modeSwitch} role="group" aria-label="Entry mode"><button type="button" disabled={transitionBlocked} aria-pressed={false} onClick={() => { closeV2Picker(); setCaptureMode(true); setCaptureKeypadOpen(true) }}>Quick Capture</button><span aria-current="page">Full Entry</span></div>}
               </div>
               <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                 <X className="h-4 w-4" />
@@ -732,9 +752,14 @@ export function TransactionEditorForm({
                   </div>
 
                   <div className="min-w-0 space-y-2 sm:col-span-2">
-                    <div className="flex items-center justify-between">
+                    <div className="min-w-0 max-w-full space-y-2 sm:col-span-2">
+                    <Label className="text-sm font-medium">Category</Label>
+                    <TransactionCategoryPicker value={category} onChange={setCategory} className={v2Create ? styles.categoryPicker : undefined} />
+                  </div>
+
+                  <div className="flex items-center justify-between">
                       <Label className="text-sm font-medium">Tag</Label>
-                      {!showNewTag && (
+                      {!showNewTag && !v2Create && (
                         <button
                           type="button"
                           onClick={() => {
@@ -766,7 +791,10 @@ export function TransactionEditorForm({
                       />
                     ) : (
                       <div className="min-w-0 max-w-full overflow-hidden">
-                        {displayedQuickPickTags.length > 0 ? (
+                        {v2Create ? <div className={styles.fieldPicker}>
+                          <button type="button" aria-haspopup="listbox" aria-expanded={v2Picker === "tag"} onClick={() => { setV2Picker(v2Picker === "tag" ? null : "tag"); setV2PickerQuery("") }}><span>{tags.find(item => item.id === tagId)?.name ?? "Choose a tag"}</span><ChevronDown size={16} /></button>
+                          {v2Picker === "tag" && <div className={styles.pickerPanel}><input aria-label="Search tags" value={v2PickerQuery} onChange={event => setV2PickerQuery(event.target.value)} placeholder="Search tags" />{filteredV2Tags.map(item => <button type="button" key={item.id} onClick={() => { setTagId(item.id); closeV2Picker() }}>{item.name}{item.id === tagId && <Check size={16} />}</button>)}<button type="button" onClick={() => { closeV2Picker(); setNewTagIconKey(""); setShowNewTag(true) }}><Plus size={16} /> New tag</button></div>}
+                        </div> : displayedQuickPickTags.length > 0 ? (
                           <FormChipRail
                             items={displayedQuickPickTags.map((tag) => {
                               const QuickPickIcon = getTagIcon(tag.name, tag.icon_key)
@@ -783,17 +811,10 @@ export function TransactionEditorForm({
                             ariaLabel="Choose a tag"
                           />
                         ) : (
-                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">
-                            Create a tag to use it for this transaction.
-                          </div>
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground">Create a tag to use it for this transaction.</div>
                         )}
                       </div>
                     )}
-                  </div>
-
-                  <div className="min-w-0 max-w-full space-y-2 sm:col-span-2">
-                    <Label className="text-sm font-medium">Category</Label>
-                    <TransactionCategoryPicker value={category} onChange={setCategory} />
                   </div>
 
                   <div className="min-w-0 max-w-full space-y-2 sm:col-span-2">
@@ -852,8 +873,16 @@ export function TransactionEditorForm({
                   </div>
                 </div>
 
-                {/* Notes intentionally live inside More details so optional context does not slow down quick transaction logging. */}
-                <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card">
+                {v2Create && <div className={styles.secondaryFields}>
+                  <div className={styles.fieldPicker}>
+                    <button type="button" aria-haspopup="listbox" aria-expanded={v2Picker === "card"} onClick={() => { setV2Picker(v2Picker === "card" ? null : "card"); setV2PickerQuery("") }}><span>Card</span><span>{cards.find(item => item.id === cardId)?.name ?? "None"}</span><ChevronDown size={16} /></button>
+                    {v2Picker === "card" && <div className={styles.pickerPanel}><input aria-label="Search cards" value={v2PickerQuery} onChange={event => setV2PickerQuery(event.target.value)} placeholder="Search cards" /><button type="button" onClick={() => { setCardId(""); closeV2Picker() }}>No card</button>{filteredV2Cards.map(item => <button type="button" key={item.id} onClick={() => { setCardId(item.id); closeV2Picker() }}>{item.name}{item.id === cardId && <Check size={16} />}</button>)}<button type="button" onClick={() => { closeV2Picker(); setShowNewCard(true) }}><Plus size={16} /> New card</button></div>}
+                  </div>
+                  {showNewCard && <InlineCreateCardControl name={newCardName} onNameChange={setNewCardName} onCancel={() => { setShowNewCard(false); setNewCardName("") }} onSubmit={() => void handleCreateCard()} isSubmitting={isCreatingCard} subtitle="It will be selected for this transaction." surfaceClassName="bg-background" />}
+                  <div className={styles.fieldPicker}><button type="button" aria-haspopup="dialog" onClick={() => setContextPickerOpen(true)}><span>Context</span><span>{contexts.find(item => item.id === contextId)?.name ?? "None"}</span><ChevronDown size={16} /></button></div>
+                </div>}
+                {/* Classic and v1-only transaction fields remain available in Classic. */}
+                <div className={cn("min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card", v2Create && "hidden")}>
                   <button
                     type="button"
                     onClick={() => setShowMoreDetails((current) => !current)}
@@ -905,7 +934,7 @@ export function TransactionEditorForm({
                       <div className="min-w-0 max-w-full space-y-2">
                         <div className="flex items-center justify-between">
                             <Label className="text-sm font-medium">Card</Label>
-                          {!showNewCard && (
+                          {!showNewCard && !v2Create && (
                             <button
                               type="button"
                               onClick={() => setShowNewCard(true)}
@@ -930,8 +959,10 @@ export function TransactionEditorForm({
                             subtitle="It will be selected for this transaction."
                             surfaceClassName="bg-background"
                           />
-                        ) : (
-                          <FormChipRail
+                        ) : v2Create ? <div className={styles.fieldPicker}>
+                            <button type="button" aria-haspopup="listbox" aria-expanded={v2Picker === "card"} onClick={() => { setV2Picker(v2Picker === "card" ? null : "card"); setV2PickerQuery("") }}><span>{cards.find(item => item.id === cardId)?.name ?? "No card"}</span><ChevronDown size={16} /></button>
+                            {v2Picker === "card" && <div className={styles.pickerPanel}><input aria-label="Search cards" value={v2PickerQuery} onChange={event => setV2PickerQuery(event.target.value)} placeholder="Search cards" /><button type="button" onClick={() => { setCardId(""); closeV2Picker() }}>No card</button>{filteredV2Cards.map(item => <button type="button" key={item.id} onClick={() => { setCardId(item.id); closeV2Picker() }}>{item.name}{item.id === cardId && <Check size={16} />}</button>)}<button type="button" onClick={() => { closeV2Picker(); setShowNewCard(true) }}><Plus size={16} /> New card</button></div>}
+                          </div> : <FormChipRail
                             items={[
                               {
                                 value: "",
@@ -963,8 +994,7 @@ export function TransactionEditorForm({
                             }}
                             ariaLabel="Choose a card"
                             fadeClassName="from-card via-card/80 to-transparent"
-                          />
-                        )}
+                          />}
                       </div>
 
                       <TransactionDetailsSection
