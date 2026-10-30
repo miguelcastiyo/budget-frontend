@@ -9,6 +9,7 @@ import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
+import { useInterfacePreference } from "./interface-preference"
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
@@ -18,6 +19,7 @@ const navItems = [
 ]
 
 export function Header() {
+  const { version } = useInterfacePreference()
   const { profile } = useAuth()
   const pathname = usePathname()
   const authority = useFinancialAuthority()
@@ -29,6 +31,8 @@ export function Header() {
       ? "/transactions?resume=1"
       : `/transactions?month=${getCurrentMonthKey()}`)
   }, [profile?.id])
+
+  if (version === "v2") return null
 
   return (
     <header className="sticky top-0 z-40 hidden lg:block bg-background/80 backdrop-blur-xl border-b border-border/50">

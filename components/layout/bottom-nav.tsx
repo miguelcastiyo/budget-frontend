@@ -9,6 +9,8 @@ import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
+import { useInterfacePreference } from "./interface-preference"
+import styles from "./v2-navigation.module.css"
 
 const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
 
@@ -96,6 +98,7 @@ export function BottomNav({
   showAddCoachmark = false,
   addCoachmarkText = "Start here. Add your first transaction.",
 }: BottomNavProps) {
+  const { version } = useInterfacePreference()
   const { profile } = useAuth()
   const authority = useFinancialAuthority()
   const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
@@ -106,11 +109,12 @@ export function BottomNav({
   const [transactionsHref, setTransactionsHref] = useState("/transactions")
 
   useEffect(() => {
-    const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
+    let dismissed = false
+    try { dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1" } catch { /* Storage is optional. */ }
     setCoachmarkDismissed(dismissed)
-    setTransactionsHref(hasTransactionViewState(profile?.id ?? "")
-      ? "/transactions?resume=1"
-      : `/transactions?month=${getCurrentMonthKey()}`)
+    try {
+      setTransactionsHref(hasTransactionViewState(profile?.id ?? "") ? "/transactions?resume=1" : `/transactions?month=${getCurrentMonthKey()}`)
+    } catch { setTransactionsHref(`/transactions?month=${getCurrentMonthKey()}`) }
     setHasHydrated(true)
   }, [profile?.id])
 
@@ -121,7 +125,7 @@ export function BottomNav({
 
   const dismissCoachmark = () => {
     setCoachmarkDismissed(true)
-    window.localStorage.setItem(coachmarkDismissedStorageKey, "1")
+    try { window.localStorage.setItem(coachmarkDismissedStorageKey, "1") } catch { /* Storage is optional. */ }
   }
 
   const handleAddClick = () => {
@@ -133,6 +137,30 @@ export function BottomNav({
       return
     }
     router.push(addHref)
+  }
+
+  if (version === "v2") {
+    const items: MobileNavItem[] = reviewEnabled
+      ? [...mobileNavItems.slice(0, 2), { type: "route", href: "/review", icon: ListChecks, label: "Review" }, ...mobileNavItems.slice(2)]
+      : mobileNavItems
+    const renderRoutes = (includeAction: boolean) => items.map((item) => {
+      if (item.type === "action") return includeAction ? <button key={item.action} type="button" className={styles.item} onClick={handleAddClick} aria-label="Log transaction"><span className={styles.action}><Plus className={styles.icon} aria-hidden="true" /></span></button> : null
+      const Icon = item.icon
+      const active = isRouteActive(pathname, item.href)
+      const badge = item.href === "/review" && authority.isUnlocked && !authority.isLoading ? authority.pendingGlobalCount : 0
+      return <Link key={item.href} href={item.href === "/transactions" ? transactionsHref : item.href} className={styles.item} aria-current={active ? "page" : undefined}>
+        <Icon className={styles.icon} aria-hidden="true" />{item.label}
+        {badge > 0 && <span className={styles.badge} aria-label={`${badge} pending`}>{badge}</span>}
+      </Link>
+    })
+    return <>
+      <aside className={cn(styles.nav, styles.sidebar)} aria-label="Desktop navigation">
+        <span className={styles.brand}>Budget</span>
+        <button type="button" className={styles.action} onClick={handleAddClick}><Plus className={styles.icon} aria-hidden="true" />{addLabel}</button>
+        <nav aria-label="Primary desktop" className={styles.items}>{renderRoutes(false)}</nav>
+      </aside>
+      <nav className={cn(styles.nav, styles.mobile)} aria-label="Primary"><div className={styles.items}>{renderRoutes(true)}</div></nav>
+    </>
   }
 
   return (
@@ -183,11 +211,13 @@ export function FloatingAddButton({
   showCoachmark = false,
   coachmarkText = "Start here. Add your first transaction.",
 }: FloatingAddButtonProps) {
+  const { version } = useInterfacePreference()
   const [hasHydrated, setHasHydrated] = useState(false)
   const [coachmarkDismissed, setCoachmarkDismissed] = useState(false)
 
   useEffect(() => {
-    const dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1"
+    let dismissed = false
+    try { dismissed = window.localStorage.getItem(coachmarkDismissedStorageKey) === "1" } catch { /* Storage is optional. */ }
     setCoachmarkDismissed(dismissed)
     setHasHydrated(true)
   }, [])
@@ -199,7 +229,7 @@ export function FloatingAddButton({
 
   const dismissCoachmark = () => {
     setCoachmarkDismissed(true)
-    window.localStorage.setItem(coachmarkDismissedStorageKey, "1")
+    try { window.localStorage.setItem(coachmarkDismissedStorageKey, "1") } catch { /* Storage is optional. */ }
   }
 
   const handleClick = () => {
@@ -208,6 +238,8 @@ export function FloatingAddButton({
     }
     onClick?.()
   }
+
+  if (version === "v2") return null
 
   return (
     <div className="fixed bottom-8 right-6 z-50 hidden lg:block">

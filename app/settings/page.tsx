@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/components/auth/auth-provider"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
 
 interface SettingsItemProps {
   icon: React.ReactNode
@@ -129,6 +130,7 @@ function SettingsSection({
 }
 
 export default function SettingsPage() {
+  const interfacePreference = useInterfacePreference()
   const router = useRouter()
   const { profile, setProfile, signOut } = useAuth()
   const { resolvedTheme } = useTheme()
@@ -353,6 +355,12 @@ export default function SettingsPage() {
 
             <div className="lg:order-2">
               <SettingsSection title="Preferences">
+                <SettingsItem
+                  icon={<Layers className="w-5 h-5 text-muted-foreground" />}
+                  label="Interface"
+                  description={interfacePreference.available ? "Choose Classic or v2 on this device" : "v2 is currently unavailable"}
+                  rightElement={<label className="flex items-center gap-2 text-sm"> <span>v2</span><Switch aria-label="Use v2 interface" checked={interfacePreference.version === "v2"} disabled={!interfacePreference.available || !interfacePreference.ready} onCheckedChange={(checked) => interfacePreference.setVersion(checked ? "v2" : "classic")} /></label>}
+                />
                 <SettingsItem
                   icon={<Moon className="w-5 h-5 text-muted-foreground" />}
                   label="Appearance"

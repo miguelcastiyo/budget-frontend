@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { FinancialAuthorityProvider } from '@/components/privacy/financial-authority-provider'
 import { EncryptedVaultBoundary } from '@/components/privacy/encrypted-vault-boundary'
 import { ClientUpdateNotice } from '@/components/common/client-update-notice'
+import { InterfacePreferenceProvider } from '@/components/layout/interface-preference'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -62,7 +63,7 @@ export default function RootLayout({
           <GoogleOauthProvider>
             <AuthProvider>
               <GlobalErrorProvider>
-                <AuthGate><FinancialAuthorityProvider><EncryptedVaultBoundary>{children}</EncryptedVaultBoundary></FinancialAuthorityProvider></AuthGate>
+                <AuthGate><FinancialAuthorityProvider><EncryptedVaultBoundary><InterfacePreferenceProvider>{children}</InterfacePreferenceProvider></EncryptedVaultBoundary></FinancialAuthorityProvider></AuthGate>
               </GlobalErrorProvider>
             </AuthProvider>
           </GoogleOauthProvider>
