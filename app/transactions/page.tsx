@@ -7,6 +7,8 @@ import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { TransactionFilters } from "@/components/budget/transaction-filters"
 import { TransactionStatsGrid } from "@/components/budget/transaction-stats-grid"
 import { TransactionList } from "@/components/budget/transaction-list"
+import { V2Activity } from "@/components/budget/v2-activity"
+import activityStyles from "@/components/budget/v2-activity.module.css"
 import { AddTransactionSheet } from "@/components/budget/add-transaction-sheet"
 import { TransactionDetailSheet } from "@/components/budget/transaction-detail-sheet"
 import { ErrorDialog, type ErrorDialogState } from "@/components/common/error-dialog"
@@ -488,6 +490,7 @@ export default function TransactionsPage() {
   }
 
   const remainingTransactions = Math.max(totalItems - transactions.length, 0)
+  const openCreate = () => version === "v2" ? openAdd() : setShowAddTransaction(true)
 
   const transactionFiltersProps = useMemo(
     () => ({
@@ -566,17 +569,19 @@ export default function TransactionsPage() {
       />
 
       <main className="max-w-lg lg:max-w-6xl mx-auto px-5 lg:px-8 pt-standalone-safe-top">
+        <div className={version === "v2" ? activityStyles.root : undefined}>
+        {version === "v2" && <h1 className={activityStyles.heading}>Activity</h1>}
         <div
           className={cn(
-            "lg:grid lg:gap-8",
-            desktopFiltersCollapsed
+            version !== "v2" && "lg:grid lg:gap-8",
+            version !== "v2" && (desktopFiltersCollapsed
               ? "lg:grid-cols-[44px_minmax(0,1fr)]"
-              : "lg:grid-cols-[288px_minmax(0,1fr)]"
+              : "lg:grid-cols-[288px_minmax(0,1fr)]")
           )}
         >
           <div className="mb-6 lg:mb-0">
             <div className="lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1 [scrollbar-width:thin]">
-              <div className="hidden lg:block">
+              <div className={version === "v2" ? "hidden" : "hidden lg:block"}>
                 {desktopFiltersCollapsed ? (
                   <div className="flex justify-center">
                     <button
@@ -611,14 +616,15 @@ export default function TransactionsPage() {
                 )}
               </div>
 
-              <div className="lg:hidden">
+              <div className={version === "v2" ? undefined : "lg:hidden"}>
                 <TransactionFilters {...transactionFiltersProps} desktopMode={false} />
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
-            {totalItems > 0 && (
+            {version === "v2" && totalItems > 0 && <div className={activityStyles.summary}><span><strong>{formatCurrency(summary.total_spent)}</strong> total spent</span><span><strong>{summary.count.toLocaleString()}</strong> transactions</span><span><strong>{formatCurrency(summary.avg_transaction)}</strong> average</span><span><strong>{summary.split_count.toLocaleString()}</strong> split</span></div>}
+            {version !== "v2" && totalItems > 0 && (
               <>
                 <div className="grid grid-cols-1 gap-2 lg:hidden">
                   <TransactionStatsGrid compact totalSpent={stats.totalSpent} count={stats.count} avgTransaction={stats.avgTransaction} splitCount={stats.splitCount} />
@@ -626,6 +632,55 @@ export default function TransactionsPage() {
               </>
             )}
 
+            {version === "v2" ? (
+            <V2Activity
+              transactions={transactions}
+              title={transactionTitle}
+              emptyTitle={hasActiveFilters ? "No matching transactions" : "No transactions yet"}
+              emptyDescription={hasActiveFilters ? "Try removing or adjusting some filters." : "Add your first transaction to start tracking spending."}
+              emptyActionLabel={hasActiveFilters ? "Clear filters" : "Add Transaction"}
+              onEmptyAction={hasActiveFilters ? () => { clearAllFilters(); setSearchQuery("") } : openCreate}
+              loading={isLoading}
+              headerRight={
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center rounded-lg border border-border/70 p-0.5 bg-background">
+                    <span className="hidden lg:inline px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Sort
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSortOrder("date_desc")}
+                      aria-label="Sort newest first"
+                      title="Newest first"
+                      className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
+                        sortOrder === "date_desc"
+                          ? "bg-secondary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <ArrowDownWideNarrow className="w-3.5 h-3.5" />
+                      <span className="hidden lg:inline">Newest</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSortOrder("date_asc")}
+                      aria-label="Sort oldest first"
+                      title="Oldest first"
+                      className={`inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 lg:px-2 py-1 text-xs font-medium transition-colors ${
+                        sortOrder === "date_asc"
+                          ? "bg-secondary text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <ArrowUpNarrowWide className="w-3.5 h-3.5" />
+                      <span className="hidden lg:inline">Oldest</span>
+                    </button>
+                  </div>
+                </div>
+              }
+              onTransactionClick={setSelectedTransaction}
+            />
+            ) : (
             <TransactionList
               transactions={transactions}
               title={transactionTitle}
@@ -677,6 +732,7 @@ export default function TransactionsPage() {
               }
               onTransactionClick={setSelectedTransaction}
             />
+            )}
 
             {transactions.length > 0 && (
               <div className="flex flex-col items-stretch gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -711,6 +767,7 @@ export default function TransactionsPage() {
               </div>
             )}
           </div>
+        </div>
         </div>
       </main>
 

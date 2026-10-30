@@ -1,0 +1,24 @@
+.root { --activity-bg:#fbfbfa; --activity-fg:#292a2e; --activity-muted:#727277; --activity-line:#e7e7e5; --activity-needs:#73747b; --activity-wants:#ba9a6b; --activity-savings:#75a994; background:var(--activity-bg); color:var(--activity-fg); font-family:Inter,system-ui,sans-serif; min-height:calc(100vh - 6rem); margin:0 -1.25rem; padding:1rem 1.25rem 3rem; }
+:global(.dark) .root { --activity-bg:#16171a; --activity-fg:#f0efed; --activity-muted:#a2a2a4; --activity-line:#303135; --activity-needs:#b6b7bd; --activity-wants:#c6a879; --activity-savings:#8cbda9; }
+.heading { font-size:1rem; font-weight:600; margin-bottom:1rem; }
+.summary { display:flex; flex-wrap:wrap; gap:.4rem 1.25rem; color:var(--activity-muted); font-size:.8rem; margin:1.25rem 0 .5rem; font-variant-numeric:tabular-nums; }
+.summary strong { color:var(--activity-fg); font-weight:500; }
+.ledger { min-width:0; }
+.listHeading { display:flex; align-items:center; justify-content:space-between; gap:1rem; color:var(--activity-muted); font-size:.8rem; padding:.5rem 0; }
+.listHeading h2 { font-weight:500; }
+.group { margin-top:1rem; }
+.date { color:var(--activity-muted); font-size:.75rem; font-weight:500; padding:.45rem 0; border-bottom:1px solid var(--activity-line); }
+.row { display:flex; align-items:center; gap:.875rem; width:100%; min-height:3.75rem; padding:.6rem 0; text-align:left; border-bottom:1px solid var(--activity-line); cursor:pointer; }
+.row:focus-visible, .empty button:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.icon { flex:none; display:grid; place-items:center; width:1.5rem; height:1.5rem; }
+.icon svg { width:1.1rem; height:1.1rem; }
+.needs { color:var(--activity-needs); } .wants { color:var(--activity-wants); } .savings { color:var(--activity-savings); }
+.description { display:flex; flex:1; min-width:0; flex-direction:column; font-size:.9375rem; line-height:1.3; }
+.description span, .description small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.description small { color:var(--activity-muted); font-size:.78rem; margin-top:.2rem; }
+.category { display:none; color:var(--activity-muted); font-size:.8rem; }
+.amount { flex:none; font-size:.9375rem; font-variant-numeric:tabular-nums; }
+.empty { text-align:center; padding:3rem 0; color:var(--activity-muted); font-size:.875rem; }
+.empty p + p { margin-top:.4rem; }
+.empty button { margin-top:1rem; color:var(--activity-fg); text-decoration:underline; cursor:pointer; }
+@media (min-width:1024px) { .root { margin:0 -2rem; padding:2rem 2.5rem 4rem; } .category { display:block; width:7rem; } }
