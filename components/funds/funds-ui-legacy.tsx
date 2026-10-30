@@ -71,6 +71,8 @@ import { formatSavingsCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { SavingsPlanInlineSummary, SavingsPlanFundContext } from "@/components/funds/savings-plan"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/funds/v2-funds.module.css"
 
 type FundsFilter = "active" | "archived"
 type FundActionMode = "create" | "edit"
@@ -393,11 +395,11 @@ function getEntryFormState(entry?: FundEntry | null, intent: EntryIntent = "add"
   }
 }
 
-function renderFundShell(children: React.ReactNode) {
+function renderFundShell(children: React.ReactNode, isV2: boolean) {
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
       <Header />
-      <main className="mx-auto max-w-lg px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8">
+      <main data-testid={isV2 ? "v2-funds" : undefined} className={cn("mx-auto max-w-lg px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8", isV2 && styles.root)}>
         {children}
       </main>
       <BottomNav />
@@ -406,6 +408,7 @@ function renderFundShell(children: React.ReactNode) {
 }
 
 export function FundsOverviewPage() {
+  const { version } = useInterfacePreference()
   const financialAuthority = useFinancialAuthority()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -496,7 +499,7 @@ export function FundsOverviewPage() {
         <Link href="/insights"><ArrowLeft className="size-4" />Insights</Link>
       </Button>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className={cn("flex items-start justify-between gap-4", version === "v2" && styles.heading)}>
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Funds</p>
           <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight text-foreground lg:mt-2 lg:text-3xl">
@@ -636,7 +639,7 @@ export function FundsOverviewPage() {
           router.replace("/insights/funds")
         }}
       />
-    </div>
+    </div>, version === "v2"
   )
 }
 
@@ -760,6 +763,7 @@ function FundListCard({
   onEdit: () => void
   onArchiveRestore: () => void
 }) {
+  const { version } = useInterfacePreference()
   const savedAmount = parseAmount(fund.current_balance)
   const goalAmount = parseAmount(fund.goal_amount)
   const hasGoal = goalAmount > 0
@@ -771,7 +775,7 @@ function FundListCard({
   const targetLabel = fund.target_month ? formatMonthLabel(fund.target_month) ?? fund.target_month : null
 
   return (
-    <Card className="overflow-hidden border border-border/50 shadow-sm transition-colors hover:border-border hover:bg-muted/20">
+    <Card className={cn("overflow-hidden border border-border/50 shadow-sm transition-colors hover:border-border hover:bg-muted/20", version === "v2" && styles.fundRow)}>
       <CardContent className="relative p-3.5 lg:p-4">
         <div className="absolute right-4 top-3 z-10 lg:right-5 lg:top-4">
           <DropdownMenu>
@@ -785,7 +789,7 @@ function FundListCard({
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuContent align="end" className={cn("rounded-xl", version === "v2" && styles.portal)}>
               <DropdownMenuItem onClick={onEdit}>
                 <Pencil className="size-4" />
                 Edit fund
@@ -868,6 +872,7 @@ function FundListCard({
 }
 
 export function FundDetailPage() {
+  const { version } = useInterfacePreference()
   const financialAuthority = useFinancialAuthority()
   const router = useRouter()
   const params = useParams<{ fundId: string }>()
@@ -958,7 +963,7 @@ export function FundDetailPage() {
             </Card>
           ) : null}
 
-          <Card className="overflow-hidden border border-border/40 bg-card [background-image:radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_42%),linear-gradient(135deg,var(--card),var(--secondary))]">
+          <Card className={cn("overflow-hidden border border-border/40 bg-card [background-image:radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--primary)_18%,transparent),transparent_42%),linear-gradient(135deg,var(--card),var(--secondary))]", version === "v2" && styles.hero)}>
             <CardContent className="space-y-5 p-5 lg:space-y-6 lg:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 space-y-2">
@@ -980,7 +985,7 @@ export function FundDetailPage() {
                       <MoreHorizontal className="size-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl">
+                  <DropdownMenuContent align="end" className={cn("rounded-xl", version === "v2" && styles.portal)}>
                     <DropdownMenuItem onClick={() => setFundDialogOpen(true)}>
                       <Pencil className="size-4" />
                       Edit fund
@@ -1073,7 +1078,7 @@ export function FundDetailPage() {
 
           <SavingsPlanFundContext fundId={fund.id} />
 
-          <Card className="border-0 bg-transparent shadow-none lg:bg-card lg:shadow-sm">
+          <Card className={cn("border-0 bg-transparent shadow-none lg:bg-card lg:shadow-sm", version === "v2" && styles.breakdown)}>
             <CardContent className="space-y-3 px-0 pt-0 lg:p-6">
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Balance breakdown</p>
               <div className="divide-y divide-border/70 rounded-3xl border border-border/60 bg-card lg:rounded-2xl">
@@ -1085,7 +1090,7 @@ export function FundDetailPage() {
             </CardContent>
           </Card>
 
-          <section className="space-y-4 lg:rounded-3xl lg:bg-card lg:p-6 lg:shadow-sm">
+          <section className={cn("space-y-4 lg:rounded-3xl lg:bg-card lg:p-6 lg:shadow-sm", version === "v2" && styles.ledger)}>
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Ledger</p>
@@ -1133,7 +1138,7 @@ export function FundDetailPage() {
                               <MoreHorizontal className="size-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuContent align="end" className={cn("rounded-xl", version === "v2" && styles.portal)}>
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedEntry(entry)
@@ -1190,6 +1195,7 @@ export function FundDetailPage() {
                 setDeleteTarget(null)
               }
             }}
+            contentClassName={version === "v2" ? styles.portal : undefined}
             title="Delete this entry?"
             description="This only works for manual, starting-balance, and correction entries."
             confirmLabel="Delete entry"
@@ -1202,7 +1208,7 @@ export function FundDetailPage() {
           </ResponsiveConfirmDialog>
         </>
       )}
-    </div>
+    </div>, version === "v2"
   )
 }
 
@@ -1233,6 +1239,7 @@ export function FundDialog({
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const { version } = useInterfacePreference()
   const financialAuthority = useFinancialAuthority()
   const [values, setValues] = useState<FundFormState>(getDefaultFundFormState())
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -1294,6 +1301,7 @@ export function FundDialog({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
+      contentClassName={version === "v2" ? styles.portal : undefined}
       title={mode === "create" ? "Create fund" : "Edit fund"}
       description={mode === "create" ? "Track dedicated money without creating a new budget bucket." : fund?.name ?? "Fund details"}
       footer={
@@ -1402,6 +1410,7 @@ export function FundTargetMonthPicker({
   disabled?: boolean
   onChange: (value: string) => void
 }) {
+  const { version } = useInterfacePreference()
   const [open, setOpen] = useState(false)
   const currentMonth = getCurrentMonthKey()
   const selectedMonth = value || currentMonth
@@ -1445,7 +1454,7 @@ export function FundTargetMonthPicker({
           <span className={cn("truncate", !value && "text-muted-foreground")}>{selectedLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(calc(100svw-2rem),24rem)] rounded-2xl p-4" align="start" avoidCollisions>
+      <PopoverContent className={cn("w-[min(calc(100svw-2rem),24rem)] rounded-2xl p-4", version === "v2" && styles.portal)} align="start" avoidCollisions>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <Button
@@ -1532,6 +1541,7 @@ export function FundEntryDialog({
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const { version } = useInterfacePreference()
   const financialAuthority = useFinancialAuthority()
   const [values, setValues] = useState<EntryFormState>(getEntryFormState())
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -1616,6 +1626,7 @@ export function FundEntryDialog({
     <ResponsiveDialog
       open={open}
       onOpenChange={onOpenChange}
+      contentClassName={version === "v2" ? styles.portal : undefined}
       title={mode === "create" ? (intent === "add" ? "Add money" : "Use money") : "Edit fund entry"}
       description={fund.name}
       footer={
@@ -1655,7 +1666,7 @@ export function FundEntryDialog({
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className={cn("w-auto p-0", version === "v2" && styles.portal)} align="start">
               <AppCalendar
                 mode="single"
                 selected={selectedEntryDate ?? undefined}
@@ -1717,7 +1728,7 @@ export function FundEntryDialog({
                 <SelectTrigger id="fund-transaction-tag" className="h-11 w-full rounded-xl border-border/60">
                   <SelectValue placeholder="Choose a tag" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={version === "v2" ? styles.portal : undefined}>
                   {tags.map((tag) => (
                     <SelectItem key={tag.id} value={tag.id}>
                       {tag.name}
@@ -1740,7 +1751,7 @@ export function FundEntryDialog({
                 <SelectTrigger id="fund-transaction-card" className="h-11 w-full rounded-xl border-border/60">
                   <SelectValue placeholder="No card" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={version === "v2" ? styles.portal : undefined}>
                   <SelectItem value={NO_CARD_SELECT_VALUE}>No card</SelectItem>
                   {cards.map((card) => (
                     <SelectItem key={card.id} value={card.id}>
@@ -1781,7 +1792,7 @@ export function FundEntryDialog({
               <SelectTrigger id="fund-transaction-link" className="h-11 w-full rounded-xl border-border/60">
                 <SelectValue placeholder="Choose a transaction" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={version === "v2" ? styles.portal : undefined}>
                 {transactions.map((transaction) => (
                   <SelectItem key={transaction.id} value={transaction.id}>
                     {`${transaction.expense} • ${formatCurrency(transaction.amount)} • ${transaction.date}`}

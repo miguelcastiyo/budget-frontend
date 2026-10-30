@@ -1,0 +1,21 @@
+.root { --fund-bg:#fbfbfa; --fund-fg:#292a2e; --fund-muted:#727277; --fund-line:#e7e7e5; background:var(--fund-bg); min-height:calc(100vh - 6rem); padding-top:1rem; padding-bottom:calc(3rem + env(safe-area-inset-bottom)); }
+:global(.dark) .root { --fund-bg:#16171a; --fund-fg:#f0efed; --fund-muted:#a2a2a4; --fund-line:#303135; }
+.heading h1 { font-size:1.25rem; font-weight:600; letter-spacing:-.025em; }
+.heading > div > p:first-child { color:var(--fund-muted); letter-spacing:.08em; }
+.fundRow { background:transparent; border:0; border-top:1px solid var(--fund-line); border-radius:0; box-shadow:none; }
+.fundRow:hover { background:transparent; border-color:var(--fund-line); }
+.fundRow :global([data-slot="card-content"]) { padding:1rem 0; }
+.fundRow h2 { font-size:.9375rem; font-weight:600; }
+.fundRow :global([role="progressbar"]) { height:3px; }
+.hero { background:transparent; background-image:none; border:0; border-bottom:1px solid var(--fund-line); border-radius:0; box-shadow:none; }
+.hero :global([data-slot="card-content"]) { padding:1rem 0 1.5rem; }
+.root button:focus-visible, .root a:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.portal { --background:#fbfbfa; --foreground:#292a2e; --card:#fff; --card-foreground:#292a2e; --popover:#fff; --popover-foreground:#292a2e; --primary:#292a2e; --primary-foreground:#fbfbfa; --secondary:#f1f1ef; --secondary-foreground:#292a2e; --muted:#f1f1ef; --muted-foreground:#727277; --border:#e7e7e5; --input:#e7e7e5; --ring:#77777c; background:var(--background); color:var(--foreground); font-family:Inter,system-ui,sans-serif; }
+:global(.dark) .portal { --background:#16171a; --foreground:#f0efed; --card:#202125; --card-foreground:#f0efed; --popover:#25262a; --popover-foreground:#f0efed; --primary:#f0efed; --primary-foreground:#16171a; --secondary:#292a2e; --secondary-foreground:#f0efed; --muted:#292a2e; --muted-foreground:#a2a2a4; --border:#36373c; --input:#36373c; --ring:#aaa; }
+@media (min-width:1024px) { .root { padding-top:2rem; } }
+@media (prefers-reduced-motion:reduce) { .fundRow, .hero, .portal { animation-duration:0s !important; transition-duration:0s !important; } }
+
+.breakdown { border:0; border-radius:0; background:transparent; box-shadow:none; }
+.ledger { border-top:1px solid var(--fund-line); border-radius:0; background:transparent; box-shadow:none; padding:1.25rem 0 0; }
+
+.heading, .fundRow, .hero, .ledger, .breakdown { color:var(--fund-fg); font-family:Inter,system-ui,sans-serif; }

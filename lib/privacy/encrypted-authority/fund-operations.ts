@@ -89,7 +89,8 @@ export async function getEncryptedFunds(deps: EncryptedOperationDependencies, fi
     const view = fundVMFromState(fund, entries)
     const breakdown = sourceBreakdown(entries, fund.id)
     const balanceCents = ledgerBalance(entries, fund.id)
-    return { id: view.id, name: view.name, fund_type: view.fundType as FundListItem["fund_type"], goal_amount: view.goalAmount, target_month: null, notes: null, status: view.status, sort_order: view.sortOrder, current_balance: view.balance, remaining_amount: view.remaining, percent_funded: view.goalAmount === null ? null : formatMoneyCents(Math.round((balanceCents * 10000) / (fund.goalAmountCents ?? 1))), is_goal_met: view.isGoalMet, created_at: "", updated_at: "", archived_at: null, entries_count: entries.filter((entry) => entry.fundId === fund.id).length, ...breakdown }
+    const source = state.funds.find((item) => String(item.id ?? "") === fund.id)
+    return { id: view.id, name: view.name, fund_type: view.fundType as FundListItem["fund_type"], goal_amount: view.goalAmount, target_month: source?.target_month == null ? null : String(source.target_month), notes: source?.notes == null ? null : String(source.notes), status: view.status, sort_order: view.sortOrder, current_balance: view.balance, remaining_amount: view.remaining, percent_funded: view.goalAmount === null ? null : formatMoneyCents(Math.round((balanceCents * 10000) / (fund.goalAmountCents ?? 1))), is_goal_met: view.isGoalMet, created_at: "", updated_at: "", archived_at: null, entries_count: entries.filter((entry) => entry.fundId === fund.id).length, ...breakdown }
   })
   return { items }
 }
