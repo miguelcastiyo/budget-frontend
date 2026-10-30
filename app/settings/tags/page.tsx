@@ -20,6 +20,8 @@ import { TagIconPicker } from "@/components/settings/tag-icon-picker"
 import { ApiError, apiClient } from "@/lib/api/client"
 import { getTagIcon } from "@/lib/tag-icons"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/settings/v2-taxonomy.module.css"
 
 function tagCountLabel(count: number) {
   return `${count} ${count === 1 ? "tag" : "tags"}`
@@ -28,6 +30,7 @@ function tagCountLabel(count: number) {
 
 export default function TagsSettingsPage() {
   const financialAuthority = useFinancialAuthority()
+  const { version } = useInterfacePreference()
   const [tags, setTags] = useState<Tag[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -71,7 +74,7 @@ export default function TagsSettingsPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingId || !editingName.trim()) {
+    if (!editingId || !editingName.trim() || (version === "v2" && isMutating)) {
       return
     }
 
@@ -113,7 +116,7 @@ export default function TagsSettingsPage() {
 
   const handleAddTag = async () => {
     const name = newTagName.trim()
-    if (!name) {
+    if (!name || (version === "v2" && isMutating)) {
       return
     }
 
@@ -126,7 +129,7 @@ export default function TagsSettingsPage() {
         icon_key: newTagIconKey || null,
       }
       const created = await financialAuthority.createTag(payload)
-      setTags((previous) => [...previous, created])
+      setTags((previous) => [...previous.filter((tag) => tag.id !== created.id), created])
       setNewTagName("")
       setNewTagIconKey("")
       setShowNewTag(false)
@@ -171,7 +174,7 @@ export default function TagsSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={`min-h-screen bg-background pb-mobile-nav ${version === "v2" ? styles.root : ""}`}>
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-4">
           <Link href="/settings">
@@ -286,7 +289,7 @@ export default function TagsSettingsPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuContent align="end" className={`rounded-xl ${version === "v2" ? styles.portal : ""}`}>
                           <DropdownMenuItem onClick={() => handleStartEdit(tag)}>
                             <Pencil className="h-4 w-4" />
                             Edit tag
@@ -311,10 +314,12 @@ export default function TagsSettingsPage() {
 
       <ResponsiveDialog
         open={showNewTag}
+        contentClassName={version === "v2" ? styles.portal : undefined}
+        closeDisabled={version === "v2" && isMutating}
         onOpenChange={(open) => {
           if (open) {
             setShowNewTag(true)
-          } else {
+          } else if (version !== "v2" || !isMutating) {
             closeNewTagDrawer()
           }
         }}
@@ -332,6 +337,7 @@ export default function TagsSettingsPage() {
               variant="ghost"
               className="h-12 rounded-xl px-4"
               onClick={closeNewTagDrawer}
+              disabled={version === "v2" && isMutating}
             >
               Cancel
             </Button>
@@ -347,6 +353,7 @@ export default function TagsSettingsPage() {
         }
       >
         <div className="grid min-w-0 gap-4">
+          {version === "v2" && error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <div className="relative min-w-0">
             <NewTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -359,7 +366,7 @@ export default function TagsSettingsPage() {
                   e.preventDefault()
                   void handleAddTag()
                 }
-                if (e.key === "Escape") {
+                if (e.key === "Escape" && (version !== "v2" || !isMutating)) {
                   closeNewTagDrawer()
                 }
               }}
@@ -371,8 +378,10 @@ export default function TagsSettingsPage() {
 
       <ResponsiveDialog
         open={editingId !== null}
+        contentClassName={version === "v2" ? styles.portal : undefined}
+        closeDisabled={version === "v2" && isMutating}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && (version !== "v2" || !isMutating)) {
             handleCancelEdit()
           }
         }}
@@ -390,6 +399,7 @@ export default function TagsSettingsPage() {
               variant="ghost"
               className="h-12 rounded-xl px-4"
               onClick={handleCancelEdit}
+              disabled={version === "v2" && isMutating}
             >
               Cancel
             </Button>
@@ -405,6 +415,7 @@ export default function TagsSettingsPage() {
         }
       >
         <div className="grid min-w-0 gap-4">
+          {version === "v2" && error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <div className="relative min-w-0">
             <EditingTagInputIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -416,7 +427,7 @@ export default function TagsSettingsPage() {
                   e.preventDefault()
                   void handleSaveEdit()
                 }
-                if (e.key === "Escape") {
+                if (e.key === "Escape" && (version !== "v2" || !isMutating)) {
                   handleCancelEdit()
                 }
               }}
@@ -428,6 +439,7 @@ export default function TagsSettingsPage() {
 
       <ResponsiveConfirmDialog
         open={!!deleteTagId}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onOpenChange={(open) => {
           if (!open && !isMutating) {
             setDeleteTagId(null)

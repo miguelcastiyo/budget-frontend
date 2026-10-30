@@ -18,6 +18,8 @@ import {
 import { ApiError, apiClient } from "@/lib/api/client"
 import { sortCards } from "@/lib/cards"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/settings/v2-taxonomy.module.css"
 
 function cardCountLabel(count: number) {
   return `${count} ${count === 1 ? "card" : "cards"}`
@@ -42,6 +44,7 @@ function upsertUpdatedCard(cards: CardType[], updated: CardType): CardType[] {
 
 export default function CardsSettingsPage() {
   const financialAuthority = useFinancialAuthority()
+  const { version } = useInterfacePreference()
   const [cards, setCards] = useState<CardType[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -78,7 +81,7 @@ export default function CardsSettingsPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingId || !editingName.trim()) {
+    if (!editingId || !editingName.trim() || (version === "v2" && isMutating)) {
       return
     }
 
@@ -108,7 +111,7 @@ export default function CardsSettingsPage() {
 
   const handleAddCard = async () => {
     const name = newCardName.trim()
-    if (!name) {
+    if (!name || (version === "v2" && isMutating)) {
       return
     }
 
@@ -117,7 +120,7 @@ export default function CardsSettingsPage() {
 
     try {
       const created = await financialAuthority.createCard({ name })
-      setCards((previous) => sortCards([...previous, created]))
+      setCards((previous) => sortCards([...previous.filter((card) => card.id !== created.id), created]))
       setNewCardName("")
       setShowNewCard(false)
     } catch (err) {
@@ -185,7 +188,7 @@ export default function CardsSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-mobile-nav">
+    <div className={`min-h-screen bg-background pb-mobile-nav ${version === "v2" ? styles.root : ""}`}>
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-5 py-4">
           <Link href="/settings">
@@ -228,7 +231,7 @@ export default function CardsSettingsPage() {
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void handleAddCard()
-                  if (e.key === "Escape") {
+                  if (e.key === "Escape" && (version !== "v2" || !isMutating)) {
                     closeNewCardForm()
                   }
                 }}
@@ -249,6 +252,7 @@ export default function CardsSettingsPage() {
                 className="rounded-full"
                 aria-label="Cancel new card"
                 onClick={closeNewCardForm}
+                disabled={version === "v2" && isMutating}
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -312,7 +316,7 @@ export default function CardsSettingsPage() {
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === "Enter") void handleSaveEdit()
-                          if (e.key === "Escape") handleCancelEdit()
+                          if (e.key === "Escape" && (version !== "v2" || !isMutating)) handleCancelEdit()
                         }}
                       />
                       <Button
@@ -331,6 +335,7 @@ export default function CardsSettingsPage() {
                         className="rounded-full"
                         aria-label={`Cancel editing ${card.name}`}
                         onClick={handleCancelEdit}
+                        disabled={version === "v2" && isMutating}
                       >
                         <X className="h-5 w-5" />
                       </Button>
@@ -393,7 +398,7 @@ export default function CardsSettingsPage() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuContent align="end" className={`rounded-xl ${version === "v2" ? styles.portal : ""}`}>
                             <DropdownMenuItem disabled={isMutating} onClick={() => void handleFavoriteToggle(card)}>
                               <Star className={card.is_favorite ? "h-4 w-4 fill-amber-400 text-amber-500" : "h-4 w-4"} />
                               {card.is_favorite ? "Clear favorite" : "Set as favorite"}
@@ -423,6 +428,7 @@ export default function CardsSettingsPage() {
 
       <ResponsiveConfirmDialog
         open={!!deleteCardId}
+        contentClassName={version === "v2" ? styles.portal : undefined}
         onOpenChange={(open) => {
           if (!open && !isMutating) {
             setDeleteCardId(null)
