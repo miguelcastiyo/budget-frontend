@@ -64,7 +64,7 @@ export default function RootLayout({
           <GoogleOauthProvider>
             <AuthProvider>
               <GlobalErrorProvider>
-                <AuthGate><FinancialAuthorityProvider><EncryptedVaultBoundary><InterfacePreferenceProvider><V2AddProvider>{children}</V2AddProvider></InterfacePreferenceProvider></EncryptedVaultBoundary></FinancialAuthorityProvider></AuthGate>
+                <AuthGate><FinancialAuthorityProvider><InterfacePreferenceProvider><EncryptedVaultBoundary><V2AddProvider>{children}</V2AddProvider></EncryptedVaultBoundary></InterfacePreferenceProvider></FinancialAuthorityProvider></AuthGate>
               </GlobalErrorProvider>
             </AuthProvider>
           </GoogleOauthProvider>

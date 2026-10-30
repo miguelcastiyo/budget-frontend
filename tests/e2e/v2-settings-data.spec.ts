@@ -7,9 +7,10 @@ test("Settings destinations and an import draft remain available", async ({ page
   test.setTimeout(90000)
   await setupEncryptedFixture(page, true)
   await page.getByRole("link", { name: "Settings", exact: true }).first().click()
-  for (const path of ["budget", "tags", "cards", "contexts", "recurring", "data"]) {
+  for (const path of ["budget", "tags", "cards", "contexts", "recurring", "data", "vault"]) {
     await expect(page.locator(`main a[href="/settings/${path}"]`).first()).toBeAttached()
   }
+  await expect(page.locator('main a[href="/settings/invites"]')).toHaveCount(0)
   await page.locator('main a[href="/settings/data"]').click()
   await page.getByRole("button", { name: "Import CSV", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "Import CSV" })

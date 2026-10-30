@@ -1,14 +1,13 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test"
 import { execFileSync } from "node:child_process"
-import { createHash } from "node:crypto"
+import { randomBytes } from "node:crypto"
 import path from "node:path"
 
 const backendRoot = path.resolve(process.cwd(), "../budget-backend")
 type SeededAccount = { email: string; password: string; session_token: string; csrf_token: string }
 
 function seed(testInfo: TestInfo) {
-  const titleKey = `${testInfo.project.name}-${testInfo.title}`
-  const suffix = `${titleKey.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 26)}${createHash("sha256").update(titleKey).digest("hex").slice(0, 10)}`
+  const suffix = `${testInfo.project.name}${randomBytes(8).toString("hex")}`
   const raw = execFileSync("php", ["scripts/seed_encrypted_default_browser_account.php"], { cwd: backendRoot, env: { ...process.env, PRIVACY_PARITY_TEST: "1", DB_DSN: "mysql:host=127.0.0.1;port=3307;dbname=budget_privacy_parity_test;charset=utf8mb4", DB_USER: "parity", DB_PASS: "parity_test_only", ENCRYPTED_DEFAULT_BROWSER_SUFFIX: suffix }, encoding: "utf8" })
   return JSON.parse(raw) as SeededAccount
 }
@@ -39,10 +38,11 @@ test("new account completes Vault setup without migration", async ({ page }, tes
   await page.getByText("I've saved my Recovery Code somewhere safe.").click()
   await page.getByLabel("Enter the last 4 characters of your Recovery Code.").fill(displayedCode.replace(/-/g, "").slice(-4))
   await page.getByRole("button", { name: "Continue", exact: true }).click()
-  await expect(page.getByText("You're ready")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Vault status" })).toBeVisible()
   const privacy = await page.evaluate(async () => (await fetch("/api/v1/me/privacy")).json()) as { financial_privacy_state: string }
   expect(privacy.financial_privacy_state).toBe("encrypted")
-  await page.getByRole("button", { name: "Start budgeting", exact: true }).click()
-  await page.goto("/settings/vault")
-  await expect(page.getByText("Unlocked")).toBeVisible()
+  await page.getByRole("button", { name: /Vault Locked/ }).click()
+  await page.getByLabel("Vault passphrase", { exact: true }).fill("new account vault passphrase")
+  await page.getByRole("button", { name: "Unlock Vault" }).click()
+  await expect(page.getByText("Unlocked on this device")).toBeVisible()
 })

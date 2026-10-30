@@ -333,8 +333,7 @@ export default function SettingsPage() {
               </SettingsSection>
             </div>
 
-            {isOwner && (
-              <div className="lg:order-3">
+            <div className="lg:order-3">
                 <SettingsSection title="Account & Access">
                   <SettingsItem
                     icon={<LockKeyhole className="w-5 h-5 text-muted-foreground" />}
@@ -352,7 +351,6 @@ export default function SettingsPage() {
                   )}
                 </SettingsSection>
               </div>
-            )}
 
             <div className="lg:order-2">
               <SettingsSection title="Preferences">

@@ -7,6 +7,7 @@ test("Vault unlock and interface switching retain the same unlocked authority", 
   test.setTimeout(120000)
   await setupEncryptedFixture(page, true)
   await page.reload()
+  await expect(page.getByTestId("encrypted-vault-locked-boundary").locator("../..")).toHaveClass(/v2-privacy/)
   await page.getByRole("button", { name: "Use Vault passphrase" }).click()
   const unlock = page.getByRole("dialog", { name: "Unlock your Vault" })
   await unlock.getByLabel("Vault passphrase", { exact: true }).fill("wrong passphrase")
