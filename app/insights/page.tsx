@@ -37,6 +37,8 @@ import { formatCurrency, getCategoryColorClass } from "@/lib/formatters"
 import { getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "@/components/budget/v2-insights.module.css"
 
 type InsightPreset = "this_month" | "last_month" | "last_3_months" | "last_6_months" | "year_to_date" | "all_time" | "custom"
 
@@ -292,6 +294,7 @@ function formatCompactDateRange(firstDate: string, lastDate: string): string {
 
 export default function InsightsPage() {
   const authority = useFinancialAuthority()
+  const { version } = useInterfacePreference()
   const initialRange = useMemo(() => getPresetRange("this_month"), [])
   const [selectedPreset, setSelectedPreset] = useState<InsightPreset>("this_month")
   const [customFrom, setCustomFrom] = useState(initialRange.date_from)
@@ -396,8 +399,8 @@ export default function InsightsPage() {
     <div className="min-h-[100svh] w-full max-w-[100svw] overflow-x-hidden bg-background pb-mobile-nav">
       <Header />
 
-      <main className="mx-auto box-border w-full max-w-[100svw] space-y-3 overflow-x-hidden px-4 pt-standalone-safe-top sm:px-5 lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8">
-        <section className="space-y-3 lg:space-y-4">
+      <main data-testid={version === "v2" ? "v2-insights" : undefined} className={cn("mx-auto box-border w-full max-w-[100svw] space-y-3 overflow-x-hidden px-4 pt-standalone-safe-top sm:px-5 lg:max-w-6xl lg:space-y-4 lg:px-8 lg:pb-8", version === "v2" && styles.root)}>
+        <section className={cn("space-y-3 lg:space-y-4", version === "v2" && styles.heading)}>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>
             <p className="mt-1 text-sm text-muted-foreground">Review your spending.</p>
@@ -428,7 +431,7 @@ export default function InsightsPage() {
         ) : noData || !data ? (
           <InsightEmptyState />
         ) : (
-          <div className="grid min-w-0 max-w-full gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
+          <div className={cn("grid min-w-0 max-w-full gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6", version === "v2" && styles.grid)}>
             <div className="min-w-0 space-y-3 lg:space-y-4">
               {error && (
                 <Card className="border-destructive/20 bg-destructive/5 p-4 shadow-sm">
@@ -520,8 +523,9 @@ function InsightsRangeSelector({
   onCustomToChange: (value: string) => void
   onApplyCustomRange: () => void
 }) {
+  const { version } = useInterfacePreference()
   return (
-    <Card className="min-w-0 max-w-full gap-2 overflow-hidden border-0 p-2.5 shadow-sm lg:p-3">
+    <Card className={cn("min-w-0 max-w-full gap-2 overflow-hidden border-0 p-2.5 shadow-sm lg:p-3", version === "v2" && styles.range)}>
       <div className="relative min-w-0 overflow-hidden">
         <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto scroll-smooth pb-0.5 pr-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {insightPresets.map((preset) => (
@@ -584,7 +588,7 @@ function InsightsRangeSelector({
                     <span className="truncate">{customFrom ? format(dateFromIso(customFrom), "MMM d, yyyy") : "From"}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto" align="start" avoidCollisions>
+                <PopoverContent className={cn("w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto", version === "v2" && styles.portal)} align="start" avoidCollisions>
                   <AppCalendar
                     mode="single"
                     selected={parseIsoDate(customFrom) ?? undefined}
@@ -612,7 +616,7 @@ function InsightsRangeSelector({
                     <span className="truncate">{customTo ? format(dateFromIso(customTo), "MMM d, yyyy") : "To"}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto" align="start" avoidCollisions>
+                <PopoverContent className={cn("w-[min(calc(100svw-2rem),22rem)] overflow-hidden rounded-2xl p-0 sm:w-auto", version === "v2" && styles.portal)} align="start" avoidCollisions>
                   <AppCalendar
                     mode="single"
                     selected={parseIsoDate(customTo) ?? undefined}
@@ -862,6 +866,7 @@ function FixedFlexibleRow({
 }
 
 function SpendingHabitsCard({ items }: { items: InsightsDayOfWeekSpendItem[] }) {
+  const { version } = useInterfacePreference()
   const highestAverage = highestAverageWeekday(items)
   const mostFrequent = mostFrequentWeekday(items)
   const maxTotal = Math.max(...items.map((item) => numberFrom(item.total_spend)), 0)
@@ -886,7 +891,7 @@ function SpendingHabitsCard({ items }: { items: InsightsDayOfWeekSpendItem[] }) 
               const height = maxTotal > 0 ? Math.max(12, (total / maxTotal) * 52) : 12
 
               return (
-                <div key={day} className="flex flex-col items-center gap-1">
+                <div key={day} className="flex flex-col items-center gap-1" role={version === "v2" ? "img" : undefined} aria-label={version === "v2" ? `${weekdayLabel(day)}: ${formatMoney(total)} spent` : undefined}>
                   <div className="flex h-14 items-end">
                     <div className="w-5 rounded-full bg-primary/45 dark:bg-primary/55" style={{ height }} />
                   </div>
@@ -1013,6 +1018,7 @@ function NotableSpendingGroupSheet({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { version } = useInterfacePreference()
   if (!group) {
     return null
   }
@@ -1028,6 +1034,7 @@ function NotableSpendingGroupSheet({
       mobileSize="compact"
       desktopClassName="sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem]"
       bodyClassName="pb-6"
+      contentClassName={version === "v2" ? styles.portal : undefined}
     >
       <div className="space-y-4">
         <div className="rounded-2xl bg-secondary/50 p-4">

@@ -1,0 +1,28 @@
+.root, .portal {
+  --background:#fbfbfa; --foreground:#292a2e; --card:#fbfbfa; --card-foreground:#292a2e;
+  --popover:#fbfbfa; --popover-foreground:#292a2e; --primary:#292a2e; --primary-foreground:#fbfbfa;
+  --secondary:#f1f1ef; --secondary-foreground:#292a2e; --muted:#f1f1ef; --muted-foreground:#727277;
+  --border:#e7e7e5; --input:#e7e7e5; --ring:#77777c; --needs:#73747b; --wants:#ba9a6b; --savings:#75a994;
+  color:var(--foreground); background:var(--background); font-family:Inter,system-ui,sans-serif;
+}
+:global(.dark) .root, :global(.dark) .portal {
+  --background:#16171a; --foreground:#f0efed; --card:#16171a; --card-foreground:#f0efed;
+  --popover:#16171a; --popover-foreground:#f0efed; --primary:#f0efed; --primary-foreground:#16171a;
+  --secondary:#292a2e; --secondary-foreground:#f0efed; --muted:#292a2e; --muted-foreground:#a2a2a4;
+  --border:#303135; --input:#36373c; --ring:#aaa; --needs:#b6b7bd; --wants:#c6a879; --savings:#8cbda9;
+}
+.root { min-height:calc(100vh - 6rem); padding-bottom:calc(3rem + env(safe-area-inset-bottom)); }
+.root :global([data-slot="card"]) { box-shadow:none; border:0; border-radius:0; background:transparent; }
+.root .grid :global([data-slot="card"]) { border-top:1px solid var(--border); padding:1rem 0; }
+.root .grid h2 { font-size:.9rem; font-weight:600; }
+.root .grid :global([role="progressbar"]) { height:3px; }
+.root button:focus-visible, .root a:focus-visible, .portal button:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }
+.heading { padding-top:1rem; }
+.heading h1 { font-size:1rem; font-weight:600; }
+.heading > div:first-child p { font-size:.8125rem; }
+.root .range { padding:.5rem 0; }
+.range button { min-height:2.75rem; border-radius:.5rem; }
+.grid { margin-top:1.5rem; }
+.portal { border-color:var(--border); }
+@media (min-width:1024px) { .root { padding-top:2rem; } .grid { grid-template-columns:minmax(0,1fr) minmax(0,22rem); gap:4rem; } }
+@media (prefers-reduced-motion:reduce) { .root *, .portal * { animation-duration:0s !important; transition-duration:0s !important; scroll-behavior:auto !important; } }
