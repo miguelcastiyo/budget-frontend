@@ -14,6 +14,14 @@ function currentTransactionRecord(current: Transaction, deps: EncryptedOperation
   return { authority, record }
 }
 
+// Until transaction-backed contribution updates can be committed and retried
+// as one operation, do not let an edit silently desynchronize the ledger.
+function assertNoLinkedFundEntry(authority: ReturnType<typeof requireEncryptedAuthority>, record: ReturnType<typeof currentTransactionRecord>["record"]) {
+  const ids = [record.envelope.record_id, record.sourceId, String(record.data.id ?? "")].filter(Boolean)
+  const linked = authority.store.values().some((item) => item.family === "fund_ledger_entry" && item.data.source_type === "transaction" && item.data.is_voided !== true && item.data.is_deleted !== true && ids.includes(String(item.data.source_transaction_id ?? "")))
+  if (linked) throw new Error("This transaction is linked to a fund and cannot be edited until linked fund updates are available.")
+}
+
 function nextTransaction(current: Transaction, input: UpdateTransactionRequest, recordSourceId: string) {
   return updateTransaction({
     id: recordSourceId,
@@ -70,6 +78,7 @@ export async function createEncryptedTransaction(deps: EncryptedOperationDepende
 
 export async function updateEncryptedTransaction(deps: EncryptedOperationDependencies, current: Transaction, input: UpdateTransactionRequest): Promise<Transaction> {
   const { authority, record } = currentTransactionRecord(current, deps)
+  assertNoLinkedFundEntry(authority, record)
   const next = nextTransaction(current, input, record.sourceId)
   const recordId = record.envelope.record_id
   const nextData = transactionData(next)
@@ -81,6 +90,7 @@ export async function updateEncryptedTransaction(deps: EncryptedOperationDepende
 
 export async function updateEncryptedRecurringTransactionScope(deps: EncryptedOperationDependencies, current: Transaction, input: UpdateTransactionRequest): Promise<Transaction> {
   const { authority, record } = currentTransactionRecord(current, deps)
+  assertNoLinkedFundEntry(authority, record)
   const next = nextTransaction(current, input, record.sourceId)
   const nextData = transactionData(next)
   await updateEncryptedRecurringTransaction(authority, { id: record.envelope.record_id, family: "transaction", data: record.data }, nextData)

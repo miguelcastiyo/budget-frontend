@@ -1691,6 +1691,7 @@ export function FundEntryDialog({
                   <button
                     key={option.value}
                     type="button"
+                    disabled={option.value !== "fund_only"}
                     className={cn(
                       "min-w-0 overflow-hidden rounded-2xl border px-4 py-4 text-left transition-colors",
                       isSelected
@@ -1700,7 +1701,7 @@ export function FundEntryDialog({
                     onClick={() => setValues((current) => ({ ...current, budget_tracking: option.value }))}
                   >
                     <p className="text-balance font-medium leading-tight text-foreground">{option.label}</p>
-                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.helper}</p>
+                    <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">{option.value === "fund_only" ? option.helper : "Temporarily unavailable while transaction-linked contributions are being restored."}</p>
                   </button>
                 )
               })}

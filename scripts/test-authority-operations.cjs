@@ -16,7 +16,7 @@ global.window = { isSecureContext: true, crypto: webcrypto }
 
 const { createEncryptedTransaction, updateEncryptedTransaction, deleteEncryptedTransaction } = require("../lib/privacy/encrypted-authority/transaction-operations.ts")
 const { createEncryptedTag, createEncryptedCard, createEncryptedContext, getEncryptedContexts, updateEncryptedTag, deleteEncryptedTag, updateEncryptedCard, deleteEncryptedCard, updateEncryptedContext, deleteEncryptedContext } = require("../lib/privacy/encrypted-authority/taxonomy-operations.ts")
-const { createEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
+const { createEncryptedFundEntry, updateEncryptedFundEntry, deleteEncryptedFundEntry, getEncryptedFunds, getEncryptedFundEntries } = require("../lib/privacy/encrypted-authority/fund-operations.ts")
 const { saveEncryptedBudget } = require("../lib/privacy/encrypted-authority/budget-operations.ts")
 const { commitEncryptedCsvImport, getEncryptedDataRuns, planEncryptedCsvImport, rollbackEncryptedCsvImport } = require("../lib/privacy/encrypted-authority/import-operations.ts")
 const assert = (condition, message) => { if (!condition) throw new Error(message) }
@@ -86,6 +86,21 @@ function makeAuthority(initialRecords = []) {
   const funds = await getEncryptedFunds(deps(created.authority), { status: "active" })
   const entries = await getEncryptedFundEntries(deps(created.authority), "fund_1")
   assert(funds.items.length === 1 && entries.items[0]?.id === entry.id, "fund operations preserve fund and ledger lookups")
+  for (const mode of ["create_transaction", "link_existing_transaction", "unknown"]) {
+    const before = created.records.size
+    await require("node:assert/strict").rejects(() => createEncryptedFundEntry(deps(created.authority), "fund_1", { entry_date: "2026-08-03", entry_type: "contribution", direction: "in", amount: "25.00", source_type: "manual", budget_tracking: mode }))
+    assert(created.records.size === before, "unsupported tracking modes must not create a manual entry")
+  }
+  await require("node:assert/strict").rejects(() => createEncryptedFundEntry(deps(created.authority), "fund_1", { entry_type: "contribution", direction: "in", amount: "0", source_type: "manual" }))
+  const linked = makeRecord("linked_1", "fund_ledger_entry", { fund_id: "fund_1", source_type: "transaction", source_transaction_id: "tx_1", amount_cents: 500, entry_date: "2026-08-01" })
+  created.records.set("linked_1", linked)
+  const linkedEntry = { id: "linked_1" }
+  await require("node:assert/strict").rejects(() => updateEncryptedFundEntry(deps(created.authority), "fund_1", linkedEntry, { amount: "10.00" }))
+  await require("node:assert/strict").rejects(() => deleteEncryptedFundEntry(deps(created.authority), "fund_1", linkedEntry))
+  const linkedTransaction = await createEncryptedTransaction(deps(created.authority), { date: "2026-08-01", expense: "Transfer", amount: "5.00", category: "savings", is_split: false, tag_id: "tag_1" })
+  linked.data.source_transaction_id = linkedTransaction.id
+  await require("node:assert/strict").rejects(() => updateEncryptedTransaction(deps(created.authority), linkedTransaction, { amount: "10.00" }))
+  assert(created.records.get(linkedTransaction.id).data.amount_cents === 500, "linked transaction edits must not silently desynchronize the fund ledger")
 
   const importPlan = planEncryptedCsvImport(created.authority, [{ row: 2, date: "2026-08-04", expense: "Groceries", amount: "42.50", externalCategory: "needs", tag: "Imported tag", card: "Imported card", context: "Imported context" }], { year: 2026, tagValueMap: {} })
   const validRecordId = (id) => /^rec_[A-Za-z0-9_-]{8,90}$/.test(id)

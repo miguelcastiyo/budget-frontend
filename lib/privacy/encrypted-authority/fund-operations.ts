@@ -25,8 +25,17 @@ function ledgerEntriesFromState(deps: EncryptedOperationDependencies): FundLedge
 
 export async function createEncryptedFundEntry(deps: EncryptedOperationDependencies, fundId: string, input: CreateFundEntryRequest): Promise<FundEntry> {
   const authority = requireEncryptedAuthority(deps)
+  // Transaction-backed entries must never degrade to an unrelated manual entry.
+  // Until their atomic creation and recovery path is available, reject them here
+  // as well as disabling the controls in the form.
+  if ((input.budget_tracking ?? "fund_only") !== "fund_only" || input.transaction_id || input.transaction || input.source_type === "transaction") {
+    throw new Error("Transaction-linked fund contributions are not available yet.")
+  }
+  const fund = fundRecord(authority, fundId)
+  if (!fund || fund.data.status === "archived" || fund.data.is_deleted === true) throw new Error("An active fund is required.")
   const id = createEncryptedRecordId()
   const amountCents = parseMoneyCents(input.amount)
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("Amount must be greater than zero.")
   const entryDate = input.entry_date ?? ""
   await authority.createSource("fund_ledger_entry", "fund_ledger_entry_v1", id, {
     id, fund_id: fundId, entry_date: entryDate, entry_type: input.entry_type, direction: input.direction,
@@ -99,6 +108,9 @@ export async function updateEncryptedFundEntry(deps: EncryptedOperationDependenc
   const authority = requireEncryptedAuthority(deps)
   const current = resolveFundEntryRecord(authority, entry)
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  if (String(current.data.fund_id ?? "") !== fundId) throw new Error("Fund entry does not belong to this fund.")
+  if (current.data.source_type === "transaction" || current.data.source_type === "closeout") throw new Error("Linked fund entries cannot be edited directly.")
+  if (input.amount !== undefined && parseMoneyCents(input.amount) <= 0) throw new Error("Amount must be greater than zero.")
   const data = { ...current.data, entry_date: input.entry_date ?? current.data.entry_date, entry_type: input.entry_type ?? current.data.entry_type, direction: input.direction ?? current.data.direction, amount_cents: input.amount === undefined ? current.data.amount_cents : parseMoneyCents(input.amount), note: input.note === undefined ? current.data.note : input.note }
   const recordId = current.envelope.record_id
   await authority.commitSourceDiff({ creates: [], updates: [{ id: recordId, family: "fund_ledger_entry", data }], tombstones: [] })
@@ -107,10 +119,12 @@ export async function updateEncryptedFundEntry(deps: EncryptedOperationDependenc
   return fundEntryFromData(saved.data, recordId, fundId)
 }
 
-export async function deleteEncryptedFundEntry(deps: EncryptedOperationDependencies, _fundId: string, entry: FundEntry): Promise<void> {
+export async function deleteEncryptedFundEntry(deps: EncryptedOperationDependencies, fundId: string, entry: FundEntry): Promise<void> {
   const authority = requireEncryptedAuthority(deps)
   const current = resolveFundEntryRecord(authority, entry)
   if (!current) throw new Error("ENCRYPTED_RECORD_NOT_FOUND")
+  if (String(current.data.fund_id ?? "") !== fundId) throw new Error("Fund entry does not belong to this fund.")
+  if (current.data.source_type === "transaction" || current.data.source_type === "closeout") throw new Error("Linked fund entries cannot be deleted directly.")
   await authority.commitSourceDiff({ creates: [], updates: [], tombstones: [{ id: current.envelope.record_id, family: "fund_ledger_entry", data: current.data }] })
 }
 
