@@ -8,6 +8,7 @@ import { FinancialAuthorityProvider } from '@/components/privacy/financial-autho
 import { EncryptedVaultBoundary } from '@/components/privacy/encrypted-vault-boundary'
 import { ClientUpdateNotice } from '@/components/common/client-update-notice'
 import { InterfacePreferenceProvider } from '@/components/layout/interface-preference'
+import { V2AddProvider } from '@/components/budget/v2-add-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -63,7 +64,7 @@ export default function RootLayout({
           <GoogleOauthProvider>
             <AuthProvider>
               <GlobalErrorProvider>
-                <AuthGate><FinancialAuthorityProvider><EncryptedVaultBoundary><InterfacePreferenceProvider>{children}</InterfacePreferenceProvider></EncryptedVaultBoundary></FinancialAuthorityProvider></AuthGate>
+                <AuthGate><FinancialAuthorityProvider><EncryptedVaultBoundary><InterfacePreferenceProvider><V2AddProvider>{children}</V2AddProvider></InterfacePreferenceProvider></EncryptedVaultBoundary></FinancialAuthorityProvider></AuthGate>
               </GlobalErrorProvider>
             </AuthProvider>
           </GoogleOauthProvider>

@@ -7,6 +7,8 @@ export interface AddTransactionSheetProps {
   onTransactionUpdated?: (transaction: Transaction) => void
   mode?: "create" | "edit"
   transaction?: Transaction | null
+  v2Create?: boolean
+  initialCapture?: boolean
 }
 
 export type RecurringEditScope = "transaction" | "future"

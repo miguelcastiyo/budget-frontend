@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Dialog,
   DialogClose,
@@ -46,6 +46,12 @@ import { useTransactionEditor } from "./use-transaction-editor"
 import { TransactionDetailsSection } from "./transaction-details-section"
 import { TransactionCategoryPicker } from "./transaction-category-picker"
 import { canonicalIsoDate, canonicalMoney, canonicalNullableId, canonicalText, equalCanonicalSnapshots } from "@/lib/form-state/canonical-snapshot"
+import { useQuickCapture } from "@/components/review/use-quick-capture"
+import { getLocalDateKey } from "@/lib/date-filters"
+import styles from "./v2-editor.module.css"
+import { useAuth } from "@/components/auth/auth-provider"
+import { clearRememberedCapture, getRememberedCapture } from "@/components/review/capture-recovery"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
 
 import type { AddTransactionSheetProps } from "./transaction-editor-types"
 export function TransactionEditorForm({
@@ -55,8 +61,13 @@ export function TransactionEditorForm({
   onTransactionUpdated,
   mode = "create",
   transaction = null,
+  v2Create = false,
+  initialCapture = false,
 }: AddTransactionSheetProps) {
   const financialAuthority = useFinancialAuthority()
+  const { profile } = useAuth()
+  const { version } = useInterfacePreference()
+  const v2Style = v2Create || (mode === "edit" && version === "v2")
   const isEditMode = mode === "edit" && transaction !== null
   const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
   const editor = useTransactionEditor({ mode, transaction })
@@ -75,6 +86,30 @@ export function TransactionEditorForm({
     suggestionRequestRef, appliedSuggestionExpenseRef, didAutoFocusOnOpenRef, recurringScheduleTouchedRef,
     canCreateRecurringRule,
   } = editor
+  const [captureMode, setCaptureMode] = useState(initialCapture)
+  const [captureBusy, setCaptureBusy] = useState(false)
+  const [captureError, setCaptureError] = useState("")
+  const [captureNotice, setCaptureNotice] = useState("")
+  const saveAndNew = useRef(false)
+  const v2Initialized = useRef(false)
+  const quick = useQuickCapture({
+    authority: v2Create ? financialAuthority.authority : null,
+    busy: captureBusy,
+    setBusy: setCaptureBusy,
+    onError: setCaptureError,
+    onNotice: setCaptureNotice,
+    draft: v2Create ? { amount, setAmount, description: expense, setDescription: setExpense, date: format(date, "yyyy-MM-dd"), setDate: (value) => { const next = parseDateValue(value); if (next) setDate(next) } } : undefined,
+    onSaved: () => { if (!saveAndNew.current) onOpenChange(false) },
+    accountId: v2Create ? profile?.id : undefined,
+  })
+  const transitionBlocked = isSubmitting || isCreatingTag || isCreatingCard || isCreatingContext || captureBusy || Boolean(quick.captureBatch)
+  const dirty = Boolean(amount || expense || category !== "needs" || tagId || cardId || contextId || notes || isSplit || makeRecurring || showNewTag || newTagName || newTagIconKey || showNewCard || newCardName || format(date, "yyyy-MM-dd") !== getLocalDateKey())
+  const requestOpenChange = (next: boolean) => {
+    if (!v2Create || next) { onOpenChange(next); return }
+    if (transitionBlocked) return
+    if (dirty && !window.confirm("Discard this unfinished transaction?")) return
+    onOpenChange(false)
+  }
 
   const parseTransactionDate = (dateStr: string): Date => {
     return parseDateValue(dateStr) ?? new Date()
@@ -177,7 +212,7 @@ export function TransactionEditorForm({
       return
     }
 
-    resetForm()
+    if (!v2Create || !v2Initialized.current) { resetForm(); v2Initialized.current = true }
   }, [isEditMode, loadTaxonomy, open, transaction])
 
   useEffect(() => {
@@ -300,7 +335,7 @@ export function TransactionEditorForm({
         name,
         icon_key: newTagIconKey || null,
       })
-      setTags((prev) => [...prev, created])
+      setTags((prev) => [...prev.filter((tag) => tag.id !== created.id), created])
       setQuickPickTags((prev) => [created, ...prev.filter((tag) => tag.id !== created.id)].slice(0, 5))
       setTagId(created.id)
       setNewTagName("")
@@ -326,7 +361,7 @@ export function TransactionEditorForm({
 
     try {
       const created = await financialAuthority.createCard({ name })
-      setCards((prev) => sortCards([...prev, created]))
+      setCards((prev) => sortCards([...prev.filter((card) => card.id !== created.id), created]))
       setCardId(created.id)
       setNewCardName("")
       setShowNewCard(false)
@@ -348,7 +383,7 @@ export function TransactionEditorForm({
     setContextLoadError(null)
     try {
       const created = await financialAuthority.createContext({ name: trimmedName, icon_key: iconKey || null })
-      setContexts((previous) => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setContexts((previous) => [...previous.filter((context) => context.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name)))
       setContextId(created.id)
     } catch (err) {
       throw new Error(err instanceof ApiError ? err.error.message : "Unable to create context")
@@ -585,22 +620,34 @@ export function TransactionEditorForm({
   const submitButtonLabel = submitLabel({ isEditMode, isSubmitting, recurringEditScope, normalizedAmount, tagId })
   const swipeDismiss = useSwipeDismiss({
     open,
-    onDismiss: () => onOpenChange(false),
+    onDismiss: () => requestOpenChange(false),
     scrollRef: scrollContainerRef,
   })
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent
         {...swipeDismiss}
         showCloseButton={false}
         className={cn(
           "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
-          mobileDrawerDialogClassName
+          mobileDrawerDialogClassName,
+          v2Style && styles.surface
         )}
       >
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" autoComplete="off" data-form-type="other">
+        {v2Create && captureMode && <form onSubmit={quick.capture} className={styles.capture} aria-label="Quick Capture">
+          <div className={styles.captureHeader}><DialogTitle>Quick Capture</DialogTitle><DialogClose aria-label="Close" disabled={transitionBlocked}><X size={20} /></DialogClose></div>
+          <p className={styles.hint}>Capture now, organize later.</p>
+          <label>Amount<input inputMode="decimal" ref={quick.amountRef} value={amount} disabled={Boolean(quick.captureBatch)} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" /></label>
+          <label>Description<input value={expense} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" /></label>
+          <label>Date<input type="date" value={format(date, "yyyy-MM-dd")} disabled={Boolean(quick.captureBatch)} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
+          <p className={styles.hint}>{quick.captureBatch ? "The save outcome is uncertain. Retry to confirm it." : "Enter an amount, a description, or both."}</p>
+          {captureError && <p role="alert">{captureError}</p>}{captureNotice && <p role="status">{captureNotice}</p>}
+          {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}
+          <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button><button type="button" disabled={transitionBlocked} onClick={() => setCaptureMode(false)}>Full Entry</button></div>
+        </form>}
+        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && captureMode && "hidden")} autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
@@ -611,6 +658,7 @@ export function TransactionEditorForm({
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {format(date, "EEE, MMM d")} · {categoryConfig[category].label}
                 </p>
+                {v2Create && financialAuthority.pendingCaptureEnabled && <button type="button" disabled={transitionBlocked} className={styles.switch} onClick={() => setCaptureMode(true)}>Quick Capture</button>}
               </div>
               <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                 <X className="h-4 w-4" />
@@ -786,7 +834,7 @@ export function TransactionEditorForm({
                             </span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
+                        <PopoverContent className={cn("w-auto p-0", v2Style && styles.surface)} align="end">
                           <Calendar
                             mode="single"
                             selected={date}
@@ -967,6 +1015,7 @@ export function TransactionEditorForm({
       </DialogContent>
       </Dialog>
       <ContextPickerSheet
+      contentClassName={v2Style ? styles.surface : undefined}
       open={contextPickerOpen}
       onOpenChange={setContextPickerOpen}
       contexts={contexts}

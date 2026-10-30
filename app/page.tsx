@@ -26,6 +26,7 @@ import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { FundsCta } from "@/components/funds/funds-cta"
+import { useV2Add } from "@/components/budget/v2-add-provider"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 import { V2Overview } from "@/components/budget/v2-overview"
 
@@ -34,6 +35,7 @@ const FIRST_MONTH_PROGRESS_DISMISSED_KEY = "budget-first-month-progress-dismisse
 export default function DashboardPage() {
   const router = useRouter()
   const { version } = useInterfacePreference()
+  const { openAdd } = useV2Add()
   const { setupStatus, refreshProfile } = useAuth()
   const authority = useFinancialAuthority()
   const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
@@ -120,6 +122,13 @@ export default function DashboardPage() {
     void loadDashboardData()
   }, [loadDashboardData])
 
+  useEffect(() => {
+    const refresh = () => void loadDashboardData()
+    window.addEventListener("budget:v2-transaction-created", refresh)
+    return () => window.removeEventListener("budget:v2-transaction-created", refresh)
+  }, [loadDashboardData])
+
+  const openCreate = () => { if (version === "v2") openAdd("full"); else setShowAddTransaction(true) }
   const categories = overview?.categories ?? []
   const tags = overview?.tags ?? []
   const recentTransactions = overview?.recent_transactions ?? []
@@ -166,7 +175,7 @@ export default function DashboardPage() {
 
   const handleProgressTaskSelect = (taskKey: SetupTask["key"]) => {
     if (taskKey === "add_first_transaction") {
-      setShowAddTransaction(true)
+      openCreate()
       return
     }
 
@@ -236,14 +245,14 @@ export default function DashboardPage() {
           loading={isLoading}
           pending={reviewEnabled && authority.isUnlocked && !authority.isLoading ? authority.getPendingMonthSummary(currentMonth) : null}
           onboarding={(shouldShowFirstMonthActionCard || (shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed)) ? <>
-            {shouldShowFirstMonthActionCard && <FirstMonthActionCard month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth} isDismissing={isDismissingFirstRun} onAddTransaction={() => setShowAddTransaction(true)} onDismiss={() => void handleDismissFirstRun()} />}
+            {shouldShowFirstMonthActionCard && <FirstMonthActionCard month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth} isDismissing={isDismissingFirstRun} onAddTransaction={() => openCreate()} onDismiss={() => void handleDismissFirstRun()} />}
             {shouldShowFirstRunChecklist && setupStatus && !isProgressDismissed && <FirstMonthProgressCard setupStatus={setupStatus} isDismissing={false} onDismiss={handleDismissProgressCard} onTaskSelect={handleProgressTaskSelect} />}
           </> : null}
           onClose={() => openCloseoutTray("close")}
           onViewCloseout={() => openCloseoutTray("view")}
           onReviewCloseout={() => openCloseoutTray("review")}
           onSetBudget={() => router.push(`/settings/budget?${new URLSearchParams({ month: currentMonth, edit: "1" })}`)}
-          onAdd={() => setShowAddTransaction(true)}
+          onAdd={() => openCreate()}
           onCategory={(category) => router.push(`/transactions?${new URLSearchParams({ category, month: currentMonth })}`)}
           onTag={(tagId) => router.push(`/transactions?${new URLSearchParams({ tag_id: tagId, month: currentMonth })}`)}
           onTransaction={setEditingTransaction}
@@ -271,7 +280,7 @@ export default function DashboardPage() {
             <FirstMonthActionCard
               month={formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth}
               isDismissing={isDismissingFirstRun}
-              onAddTransaction={() => setShowAddTransaction(true)}
+              onAddTransaction={() => openCreate()}
               onDismiss={() => void handleDismissFirstRun()}
             />
           )}
@@ -340,7 +349,7 @@ export default function DashboardPage() {
                 tags={tags}
                 emptyTitle="Your spending patterns will appear here"
                 emptyDescription="Add a transaction to start filling the page."
-                onEmptyAction={() => setShowAddTransaction(true)}
+                onEmptyAction={() => openCreate()}
                 onTagClick={(tagId) => {
                   const params = new URLSearchParams({
                     tag_id: tagId,
@@ -360,7 +369,7 @@ export default function DashboardPage() {
                 showScrollHint
                 emptyTitle="No transactions this month"
                 emptyDescription="Add your first transaction to start tracking."
-                onEmptyAction={() => setShowAddTransaction(true)}
+                onEmptyAction={() => openCreate()}
                 onViewAll={() => {
                   const params = new URLSearchParams({
                     month: currentMonth,
@@ -376,11 +385,11 @@ export default function DashboardPage() {
       </main>
 
       <FloatingAddButton
-        onClick={() => setShowAddTransaction(true)}
+        onClick={() => openCreate()}
         showCoachmark={!hasMonthTransactions}
       />
       <BottomNav
-        onAddClick={() => setShowAddTransaction(true)}
+        onAddClick={() => openCreate()}
         showAddCoachmark={!hasMonthTransactions}
       />
 

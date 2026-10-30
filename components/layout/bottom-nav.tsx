@@ -11,6 +11,7 @@ import { useFinancialAuthority } from "@/components/privacy/financial-authority-
 import { hasTransactionViewState } from "@/lib/transaction-view-state"
 import { useInterfacePreference } from "./interface-preference"
 import styles from "./v2-navigation.module.css"
+import { useV2Add } from "@/components/budget/v2-add-provider"
 
 const coachmarkDismissedStorageKey = "budget-add-transaction-coachmark-dismissed"
 
@@ -99,6 +100,7 @@ export function BottomNav({
   addCoachmarkText = "Start here. Add your first transaction.",
 }: BottomNavProps) {
   const { version } = useInterfacePreference()
+  const { openAdd } = useV2Add()
   const { profile } = useAuth()
   const authority = useFinancialAuthority()
   const reviewEnabled = authority.pendingCaptureEnabled || (authority.isUnlocked && authority.pendingGlobalCount > 0)
@@ -132,6 +134,7 @@ export function BottomNav({
     if (shouldShowCoachmark) {
       dismissCoachmark()
     }
+    if (version === "v2") { openAdd(); return }
     if (onAddClick) {
       onAddClick()
       return

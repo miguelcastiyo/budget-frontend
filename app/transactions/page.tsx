@@ -25,6 +25,8 @@ import { mergeTransactionPages, replaceTransaction } from "@/lib/transaction-col
 import { ApiError, apiClient } from "@/lib/api/client"
 import { formatMonthLabel, getLocalDateKey, getMonthDateRange, getPresetDateRange } from "@/lib/date-filters"
 import type { DateRangeFilter } from "@/lib/date-filters"
+import { useV2Add } from "@/components/budget/v2-add-provider"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { useAuth } from "@/components/auth/auth-provider"
 import { readTransactionViewState, writeTransactionViewState } from "@/lib/transaction-view-state"
@@ -81,6 +83,8 @@ function parseCategoryQuery(value: string): Category | null {
 
 export default function TransactionsPage() {
   const financialAuthority = useFinancialAuthority()
+  const { version, ready: interfaceReady } = useInterfacePreference()
+  const { openAdd } = useV2Add()
   const { profile } = useAuth()
   const userId = profile?.id ?? ""
   const desktopFiltersStorageKey = "transactions-desktop-filters-collapsed"
@@ -217,16 +221,17 @@ export default function TransactionsPage() {
   }, [customDateRange, filtersInitializedForUserId, preset, searchQuery, selectedCards, selectedCategories, selectedContexts, selectedTags, sortOrder, splitFilter, userId])
 
   useEffect(() => {
-    if (!queryOpenAdd) {
+    if (!queryOpenAdd || !interfaceReady || (version === "v2" && (financialAuthority.isLoading || !financialAuthority.authority))) {
       return
     }
 
-    setShowAddTransaction(true)
+    if (version === "v2") openAdd("full")
+    else setShowAddTransaction(true)
     const nextParams = new URLSearchParams(searchParams.toString())
     nextParams.delete("add")
     const nextQuery = nextParams.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [pathname, queryOpenAdd, router, searchParams])
+  }, [pathname, queryOpenAdd, router, searchParams, version, openAdd, interfaceReady, financialAuthority.isLoading, financialAuthority.authority])
 
   const activeTransactionFilters = useMemo<ApiTransactionFilters>(() => {
     const filters: ApiTransactionFilters = {
@@ -450,6 +455,12 @@ export default function TransactionsPage() {
   }, [summary])
 
   const hasMoreTransactions = transactions.length < totalItems
+
+  useEffect(() => {
+    const refresh = () => void refreshTransactionSurface()
+    window.addEventListener("budget:v2-transaction-created", refresh)
+    return () => window.removeEventListener("budget:v2-transaction-created", refresh)
+  }, [refreshTransactionSurface])
 
   const handleDeleteTransaction = useCallback(async (transactionId: string) => {
     setDeletingTransactionId(transactionId)

@@ -13,6 +13,7 @@ import type { Context } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
 interface ContextPickerSheetProps {
+  contentClassName?: string
   open: boolean
   onOpenChange: (open: boolean) => void
   contexts: Context[]
@@ -27,6 +28,7 @@ interface ContextPickerSheetProps {
 const RECENT_CONTEXTS_KEY = "budget.recent-context-ids"
 
 export function ContextPickerSheet({
+  contentClassName,
   open,
   onOpenChange,
   contexts,
@@ -122,7 +124,8 @@ export function ContextPickerSheet({
         showCloseButton={false}
         className={cn(
           "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),46rem)] w-full grid-rows-none flex-col gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,46rem)] sm:w-[min(calc(100dvw-2rem),34rem)] sm:max-w-[34rem] sm:rounded-2xl sm:border",
-          mobileDrawerDialogClassName
+          mobileDrawerDialogClassName,
+          contentClassName
         )}
       >
         <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur sm:px-5 sm:py-4">
