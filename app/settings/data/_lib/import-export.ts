@@ -133,7 +133,7 @@ export function statusLabel(status: DataRunStatus): string {
 }
 
 export function activityStatusLabel(item: DataRunItem): string {
-  if (item.type === "import" && item.rolled_back_at) {
+  if (item.type === "import" && (item.is_rolled_back || item.rolled_back_at)) {
     return "Rolled back"
   }
 
@@ -148,7 +148,7 @@ export function statusClassName(status: DataRunStatus): string {
 }
 
 export function activityStatusClassName(item: DataRunItem): string {
-  if (item.type === "import" && item.rolled_back_at) {
+  if (item.type === "import" && (item.is_rolled_back || item.rolled_back_at)) {
     return "bg-muted text-muted-foreground"
   }
 

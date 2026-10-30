@@ -698,12 +698,14 @@ export function ActivityRow({
   onRepair,
   isRollingBack,
   isRepairing,
+  mutationDisabled = false,
 }: {
   item: DataRunItem
   onRollback: (item: DataRunItem) => void
   onRepair: (item: DataRunItem) => void
   isRollingBack: boolean
   isRepairing: boolean
+  mutationDisabled?: boolean
 }) {
   const rangeLabel = item.type === "export"
     ? item.date_from && item.date_to
@@ -741,7 +743,7 @@ export function ActivityRow({
               </div>
             )}
             {item.type === "import" && item.rollback_available && (
-              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 w-full rounded-lg sm:w-auto" disabled={isRollingBack} onClick={() => onRollback(item)}>
+              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 w-full rounded-lg sm:w-auto" disabled={isRollingBack || mutationDisabled} onClick={() => onRollback(item)}>
                 {isRollingBack ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
@@ -753,7 +755,7 @@ export function ActivityRow({
               </Button>
             )}
             {item.type === "import" && item.lineage_repair_status === "repairable_automatically" && (
-              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 w-full rounded-lg sm:w-auto" disabled={isRepairing} onClick={() => onRepair(item)}>
+              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 w-full rounded-lg sm:w-auto" disabled={isRepairing || mutationDisabled} onClick={() => onRepair(item)}>
                 {isRepairing ? "Repairing rollback" : "Repair rollback history"}
               </Button>
             )}

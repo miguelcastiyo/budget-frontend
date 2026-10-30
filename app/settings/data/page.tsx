@@ -32,6 +32,9 @@ import {
 } from "./_components/data-settings-sections"
 import { useDataRuns } from "./_hooks/use-data-runs"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
+import { useAuth } from "@/components/auth/auth-provider"
+import { csvOperationConfirmed, prepareEncryptedCsvImport, prepareEncryptedCsvRollback } from "@/lib/privacy/encrypted-authority/import-operations"
+import { clearDataOperation, forgetPreparedDataOperation, preparedDataOperation, readDataRecovery, rememberDataOperation, type DataRecoveryMarker } from "./_lib/data-recovery"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 import styles from "../v2-settings.module.css"
 import {
@@ -79,6 +82,8 @@ function importPlanSignature(plan: CsvImportPlan): string {
 
 export default function DataSettingsPage() {
   const { version } = useInterfacePreference()
+  const { profile } = useAuth()
+  const account = profile?.id == null ? "" : String(profile.id)
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -111,8 +116,10 @@ export default function DataSettingsPage() {
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [importUncertain, setImportUncertain] = useState(false)
-  const [rollbackUncertain, setRollbackUncertain] = useState(false)
+  const [recoveryBlocked, setRecoveryBlocked] = useState(true)
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null)
+  const recoveryInFlight = useRef(false)
 
   const [exportDateMode, setExportDateMode] = useState<ExportDateMode>("all")
   const [exportCustomFrom, setExportCustomFrom] = useState("")
@@ -128,6 +135,96 @@ export default function DataSettingsPage() {
     openImportDialog()
     router.replace("/settings/data")
   }, [router, searchParams])
+
+  async function checkDataRecovery() {
+    if (!account || !authority.authority || recoveryInFlight.current) return
+    recoveryInFlight.current = true
+    setRecoveryBusy(true)
+    setRecoveryBlocked(true)
+    try {
+      const marker = readDataRecovery(account)
+      if (!marker) { setRecoveryBlocked(false); setRecoveryMessage(null); return }
+      const operation = preparedDataOperation(account)
+      if (operation?.inFlight) { setRecoveryMessage("A Data operation is still in progress."); return }
+      setRecoveryMessage("Checking the previous Data operation against encrypted records…")
+      await authority.authority.bootstrap()
+      if (csvOperationConfirmed(authority.authority, marker.kind, marker.runId)) {
+        clearDataOperation(account, marker)
+        setRecoveryBlocked(false)
+        setRecoveryMessage(marker.kind === "import" ? "Previous import confirmed." : "Previous rollback confirmed.")
+        if (marker.kind === "import") resetImportState()
+        setIsImportDialogOpen(false)
+        setRollbackTarget(null)
+        await loadDataRuns()
+      } else {
+        setRecoveryMessage("The previous Data operation is unresolved. Synchronize again or retry the original request if it is still available; do not create a replacement.")
+      }
+    } catch {
+      setRecoveryMessage("Unable to check Data recovery or access recovery storage. Data mutations are blocked until it can be checked.")
+    } finally { recoveryInFlight.current = false; setRecoveryBusy(false) }
+  }
+
+  async function submitDataOperation(marker: DataRecoveryMarker): Promise<boolean> {
+    const operation = preparedDataOperation(account)
+    if (!operation || operation.authority.deref() !== authority.authority || operation.inFlight) return false
+    recoveryInFlight.current = true
+    operation.inFlight = true
+    setRecoveryBusy(true)
+    try {
+      const activeAuthority = operation.authority.deref()
+      if (!activeAuthority) throw new Error("ENCRYPTED_AUTHORITY_LOCKED")
+      await activeAuthority.submitPreparedSourceDiff(operation.batch)
+      clearDataOperation(account, marker)
+      setRecoveryBlocked(false)
+      setRecoveryMessage(null)
+      return true
+    } catch (error) {
+      if (!operation.uncertain && error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429) {
+        clearDataOperation(account, marker)
+        setRecoveryBlocked(false)
+        setRecoveryMessage(null)
+        if (marker.kind === "import") setImportError(error.error.message)
+        else setRollbackError(error.error.message)
+      } else {
+        operation.uncertain = true
+        setRecoveryBlocked(true)
+        setRecoveryMessage("The operation outcome is uncertain. Check encrypted records or retry the original request; no replacement will be submitted.")
+      }
+      return false
+    } finally {
+      operation.inFlight = false
+      recoveryInFlight.current = false
+      setRecoveryBusy(false)
+    }
+  }
+
+  async function retryDataRecovery() {
+    try {
+      const marker = readDataRecovery(account)
+      if (!marker) { await checkDataRecovery(); return }
+      if (await submitDataOperation(marker)) {
+        setRecoveryMessage(marker.kind === "import" ? "Previous import confirmed." : "Previous rollback confirmed.")
+        if (marker.kind === "import") resetImportState()
+        setIsImportDialogOpen(false)
+        setRollbackTarget(null)
+        await loadDataRuns()
+      }
+    } catch { setRecoveryBlocked(true); setRecoveryMessage("Recovery storage is unavailable. Data mutations remain blocked.") }
+  }
+
+  useEffect(() => {
+    if (!account || !authority.authority) { if (account) forgetPreparedDataOperation(account); setRecoveryBlocked(true); return }
+    void checkDataRecovery()
+    // The check belongs to the current account and authority instance.
+  }, [account, authority.authority])
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === `budget.data-operation-recovery.${encodeURIComponent(account)}`) void checkDataRecovery()
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [account, authority.authority])
 
   const resetImportState = () => {
     const nextState = createEmptyImportState()
@@ -241,12 +338,13 @@ export default function DataSettingsPage() {
   }
 
   const openImportDialog = () => {
+    if (recoveryBlocked) return
     if (!importFile || commitResult) resetImportState()
     setIsImportDialogOpen(true)
   }
 
   const closeImportDialog = () => {
-    if (isPreviewing || isValidating || isImporting || importUncertain) {
+    if (isPreviewing || isValidating || isImporting || recoveryBlocked) {
       return
     }
     setIsImportDialogOpen(false)
@@ -362,37 +460,29 @@ export default function DataSettingsPage() {
       return
     }
 
+    if (recoveryBlocked || recoveryInFlight.current || !authority.authority) return
     setIsImporting(true)
     setImportError(null)
-    let submitted = false
-
     try {
-      if (authority.isUnlocked) {
-        const plan = await buildEncryptedPlan()
-        if (!validatedPlan || importPlanSignature(plan) !== importPlanSignature(validatedPlan)) {
-          setValidationResult(null)
-          setImportError("Import data changed since validation. Validate again before importing.")
-          setImportStep("tags")
-          return
-        }
-        submitted = true
-        await authority.commitCsvImport(plan, importFile.name)
-        submitted = false
+      const plan = await buildEncryptedPlan()
+      if (!validatedPlan || importPlanSignature(plan) !== importPlanSignature(validatedPlan)) {
+        setValidationResult(null)
+        setImportError("Import data changed since validation. Validate again before importing.")
+        setImportStep("tags")
+        return
+      }
+      const current = authority.authority
+      const batch = await prepareEncryptedCsvImport(current, plan, importFile.name)
+      const marker: DataRecoveryMarker = { kind: "import", runId: plan.batchId }
+      rememberDataOperation(account, marker, { authority: new WeakRef(current), batch, uncertain: false, inFlight: false })
+      setRecoveryBlocked(true)
+      if (await submitDataOperation(marker)) {
         setCommitResult({ status: plan.errors.length ? "partial" : "completed", message: "CSV imported into encrypted authority", mode: "commit", total_rows: plan.accepted.length + plan.errors.length + plan.duplicates.length, valid_rows: plan.accepted.length, imported_rows: plan.accepted.length, duplicate_rows: plan.duplicates.length, invalid_rows: plan.errors.length, skipped_rows: plan.skippedBlankAmountRows, skipped_blank_amount_rows: plan.skippedBlankAmountRows, errors_truncated: false, max_returned_errors: 100, errors: plan.errors, new_tags: plan.newTags.map((name) => ({ name, icon_key: "" })), new_cards: plan.newCards.map((name) => ({ name })) })
         setImportStep("done")
         await loadDataRuns()
-        return
       }
-      throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
     } catch (err) {
-      if (submitted) {
-        setImportUncertain(true)
-        setImportError("The import outcome could not be confirmed. Do not submit it again until its activity has been checked after synchronization.")
-      } else if (err instanceof ApiError) {
-        setImportError(err.error.message)
-      } else {
-        setImportError("Unable to prepare CSV import.")
-      }
+      setImportError(err instanceof ApiError ? err.error.message : "Unable to prepare the import or access recovery storage. No import was submitted.")
     } finally {
       setIsImporting(false)
     }
@@ -459,36 +549,28 @@ export default function DataSettingsPage() {
       return
     }
 
+    if (recoveryBlocked || recoveryInFlight.current || !authority.authority) return
     setRollingBackImportId(rollbackTarget.id)
     setRollbackError(null)
-    let submitted = false
-
     try {
-      if (authority.isUnlocked) {
-        submitted = true
-        await authority.rollbackCsvImport(importRunId)
-        submitted = false
-      } else {
-        throw new Error("ENCRYPTED_AUTHORITY_REQUIRED")
+      const current = authority.authority
+      const batch = await prepareEncryptedCsvRollback(current, importRunId)
+      const marker: DataRecoveryMarker = { kind: "rollback", runId: importRunId }
+      rememberDataOperation(account, marker, { authority: new WeakRef(current), batch, uncertain: false, inFlight: false })
+      setRecoveryBlocked(true)
+      if (await submitDataOperation(marker)) {
+        setRollbackTarget(null)
+        await loadDataRuns()
       }
-      setRollbackTarget(null)
-      await loadDataRuns()
     } catch (err) {
-      if (submitted) {
-        setRollbackUncertain(true)
-        setRollbackError("The rollback outcome could not be confirmed. Check activity after synchronization before attempting it again.")
-      } else if (err instanceof ApiError) {
-        setRollbackError(err.error.message)
-      } else {
-        setRollbackError("Unable to rollback import.")
-      }
+      setRollbackError(err instanceof ApiError ? err.error.message : "Unable to prepare rollback or access recovery storage. No rollback was submitted.")
     } finally {
       setRollingBackImportId(null)
     }
   }
 
   const handleRepairImport = async () => {
-    if (!repairTarget || !authority.isUnlocked) return
+    if (!repairTarget || !authority.isUnlocked || recoveryBlocked) return
     setRepairingImportId(repairTarget.id)
     setRepairError(null)
     try {
@@ -561,6 +643,13 @@ export default function DataSettingsPage() {
       </header>
 
       <main className="mx-auto max-w-lg space-y-5 px-4 pt-5 sm:px-5 lg:max-w-6xl lg:px-8">
+        {recoveryMessage && <div role="status" className="rounded-xl border border-border p-4 text-sm">
+          <p>{recoveryMessage}</p>
+          {recoveryBlocked && <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={recoveryBusy || !authority.authority} onClick={() => void checkDataRecovery()}>Check encrypted records</Button>
+            {preparedDataOperation(account)?.authority.deref() === authority.authority && <Button type="button" variant="outline" disabled={recoveryBusy} onClick={() => void retryDataRecovery()}>Retry original request</Button>}
+          </div>}
+        </div>}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-stretch">
           <Card className="border-0 p-4 shadow-sm sm:p-5">
             <div className="flex h-full flex-col gap-5">
@@ -583,7 +672,7 @@ export default function DataSettingsPage() {
                 ))}
               </div>
 
-              <Button type="button" className="mt-auto h-11 w-full rounded-lg" onClick={openImportDialog}>
+              <Button type="button" className="mt-auto h-11 w-full rounded-lg" disabled={recoveryBlocked} onClick={openImportDialog}>
                 <Upload className="size-4" />
                 {importFile && !commitResult ? "Resume import" : "Import CSV"}
               </Button>
@@ -707,6 +796,7 @@ export default function DataSettingsPage() {
                   }}
                   isRollingBack={rollingBackImportId === item.id}
                   isRepairing={repairingImportId === item.id}
+                  mutationDisabled={recoveryBlocked}
                 />
               ))}
             </Card>
@@ -742,8 +832,8 @@ export default function DataSettingsPage() {
           </>
         }
         headerAccessory={<div className="md:w-[26rem]"><ImportStepper stepIndex={currentImportStepIndex} /></div>}
-        showCloseButton={!isPreviewing && !isValidating && !isImporting && !importUncertain}
-        closeDisabled={isPreviewing || isValidating || isImporting || importUncertain}
+        showCloseButton={!isPreviewing && !isValidating && !isImporting && !recoveryBlocked}
+        closeDisabled={isPreviewing || isValidating || isImporting || recoveryBlocked}
         desktopClassName="sm:!max-w-5xl"
         contentClassName={cn("!max-w-none rounded-2xl sm:max-h-[min(820px,calc(100dvh-2rem))]", version === "v2" && styles.portal)}
         headerClassName="border-border/70 p-4 sm:p-5"
@@ -756,7 +846,7 @@ export default function DataSettingsPage() {
               type="button"
               variant="ghost"
               className="h-11 rounded-lg sm:w-auto"
-              disabled={importStep === "upload" || isPreviewing || isValidating || isImporting || importUncertain}
+              disabled={importStep === "upload" || isPreviewing || isValidating || isImporting || recoveryBlocked}
               onClick={goToPreviousImportStep}
             >
               Back
@@ -784,7 +874,7 @@ export default function DataSettingsPage() {
                 <Button
                   type="button"
                   className="h-11 rounded-lg"
-                  disabled={!canCommitImport || isImporting || importUncertain}
+                  disabled={!canCommitImport || isImporting || recoveryBlocked}
                   onClick={() => void handleCommitImport()}
                 >
                   {isImporting ? (
@@ -834,6 +924,7 @@ export default function DataSettingsPage() {
           </div>
         }
       >
+              {recoveryMessage && recoveryBlocked && <div role="status" className="rounded-xl border border-border p-3 text-sm"><p>{recoveryMessage}</p><div className="mt-2 flex gap-2"><Button type="button" variant="outline" disabled={recoveryBusy} onClick={() => void checkDataRecovery()}>Check encrypted records</Button>{preparedDataOperation(account)?.authority.deref() === authority.authority && <Button type="button" variant="outline" disabled={recoveryBusy} onClick={() => void retryDataRecovery()}>Retry original request</Button>}</div></div>}
               {importError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                   {importError}
@@ -988,7 +1079,7 @@ export default function DataSettingsPage() {
       <ResponsiveConfirmDialog
         open={!!rollbackTarget}
         onOpenChange={(open) => {
-          if (!open && !rollingBackImportId && !rollbackUncertain) {
+          if (!open && !rollingBackImportId) {
             setRollbackTarget(null)
             setRollbackError(null)
           }
@@ -997,8 +1088,8 @@ export default function DataSettingsPage() {
         description="This will remove the transactions created by this import. Tags and cards will stay."
         confirmLabel={rollingBackImportId ? "Rolling back..." : "Rollback import"}
         confirmVariant="destructive"
-        confirmDisabled={!!rollingBackImportId || rollbackUncertain}
-        closeDisabled={!!rollingBackImportId || rollbackUncertain}
+        confirmDisabled={!!rollingBackImportId || recoveryBlocked}
+        closeDisabled={!!rollingBackImportId || recoveryBlocked}
         contentClassName={version === "v2" ? styles.portal : undefined}
         onConfirm={() => void handleRollbackImport()}
       >
@@ -1012,6 +1103,7 @@ export default function DataSettingsPage() {
             </div>
           )}
           {rollbackError && <p className="text-sm text-destructive">{rollbackError}</p>}
+          {recoveryMessage && recoveryBlocked && <div role="status" className="space-y-2 text-sm"><p>{recoveryMessage}</p><Button type="button" variant="outline" disabled={recoveryBusy} onClick={() => void checkDataRecovery()}>Check encrypted records</Button>{preparedDataOperation(account)?.authority.deref() === authority.authority && <Button type="button" variant="outline" disabled={recoveryBusy} onClick={() => void retryDataRecovery()}>Retry original request</Button>}</div>}
         </>
       </ResponsiveConfirmDialog>
 
@@ -1027,7 +1119,7 @@ export default function DataSettingsPage() {
         title="Repair rollback history?"
         description="This will restore the encrypted import markers needed to roll back this historical import. No transaction or taxonomy content will be changed."
         confirmLabel={repairingImportId ? "Repairing..." : "Repair history"}
-        confirmDisabled={!!repairingImportId}
+        confirmDisabled={!!repairingImportId || recoveryBlocked}
         closeDisabled={!!repairingImportId}
         onConfirm={() => void handleRepairImport()}
       >

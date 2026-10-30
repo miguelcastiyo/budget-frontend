@@ -3,7 +3,7 @@ import { exportTransactions, planCsvImport, type CsvImportPlan, type CsvRow } fr
 import { analyzeImportLineage, applyImportLineageRepair } from "@/lib/domain/financial/import-lineage-repair"
 import type { SourceMutationDiff } from "@/lib/domain/financial/transaction-fund-diff"
 import { createEncryptedRecordId } from "../encrypted-records/crypto"
-import type { EncryptedFinancialAuthority } from "./authority"
+import type { EncryptedFinancialAuthority, PreparedSourceBatch } from "./authority"
 
 export interface EncryptedCsvImportOptions {
   year: number
@@ -28,7 +28,7 @@ export function planEncryptedCsvImport(authority: EncryptedFinancialAuthority, r
   })
 }
 
-export async function commitEncryptedCsvImport(authority: EncryptedFinancialAuthority, plan: CsvImportPlan, sourceFilename: string): Promise<{ batchId: string }> {
+export async function prepareEncryptedCsvImport(authority: EncryptedFinancialAuthority, plan: CsvImportPlan, sourceFilename: string): Promise<PreparedSourceBatch> {
   const batchId = plan.batchId
   const taxonomyCreates: SourceMutationDiff["creates"] = plan.taxonomyCreates.map((item) => ({
     id: item.id,
@@ -74,11 +74,15 @@ export async function commitEncryptedCsvImport(authority: EncryptedFinancialAuth
       },
     },
   ]
-  await authority.commitSourceDiff({ creates, updates: [], tombstones: [] }, batchId)
-  return { batchId }
+  return authority.prepareSourceDiff({ creates, updates: [], tombstones: [] }, batchId)
 }
 
-export async function rollbackEncryptedCsvImport(authority: EncryptedFinancialAuthority, importRunId: string): Promise<void> {
+export async function commitEncryptedCsvImport(authority: EncryptedFinancialAuthority, plan: CsvImportPlan, sourceFilename: string): Promise<{ batchId: string }> {
+  await authority.submitPreparedSourceDiff(await prepareEncryptedCsvImport(authority, plan, sourceFilename))
+  return { batchId: plan.batchId }
+}
+
+export async function prepareEncryptedCsvRollback(authority: EncryptedFinancialAuthority, importRunId: string): Promise<PreparedSourceBatch> {
   const records = authority.store.values()
   const imported = records.filter((record) => record.family === "transaction" && (
     String(record.data.import_run_id ?? record.data.csv_import_run_id ?? "") === importRunId ||
@@ -88,11 +92,26 @@ export async function rollbackEncryptedCsvImport(authority: EncryptedFinancialAu
   const run = records.find((record) => record.family === "import_run" && (
     String(record.data.id ?? "") === importRunId || record.sourceId === importRunId || record.envelope.record_id === importRunId
   ))
-  await authority.commitSourceDiff({
+  return authority.prepareSourceDiff({
     creates: [],
     updates: run ? [{ id: run.envelope.record_id, family: "import_run", data: { ...run.data, status: "rolled_back" } }] : [],
     tombstones: imported.map((record) => ({ id: record.envelope.record_id, family: "transaction", data: record.data })),
   })
+}
+
+export async function rollbackEncryptedCsvImport(authority: EncryptedFinancialAuthority, importRunId: string): Promise<void> {
+  await authority.submitPreparedSourceDiff(await prepareEncryptedCsvRollback(authority, importRunId))
+}
+
+export function csvOperationConfirmed(authority: EncryptedFinancialAuthority, kind: "import" | "rollback", runId: string): boolean {
+  const records = authority.store.values()
+  const run = records.find((item) => item.family === "import_run" && (item.sourceId === runId || item.envelope.record_id === runId || String(item.data.id ?? "") === runId))
+  if (!run) return false
+  const status = String(run.data.status ?? "")
+  if (kind === "import") return status === "completed" || status === "partial" || status === "rolled_back"
+  if (status !== "rolled_back") return false
+  const lineage = analyzeImportLineage(authority, runId)
+  return lineage.exactCandidateCount === 0 && lineage.ambiguousCount === 0
 }
 
 export async function repairEncryptedCsvImportLineage(authority: EncryptedFinancialAuthority, importRunId: string): Promise<void> {
@@ -105,7 +124,8 @@ export function getEncryptedDataRuns(authority: EncryptedFinancialAuthority, lim
   return authority.getState().importRuns.slice(0, limit).map((item) => {
     const id = String(item.id ?? "")
     const analysis = analyzeImportLineage(authority, id)
-    const rolledBack = String(item.status ?? "") === "rolled_back"
+    const rolledBack = csvOperationConfirmed(authority, "rollback", id)
+    const inconsistentRollback = String(item.status ?? "") === "rolled_back" && !rolledBack
     return {
       id,
       type: "import",
@@ -117,12 +137,13 @@ export function getEncryptedDataRuns(authority: EncryptedFinancialAuthority, lim
       imported_rows: Number(item.imported_rows ?? 0),
       duplicate_rows: Number(item.duplicate_rows ?? 0),
       invalid_rows: Number(item.invalid_rows ?? 0),
-      error_summary: item.error_summary == null ? null : String(item.error_summary),
-      rollback_available: !rolledBack && (analysis.status === "not_needed" || analysis.status === "repaired"),
-      rolled_back_at: rolledBack ? String(item.rolled_back_at ?? item.updated_at ?? "") : null,
+      error_summary: inconsistentRollback ? "Rollback status conflicts with remaining linked transactions. Synchronize and review the import before proceeding." : item.error_summary == null ? null : String(item.error_summary),
+      rollback_available: String(item.status ?? "") !== "rolled_back" && !rolledBack && (analysis.status === "not_needed" || analysis.status === "repaired"),
+      is_rolled_back: rolledBack,
+      rolled_back_at: rolledBack ? String(item.rolled_back_at ?? item.updated_at ?? "") || null : null,
       rolled_back_rows: Number(item.rolled_back_rows ?? 0),
-      rollback_unavailable_reason: analysis.status === "source_file_required" || analysis.status === "ambiguous" ? "pre_rollback_feature" : null,
-      lineage_repair_status: analysis.status,
+      rollback_unavailable_reason: !rolledBack && (analysis.status === "source_file_required" || analysis.status === "ambiguous") ? "pre_rollback_feature" : null,
+      lineage_repair_status: rolledBack ? undefined : analysis.status,
       lineage_repair_evidence: analysis.evidenceMethod,
     } as DataRunItem
   })

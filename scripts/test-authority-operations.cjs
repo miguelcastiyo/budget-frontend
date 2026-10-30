@@ -209,6 +209,12 @@ function makeAuthority(initialRecords = []) {
   assert(getEncryptedDataRuns(created.authority, 10)[0]?.source_filename === "august.csv", "import operation projects encrypted run activity")
   await rollbackEncryptedCsvImport(created.authority, committedImport.batchId)
   assert(created.records.get(committedImport.batchId)?.data.status === "rolled_back" && ![...created.records.values()].some((record) => record.family === "transaction" && record.data.import_run_id === committedImport.batchId), "import rollback operation tombstones imported transactions and marks the run")
+  const rolledBackRun = getEncryptedDataRuns(created.authority, 10).find((item) => item.id === committedImport.batchId)
+  assert(rolledBackRun?.is_rolled_back && !rolledBackRun.rollback_available && !rolledBackRun.rollback_unavailable_reason && !rolledBackRun.lineage_repair_status, "confirmed rollback has no false repair warning")
+  created.records.set("inconsistent_imported", makeRecord("inconsistent_imported", "transaction", { import_run_id: committedImport.batchId }))
+  const inconsistentRun = getEncryptedDataRuns(created.authority, 10).find((item) => item.id === committedImport.batchId)
+  assert(!inconsistentRun.is_rolled_back && !inconsistentRun.rollback_available && inconsistentRun.error_summary.includes("conflicts"), "remaining transactions prevent false rollback confirmation")
+  created.records.delete("inconsistent_imported")
 
   const { EncryptedFinancialAuthority } = require("../lib/privacy/encrypted-authority/authority.ts")
   const guarded = new EncryptedFinancialAuthority({ request: async () => { throw new Error("unexpected network request") } }, null, "vault")

@@ -1089,6 +1089,7 @@ export interface DataRunItem {
   error_summary: string | null
   rollback_available: boolean
   rolled_back_at: string | null
+  is_rolled_back?: boolean
   rolled_back_rows: number
   rollback_unavailable_reason: "pre_rollback_feature" | null
   lineage_repair_status?: "not_needed" | "repairable_automatically" | "source_file_required" | "ambiguous" | "repaired"
