@@ -1,102 +1,105 @@
 import { expect, test, type Page } from "@playwright/test"
+import { setupEncryptedFixture } from "./encrypted-fixture"
 
-const setupStatus = {
-  budget_profile_complete: true,
-  has_transactions: false,
-  has_recurring_expenses: false,
-  has_imported_data: false,
-  first_transaction_added: false,
-  first_recurring_expense_added: false,
-  first_import_completed: false,
-  onboarding_dismissed: true,
-  recommended_next_action: "none",
-  setup_tasks: [],
+test.use({ actionTimeout: 12000 })
+test.skip(process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED !== "true", "Requires v2 availability")
+
+async function createReviewedTransaction(page: Page, description: string, amount: string) {
+  await page.getByRole("button", { name: "Add", exact: true }).click()
+  const capture = page.getByRole("form", { name: "Quick Capture" })
+  await capture.getByLabel("Amount").fill(amount)
+  await capture.getByLabel("Description").fill(description)
+  await capture.getByRole("button", { name: "Save to Review" }).click()
+  await page.getByRole("link", { name: /Review/ }).first().click()
+  const review = page.getByRole("form", { name: "Review transaction" })
+  await review.getByRole("button", { name: /Needs/ }).click()
+  await review.getByRole("button", { name: "All tags" }).click()
+  const picker = page.getByRole("dialog", { name: "All tags" })
+  await picker.getByLabel("New tag name").fill("Groceries")
+  await picker.getByRole("button", { name: "Create tag" }).click()
+  await picker.getByRole("button", { name: "Done" }).click()
+  await review.getByRole("button", { name: "Confirm & Next" }).click()
+  await expect(page.getByRole("status").filter({ hasText: "Transaction finalized" })).toBeVisible()
+  await page.getByRole("link", { name: "Transactions", exact: true }).first().click()
 }
 
-async function mockTransactionsApi(page: Page, transactionTotal = 0) {
-  const transactionRequests: string[] = []
+test("transactions show empty and filtered states through the encrypted authority", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, true)
+  await page.getByRole("link", { name: "Transactions", exact: true }).first().click()
+  const ledger = page.getByRole("region", { name: "Activity transactions" })
+  await expect(ledger).toContainText("No matching transactions")
+  await ledger.getByRole("button", { name: "Clear filters" }).click()
+  await expect(ledger).toContainText("No transactions yet")
+  await page.getByPlaceholder("Search transactions...").filter({ visible: true }).fill("missing")
+  await expect(ledger).toContainText("No matching transactions")
+  await ledger.getByRole("button", { name: "Clear filters" }).click()
+  await expect(ledger).toContainText("No transactions yet")
+})
 
-  await page.route("**/api/v1/**", async (route) => {
-    const request = route.request()
-    const url = new URL(request.url())
-    const path = url.pathname
+test("transactions support search, details, edit, deletion and saved view", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, true)
+  await createReviewedTransaction(page, "Market", "12.50")
+  const ledger = page.getByRole("region", { name: "Activity transactions" })
+  await expect(ledger.getByRole("button", { name: /Market/ })).toContainText("12.50")
+  await page.getByPlaceholder("Search transactions...").filter({ visible: true }).fill("Market")
+  await expect(ledger).toContainText("1 match")
+  await page.getByRole("button", { name: "Sort oldest first" }).click()
+  await ledger.getByRole("button", { name: /Market/ }).click()
+  const detail = page.getByRole("dialog")
+  await expect(detail).toContainText("Groceries")
+  await detail.getByRole("button", { name: "Edit" }).click()
+  const editor = page.getByRole("dialog")
+  await editor.getByLabel("Description", { exact: true }).fill("Market edited")
+  await editor.getByLabel("Amount", { exact: true }).fill("20.00")
+  await editor.getByRole("button", { name: /Save changes/i }).click()
+  await expect(ledger.getByRole("button", { name: /Market edited/ })).toBeVisible()
+  await page.getByRole("link", { name: "Overview", exact: true }).first().click()
+  await expect(page.getByLabel("Categories")).toContainText("$20.00 spent")
+  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  const toggle = page.getByRole("switch", { name: "Use v2 interface" })
+  await toggle.click()
+  await expect(toggle).not.toBeChecked()
+  await expect(page.getByTestId("encrypted-vault-locked-boundary")).toHaveCount(0)
+  await page.getByRole("link", { name: "Overview", exact: true }).first().click()
+  await page.getByRole("tab", { name: "Recent" }).click()
+  await expect(page.getByText("Market edited").first()).toBeVisible()
+  await expect(page.getByText("$20.00").first()).toBeVisible()
+  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+  await expect(page.getByTestId("encrypted-vault-locked-boundary")).toHaveCount(0)
+  await page.getByRole("link", { name: "Transactions", exact: true }).first().click()
+  await expect(page.getByPlaceholder("Search transactions...").filter({ visible: true })).toHaveValue("Market")
+  await ledger.getByRole("button", { name: /Market edited/ }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click()
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true }).click()
+  await expect(ledger.getByRole("button", { name: /Market edited/ })).toHaveCount(0)
+})
 
-    if (path === "/api/v1/me" && request.method() === "GET") {
-      await route.fulfill({
-        json: {
-          id: "user-1",
-          email: "test@example.com",
-          display_name: "Test User",
-          avatar_url: null,
-          role: "user",
-          onboarding_complete: true,
-          user_preferences: { appearance: { theme: "light" }, onboarding: { dismissed: true } },
-          email_verified: true,
-          created_at: "2026-01-01T00:00:00Z",
-        },
-      })
-      return
-    }
-
-    if (path === "/api/v1/me/setup-status" && request.method() === "GET") {
-      await route.fulfill({ json: setupStatus })
-      return
-    }
-
-    if (path === "/api/v1/me/tags") {
-      await route.fulfill({ json: { items: [] } })
-      return
-    }
-
-    if (path === "/api/v1/me/tags/quick-picks") {
-      await route.fulfill({ json: { items: [] } })
-      return
-    }
-
-    if (path === "/api/v1/me/cards" || path === "/api/v1/me/contexts") {
-      await route.fulfill({ json: { items: [] } })
-      return
-    }
-
-    if (path === "/api/v1/me/transactions" && request.method() === "GET") {
-      transactionRequests.push(url.search)
-      await route.fulfill({
-        json: {
-          items: [],
-          page: Number(url.searchParams.get("page") ?? "1"),
-          page_size: Number(url.searchParams.get("page_size") ?? "50"),
-          total_items: transactionTotal,
-          total_pages: transactionTotal > 0 ? 1 : 0,
-          summary: { total_spent: "0.00", count: transactionTotal, avg_transaction: "0.00", split_count: 0 },
-        },
-      })
-      return
-    }
-
-    await route.continue()
-  })
-
-  return transactionRequests
-}
-
-test.describe("transactions", () => {
-  test("shows the account-empty state without a duplicate existence request", async ({ page }) => {
-    const transactionRequests = await mockTransactionsApi(page)
-
-    await page.goto("/transactions")
-
-    await expect(page.getByText("No transactions yet")).toBeVisible()
-    expect(transactionRequests).toHaveLength(1)
-  })
-
-  test("keeps the filtered empty state when a filter is present", async ({ page }) => {
-    const transactionRequests = await mockTransactionsApi(page)
-
-    await page.goto("/transactions?category=savings")
-
-    await expect(page.getByText("No matching transactions")).toBeVisible()
-    await expect(page.getByText("No transactions yet")).not.toBeVisible()
-    expect(transactionRequests).toHaveLength(1)
-    expect(transactionRequests[0]).toContain("categories=savings")
-  })
+test("v2 filter and detail portals fit mobile viewports and use scoped theme colors", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, true)
+  await createReviewedTransaction(page, "Mobile purchase", "9.25")
+  for (const width of [375, 430, 1280]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 })
+    await page.evaluate(() => document.documentElement.classList.add("dark"))
+    await page.getByRole("button", { name: /^Filters/ }).filter({ visible: true }).click()
+    const filters = page.getByRole("dialog", { name: "Filters" })
+    await expect(filters).toHaveCSS("background-color", "rgb(22, 23, 26)")
+    if (!await filters.locator("#transaction-date-from").isVisible()) await filters.getByRole("button", { name: "Custom range" }).click()
+    await filters.locator("#transaction-date-from").click()
+    await expect(page.locator('[data-slot="popover-content"]').filter({ visible: true })).toHaveCSS("background-color", "rgb(22, 23, 26)")
+    await page.keyboard.press("Escape")
+    await filters.getByRole("button", { name: "Done" }).click()
+    await page.getByRole("region", { name: "Activity transactions" }).getByRole("button", { name: /Mobile purchase/ }).click()
+    const detail = page.getByRole("dialog")
+    await expect(detail).toHaveCSS("background-color", "rgb(22, 23, 26)")
+    await detail.getByRole("button", { name: "Delete" }).click()
+    await expect(page.getByRole("alertdialog")).toHaveCSS("background-color", "rgb(22, 23, 26)")
+    await page.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click()
+    await detail.getByRole("button", { name: "Close" }).click()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
 })

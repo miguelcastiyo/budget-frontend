@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Pencil } from "lucide-react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -18,10 +18,15 @@ import type {
   BudgetSettingsResolvedResponse,
   BudgetSettingsVersionsResponse,
   BudgetSettingsVersionItem,
+  MonthOverviewResponse,
 } from "@/lib/api/types"
 import { formatMonthLabel, getCurrentMonthKey, isFutureMonth, parseMonthKey } from "@/lib/date-filters"
 import { formatCurrency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { FinancialDomainError } from "@/lib/domain/financial/errors"
+import styles from "@/components/budget/v2-budget.module.css"
+import editorStyles from "@/components/budget/v2-editor.module.css"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
 import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { resolvedAmounts, resolvedBudget } from "@/lib/domain/financial/budgets"
@@ -92,6 +97,7 @@ function getEncryptedBudgetVersions(state: RehydratedFinancialState | undefined)
 
 export default function BudgetSettingsPage() {
   const financialAuthority = useFinancialAuthority()
+  const { version } = useInterfacePreference()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -109,7 +115,9 @@ export default function BudgetSettingsPage() {
   const shouldAutoOpenEditor = searchParams.get("edit") === "1"
   const [incomeForm, setIncomeForm] = useState<IncomeFormState>(defaultIncomeFormState)
   const [allocationForm, setAllocationForm] = useState<BudgetAllocationFormState>(defaultBudgetAllocationFormState)
+  const [missingBudget, setMissingBudget] = useState(false)
   const [budgetResolution, setBudgetResolution] = useState<BudgetSettingsResolvedResponse | null>(null)
+  const [monthOverview, setMonthOverview] = useState<MonthOverviewResponse | null>(null)
   const [budgetVersions, setBudgetVersions] = useState<BudgetSettingsVersionItem[]>([])
   const [isBudgetLoading, setIsBudgetLoading] = useState(true)
   const [isVersionsLoading, setIsVersionsLoading] = useState(true)
@@ -120,6 +128,7 @@ export default function BudgetSettingsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loadedPayloadKey, setLoadedPayloadKey] = useState<string | null>(null)
   const [showBudgetEditor, setShowBudgetEditor] = useState(false)
+  const autoOpenedEditRef = useRef(false)
 
   useEffect(() => {
     if (requestedMonth === initialMonth) {
@@ -137,6 +146,8 @@ export default function BudgetSettingsPage() {
   }, [initialMonth, pathname, requestedMonth, router, searchParams])
 
   const handleSelectedMonthChange = (month: string) => {
+    if (month === selectedMonth) return
+    setIsBudgetLoading(true)
     const nextSearchParams = new URLSearchParams(searchParams.toString())
     nextSearchParams.set("month", month)
     const nextQuery = nextSearchParams.toString()
@@ -154,11 +165,13 @@ export default function BudgetSettingsPage() {
       setSaveError(null)
       setSuccess(null)
       setBudgetResolution(null)
+      setMissingBudget(false)
       setBudgetVersions([])
+      setMonthOverview(null)
       setIncomeForm(defaultIncomeFormState)
       setAllocationForm(defaultBudgetAllocationFormState)
       setLoadedPayloadKey(null)
-      const [budgetResult, versionsResult] = await Promise.allSettled([financialAuthority.getBudgetResolution(selectedMonth), financialAuthority.getBudgetVersions()])
+      const [budgetResult, versionsResult, overviewResult] = await Promise.allSettled([financialAuthority.getBudgetResolution(selectedMonth), financialAuthority.getBudgetVersions(), financialAuthority.getMonthOverview(selectedMonth)])
 
       if (cancelled) {
         return
@@ -167,6 +180,9 @@ export default function BudgetSettingsPage() {
       if (budgetResult.status === "fulfilled") {
         setBudgetResolution(budgetResult.value)
         hydrateForm(budgetResult.value.settings)
+      } else if (budgetResult.reason instanceof FinancialDomainError && budgetResult.reason.code === "REFERENCE_NOT_FOUND") {
+        setMissingBudget(true)
+        setLoadedPayloadKey(serializeBudgetFormState(defaultIncomeFormState, defaultBudgetAllocationFormState))
       } else {
         setBudgetError(
           budgetResult.reason instanceof ApiError
@@ -185,6 +201,8 @@ export default function BudgetSettingsPage() {
         )
       }
 
+      if (overviewResult.status === "fulfilled") setMonthOverview(overviewResult.value)
+
       if (cancelled) {
         return
       }
@@ -201,17 +219,22 @@ export default function BudgetSettingsPage() {
   }, [financialAuthority, initialMonth])
 
   useEffect(() => {
-    if (!shouldAutoOpenEditor || isBudgetLoading || budgetResolution === null || budgetError !== null) {
+    if (!shouldAutoOpenEditor) {
+      autoOpenedEditRef.current = false
+      return
+    }
+    if (autoOpenedEditRef.current || isBudgetLoading || (budgetResolution === null && !missingBudget) || budgetError !== null) {
       return
     }
 
+    autoOpenedEditRef.current = true
     setShowBudgetEditor(true)
 
     const nextSearchParams = new URLSearchParams(searchParams.toString())
     nextSearchParams.delete("edit")
     const nextQuery = nextSearchParams.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
-  }, [budgetError, budgetResolution, isBudgetLoading, pathname, router, searchParams, shouldAutoOpenEditor])
+  }, [budgetError, budgetResolution, missingBudget, isBudgetLoading, pathname, router, searchParams, shouldAutoOpenEditor])
 
   const hydrateForm = (settings: BudgetSettings) => {
     const nextState = createBudgetFormState(settings)
@@ -228,7 +251,7 @@ export default function BudgetSettingsPage() {
     [incomeForm, allocationForm]
   )
   const hasBudgetChanges = loadedPayloadKey !== null && currentPayloadKey !== loadedPayloadKey
-  const canCreateInheritedVersion = budgetResolution !== null && !budgetResolution.is_exact_match
+  const canCreateInheritedVersion = missingBudget || (budgetResolution !== null && !budgetResolution.is_exact_match)
   const selectedMonthLabel = formatMonthLabel(selectedMonth) ?? selectedMonth
   const resolvedMonthLabel = budgetResolution?.resolved_effective_month
     ? formatMonthLabel(budgetResolution.resolved_effective_month) ?? budgetResolution.resolved_effective_month
@@ -237,13 +260,13 @@ export default function BudgetSettingsPage() {
   const canSaveBudget =
     !isBudgetLoading &&
     !isSaving &&
-    budgetResolution !== null &&
+    (budgetResolution !== null || missingBudget) &&
     hasValidIncome &&
     hasValidAllocation &&
     (hasBudgetChanges || canCreateInheritedVersion)
   const saveLabel = isSaving
     ? "Saving..."
-    : budgetResolution === null
+    : budgetResolution === null && !missingBudget
       ? "Loading budget"
       : !hasValidIncome || !hasValidAllocation
       ? "Fix issues before saving"
@@ -279,6 +302,7 @@ export default function BudgetSettingsPage() {
       const response = payload as BudgetSettings
 
       hydrateForm(response)
+      setMissingBudget(false)
       setBudgetResolution({
         requested_month: selectedMonth,
         resolved_effective_month: selectedMonth,
@@ -370,7 +394,7 @@ export default function BudgetSettingsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-mobile-nav">
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header">
+      <header className={cn("sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-safe-header", version === "v2" && styles.header)}>
         <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:max-w-6xl lg:px-8">
           <Link href="/settings">
             <Button variant="ghost" size="icon" className="rounded-full" aria-label="Back to settings">
@@ -392,6 +416,29 @@ export default function BudgetSettingsPage() {
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
         {success && <p className="text-sm text-success">{success}</p>}
 
+        {version === "v2" ? <div className={styles.root} data-testid="v2-budget">
+          <div className={styles.month}><MonthSelector currentMonth={initialMonth} onChange={handleSelectedMonthChange} /></div>
+          <BudgetStatusCopy copy={budgetStatusCopy} className={styles.status} />
+          <div className={styles.grid}>
+            <div className={styles.column}>
+              <section className={styles.summary} aria-label="Monthly budget">
+                <div className={styles.summaryHeading}><span>Monthly budget basis</span><button type="button" disabled={isBudgetLoading || budgetError !== null} onClick={() => setShowBudgetEditor(true)}>{missingBudget ? "Set budget" : "Edit budget"}</button></div>
+                <p className={styles.amount}>{isBudgetLoading || budgetError ? "--" : missingBudget ? "No budget yet" : formatCurrency(income)}</p>
+                {!missingBudget && !isBudgetLoading && !budgetError && <p className={styles.muted}>per month · {selectedMonthLabel}</p>}
+              </section>
+              {!missingBudget && !isBudgetLoading && !budgetError && <section aria-label="Budget allocation" className={styles.allocations}>
+                <h2>Budget allocation</h2>
+                {(["needs", "wants", "savings"] as const).map(category => <div key={category} className={styles.allocation}>
+                  <div><span className={`${styles.dot} ${styles[category]}`} /><span className={styles.capitalize}>{category}</span><span className={styles.target}>{formatCurrency(getAllocationTarget(income, allocationForm, category))}</span></div>
+                  <div className={styles.track}><span className={styles[category]} style={{ width: `${Math.max(0, Math.min(100, getAllocationPercent(income, allocationForm, category)))}%` }} /></div>
+                  <small>{getAllocationPercent(income, allocationForm, category).toFixed(0)}% of monthly budget{monthOverview?.categories.find(item => item.category === category) && ` · ${formatCurrency(monthOverview.categories.find(item => item.category === category)!.actual_spend)} spent`}</small>
+                </div>)}
+              </section>}
+              {!missingBudget && <BudgetDetailsCard incomeForm={incomeForm} allocationForm={allocationForm} income={income} isLoading={isBudgetLoading} error={budgetError} />}
+            </div>
+            <div className={styles.column}><BudgetTimelineCard items={budgetVersions} isLoading={isVersionsLoading} error={versionsError} /><BudgetUsageCard /></div>
+          </div>
+        </div> : <>
         <section className="rounded-2xl border border-border/60 bg-card px-3 py-3 shadow-sm sm:p-5">
           <MonthSelector currentMonth={initialMonth} onChange={handleSelectedMonthChange} />
           <BudgetStatusCopy copy={budgetStatusCopy} className="mx-auto mt-2 max-w-sm text-center sm:mt-3" />
@@ -430,15 +477,17 @@ export default function BudgetSettingsPage() {
           isLoading={isVersionsLoading}
           error={versionsError}
         />
+        </>}
       </main>
 
       <ResponsiveDialog
         open={showBudgetEditor}
-        onOpenChange={setShowBudgetEditor}
+        onOpenChange={(open) => { if (!isSaving) setShowBudgetEditor(open) }}
+        closeDisabled={isSaving}
         title="Edit Budget"
         description="Update your monthly budget basis and category targets."
         desktopClassName="sm:w-[min(calc(100dvw-2rem),42rem)] sm:max-w-[42rem]"
-        contentClassName="sm:max-h-[min(90dvh,44rem)]"
+        contentClassName={cn("sm:max-h-[min(90dvh,44rem)]", version === "v2" && editorStyles.surface)}
         bodyClassName="px-4 pb-28 pt-4 sm:px-6 sm:pb-24 sm:pt-5"
         footer={
           <div className="flex gap-2">
@@ -446,6 +495,7 @@ export default function BudgetSettingsPage() {
               variant="ghost"
               className="h-12 flex-1 rounded-xl"
               onClick={() => setShowBudgetEditor(false)}
+              disabled={isSaving}
             >
               Cancel
             </Button>
@@ -453,6 +503,7 @@ export default function BudgetSettingsPage() {
           </div>
         }
       >
+        {version === "v2" && saveError && <p role="alert" className="mb-4 text-sm text-destructive">{saveError}</p>}
         {budgetEditor("settings-edit", false)}
       </ResponsiveDialog>
 

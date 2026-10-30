@@ -15,6 +15,8 @@ import { getContextIcon, getTagIcon } from "@/lib/tag-icons"
 import { cn } from "@/lib/utils"
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import styles from "./v2-activity-dialog.module.css"
 
 interface TransactionFiltersProps {
   preset: Preset | "all"
@@ -298,6 +300,7 @@ export function TransactionFilters({
   desktopSidebarToggle,
   desktopMode = false,
 }: TransactionFiltersProps) {
+  const { version } = useInterfacePreference()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [customRangeExpanded, setCustomRangeExpanded] = useState(Boolean(customDateRange))
   const [customFrom, setCustomFrom] = useState(customDateRange?.date_from ?? "")
@@ -484,7 +487,7 @@ export function TransactionFilters({
               {activeFiltersCount > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{activeFiltersCount}</Badge>}
             </Button>
           </SheetTrigger>
-          <SheetContent {...filtersSwipeDismiss} side="bottom" className="h-[85vh] gap-0 rounded-t-3xl p-0 lg:h-auto lg:max-h-[75vh]">
+          <SheetContent {...filtersSwipeDismiss} side="bottom" className={cn("h-[85vh] gap-0 rounded-t-3xl p-0 lg:h-auto lg:max-h-[75vh]", version === "v2" && styles.filters)}>
             <SheetHeader className="border-b border-border/50 px-6 pb-4 pt-6">
               <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "-mt-2 mb-4 lg:hidden")} aria-hidden="true" />
               <SheetTitle className="text-xl">Filters</SheetTitle>
@@ -516,7 +519,7 @@ export function TransactionFilters({
                               {selectedFromDate ? format(selectedFromDate, "MMM d, yyyy") : "Select start date"}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
+                          <PopoverContent className={cn("w-auto p-0", version === "v2" && styles.calendar)}>
                             <AppCalendar mode="single" selected={selectedFromDate ?? undefined} onSelect={(value) => value && setCustomFrom(format(value, "yyyy-MM-dd"))} initialFocus />
                           </PopoverContent>
                         </Popover>
@@ -530,7 +533,7 @@ export function TransactionFilters({
                               {selectedToDate ? format(selectedToDate, "MMM d, yyyy") : "Select end date"}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
+                          <PopoverContent className={cn("w-auto p-0", version === "v2" && styles.calendar)}>
                             <AppCalendar mode="single" selected={selectedToDate ?? undefined} onSelect={(value) => value && setCustomTo(format(value, "yyyy-MM-dd"))} initialFocus />
                           </PopoverContent>
                         </Popover>

@@ -26,6 +26,9 @@ import {
 import { useSwipeDismiss } from "@/hooks/use-swipe-dismiss"
 import { mobileDrawerHandleClassName } from "@/lib/mobile-drawer"
 import { formatDateValue } from "@/lib/date-filters"
+import { useInterfacePreference } from "@/components/layout/interface-preference"
+import { cn } from "@/lib/utils"
+import styles from "./v2-activity-dialog.module.css"
 
 interface TransactionDetailSheetProps {
   transaction: Transaction | null
@@ -53,6 +56,7 @@ export function TransactionDetailSheet({
   onDelete,
   isDeleting = false,
 }: TransactionDetailSheetProps) {
+  const { version } = useInterfacePreference()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const swipeDismiss = useSwipeDismiss({
     open,
@@ -75,7 +79,7 @@ export function TransactionDetailSheet({
         {...swipeDismiss}
         ref={scrollContainerRef}
         side="bottom"
-        className="h-auto max-h-[90vh] overflow-y-auto rounded-t-3xl px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+        className={cn("h-auto max-h-[90vh] overflow-y-auto rounded-t-3xl px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+1rem)]", version === "v2" && styles.detail)}
       >
         <div data-swipe-handle="true" className={`${mobileDrawerHandleClassName} mt-1 sm:hidden`} aria-hidden="true" />
         <SheetHeader className="pb-6">
@@ -200,7 +204,7 @@ export function TransactionDetailSheet({
                   Delete
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-2xl">
+              <AlertDialogContent className={cn("rounded-2xl", version === "v2" && styles.confirm)}>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
                   <AlertDialogDescription>
