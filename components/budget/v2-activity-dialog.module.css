@@ -1,15 +1,15 @@
 .detail, .filters, .confirm, .calendar {
-  --background:#fbfbfa; --foreground:#292a2e; --card:#fff; --card-foreground:#292a2e;
-  --popover:#fff; --popover-foreground:#292a2e; --primary:#292a2e; --primary-foreground:#fbfbfa;
-  --secondary:#f1f1ef; --secondary-foreground:#292a2e; --muted:#f1f1ef; --muted-foreground:#707076;
-  --border:#e3e3e1; --input:#e3e3e1; --ring:#77777c;
-  color:var(--foreground); background:var(--background); font-family:Inter,system-ui,sans-serif;
+  --background:var(--v2-canvas,#fbfbfa); --foreground:var(--v2-ink,#292a2e); --card:var(--v2-surface,#ffffff); --card-foreground:var(--v2-ink,#292a2e);
+  --popover:var(--v2-surface-raised,#ffffff); --popover-foreground:var(--v2-ink,#292a2e); --primary:var(--v2-primary,#292a2e); --primary-foreground:var(--v2-primary-ink,#fbfbfa);
+  --secondary:var(--v2-surface-muted,#f1f1ef); --secondary-foreground:var(--v2-ink,#292a2e); --muted:var(--v2-surface-muted,#f1f1ef); --muted-foreground:var(--v2-muted,#727277);
+  --border:var(--v2-border,#e7e7e5); --input:var(--v2-border,#e7e7e5); --ring:var(--v2-ring,#77777c);
+  color:var(--foreground); background:var(--background); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
 }
 :global(.dark) .detail, :global(.dark) .filters, :global(.dark) .confirm, :global(.dark) .calendar {
-  --background:#16171a; --foreground:#f0efed; --card:#202125; --card-foreground:#f0efed;
-  --popover:#25262a; --popover-foreground:#f0efed; --primary:#f0efed; --primary-foreground:#16171a;
-  --secondary:#292a2e; --secondary-foreground:#f0efed; --muted:#292a2e; --muted-foreground:#a8a8ac;
-  --border:#36373c; --input:#36373c; --ring:#aaa;
+  --background:var(--v2-canvas,#fbfbfa); --foreground:var(--v2-ink,#292a2e); --card:var(--v2-surface,#ffffff); --card-foreground:var(--v2-ink,#292a2e);
+  --popover:var(--v2-surface-raised,#ffffff); --popover-foreground:var(--v2-ink,#292a2e); --primary:var(--v2-primary,#292a2e); --primary-foreground:var(--v2-primary-ink,#fbfbfa);
+  --secondary:var(--v2-surface-muted,#f1f1ef); --secondary-foreground:var(--v2-ink,#292a2e); --muted:var(--v2-surface-muted,#f1f1ef); --muted-foreground:var(--v2-muted,#727277);
+  --border:var(--v2-border,#e7e7e5); --input:var(--v2-border,#e7e7e5); --ring:var(--v2-ring,#77777c);
 }
 .detail, .filters { max-height:90dvh; border-color:var(--border); }
 .detail :global([data-slot="sheet-header"]) { padding-top:1.25rem; }

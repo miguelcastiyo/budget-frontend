@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   Dialog,
   DialogClose,
@@ -95,6 +95,8 @@ export function TransactionEditorForm({
   const [captureBusy, setCaptureBusy] = useState(false)
   const [captureError, setCaptureError] = useState("")
   const [captureNotice, setCaptureNotice] = useState("")
+  const [v2ViewportHeight, setV2ViewportHeight] = useState<number | null>(null)
+  const captureDescriptionRef = useRef<HTMLInputElement>(null)
   const saveAndNew = useRef(false)
   const v2Initialized = useRef(false)
   const quick = useQuickCapture({
@@ -111,7 +113,7 @@ export function TransactionEditorForm({
     if (key === "back") { setAmount(amount.slice(0, -1)); return }
     if (key === ".") { if (!amount.includes(".")) setAmount(`${amount || "0"}.`); return }
     const [whole = "", fraction = ""] = amount.split(".")
-    if (fraction.length >= 2 || amount.replace(/\D/g, "").length >= 9) return
+    if (fraction.length >= 2 || amount.replace(/\D/g, "").length >= 8) return
     setAmount(amount.includes(".") ? `${whole}.${fraction}${key}` : `${whole}${key}`)
   }
   const closeV2Picker = () => { setV2Picker(null); setV2PickerQuery("") }
@@ -119,6 +121,21 @@ export function TransactionEditorForm({
   const filteredV2Cards = cards.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
   const transitionBlocked = isSubmitting || isCreatingTag || isCreatingCard || isCreatingContext || captureBusy || Boolean(quick.captureBatch)
   const dirty = Boolean(amount || expense || category !== "needs" || tagId || cardId || contextId || notes || isSplit || makeRecurring || showNewTag || newTagName || newTagIconKey || showNewCard || newCardName || format(date, "yyyy-MM-dd") !== getLocalDateKey())
+
+  useEffect(() => {
+    if (!v2Style || !open) return
+    const viewport = window.visualViewport
+    const updateHeight = () => setV2ViewportHeight(Math.round(viewport?.height ?? window.innerHeight))
+    updateHeight()
+    viewport?.addEventListener("resize", updateHeight)
+    viewport?.addEventListener("scroll", updateHeight)
+    window.addEventListener("resize", updateHeight)
+    return () => {
+      viewport?.removeEventListener("resize", updateHeight)
+      viewport?.removeEventListener("scroll", updateHeight)
+      window.removeEventListener("resize", updateHeight)
+    }
+  }, [open, v2Style])
   const requestOpenChange = (next: boolean) => {
     if (!v2Create || next) { onOpenChange(next); return }
     if (transitionBlocked) return
@@ -144,7 +161,8 @@ export function TransactionEditorForm({
 
   const focusExpenseInput = () => {
     window.requestAnimationFrame(() => {
-      expenseInputRef.current?.focus()
+      if (v2Create && captureMode) captureDescriptionRef.current?.focus()
+      else expenseInputRef.current?.focus()
     })
   }
 
@@ -645,10 +663,12 @@ export function TransactionEditorForm({
       <DialogContent
         {...swipeDismiss}
         showCloseButton={false}
+        style={v2ViewportHeight ? ({ "--v2-viewport-height": `${v2ViewportHeight}px` } as CSSProperties) : undefined}
         className={cn(
           "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
           mobileDrawerDialogClassName,
-          v2Style && styles.surface
+          v2Style && styles.surface,
+          v2Style && styles.dialog
         )}
       >
         {v2Create && captureMode && <form onSubmit={quick.capture} className={styles.capture} aria-label="Quick Capture">
@@ -656,13 +676,13 @@ export function TransactionEditorForm({
           <div className={styles.captureBody}>
             <label className={styles.amountLabel} htmlFor="quick-capture-amount">Amount</label>
             <AmountInput ref={quick.amountRef} id="quick-capture-amount" name="capture_amount" value={amount} onValueChange={setAmount} label="" readOnly className={styles.captureAmount} />
-            <label className={styles.captureDescription}>Description<input value={expense} onFocus={() => setCaptureKeypadOpen(false)} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" enterKeyHint="done" /></label>
+            <label className={styles.captureDescription}>Description<input ref={captureDescriptionRef} value={expense} onFocus={() => setCaptureKeypadOpen(false)} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" enterKeyHint="done" /></label>
             <div className={styles.quickDates} role="group" aria-label="Date">
               <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getLocalDateKey()} onClick={() => setDate(new Date())}>Today</button>
               <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getYesterdayKey()} onClick={() => { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); setDate(yesterday) }}>Yesterday</button>
               <label className={styles.dateOther}>{format(date, "yyyy-MM-dd") !== getLocalDateKey() && format(date, "yyyy-MM-dd") !== getYesterdayKey() ? format(date, "MMM d") : "Other"}<input aria-label="Choose date" type="date" max={getLocalDateKey()} value={format(date, "yyyy-MM-dd")} disabled={Boolean(quick.captureBatch)} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
             </div>
-            {captureKeypadOpen && !quick.captureBatch && <div className={styles.captureKeypad} role="group" aria-label="Amount keypad">{["1","2","3","4","5","6","7","8","9",".","0","back"].map((key, index) => <button key={key} type="button" style={{ gridColumn: index % 3 + 1, gridRow: Math.floor(index / 3) + 1 }} aria-label={key === "back" ? "Delete amount digit" : key === "." ? "Decimal point" : key} onClick={() => enterCaptureDigit(key)}>{key === "back" ? <Delete size={18} /> : key}</button>)}<button type="button" className={styles.keypadDone} onClick={() => setCaptureKeypadOpen(false)}>Done <Check size={16} /></button></div>}
+            {captureKeypadOpen && !quick.captureBatch && <div className={styles.captureKeypad} role="group" aria-label="Amount keypad">{["1","2","3","4","5","6","7","8","9",".","0","back"].map((key, index) => <button key={key} type="button" style={{ gridColumn: index % 3 + 1, gridRow: Math.floor(index / 3) + 1 }} aria-label={key === "back" ? "Delete amount digit" : key === "." ? "Decimal point" : key} onClick={() => enterCaptureDigit(key)}>{key === "back" ? <Delete size={18} /> : key}</button>)}<button type="button" className={styles.keypadDone} onClick={focusExpenseInput}>Next <Check size={16} /></button></div>}
             <p className={styles.hint}>{quick.captureBatch ? "The save outcome is uncertain. Retry the same save or synchronize." : "Enter an amount, a description, or both."}</p>
             {captureError && <p role="alert" className={styles.error}>{captureError}</p>}{captureNotice && <p role="status" className={styles.notice}>{captureNotice}</p>}
             {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}

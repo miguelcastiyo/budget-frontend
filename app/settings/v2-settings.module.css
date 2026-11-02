@@ -1,31 +1,31 @@
 /* Scoped to the Settings and Data surfaces; portal classes are applied explicitly. */
 .settings, .data, .portal {
-  --background: #fbfbfa;
-  --foreground: #232426;
-  --card: #fff;
-  --card-foreground: #232426;
-  --popover: #fff;
-  --popover-foreground: #232426;
-  --secondary: #f1f1ef;
-  --secondary-foreground: #292a2c;
-  --muted: #f3f3f1;
-  --muted-foreground: #717277;
-  --border: #e7e7e4;
-  --input: #e7e7e4;
+  --background:var(--v2-canvas,#fbfbfa);
+  --foreground:var(--v2-ink,#292a2e);
+  --card:var(--v2-surface,#ffffff);
+  --card-foreground:var(--v2-ink,#292a2e);
+  --popover:var(--v2-surface-raised,#ffffff);
+  --popover-foreground:var(--v2-ink,#292a2e);
+  --secondary:var(--v2-surface-muted,#f1f1ef);
+  --secondary-foreground:var(--v2-ink,#292a2e);
+  --muted:var(--v2-surface-muted,#f1f1ef);
+  --muted-foreground:var(--v2-muted,#727277);
+  --border:var(--v2-border,#e7e7e5);
+  --input:var(--v2-border,#e7e7e5);
 }
 :global(.dark) .settings, :global(.dark) .data, :global(.dark) .portal {
-  --background: #16171a;
-  --foreground: #f4f4f2;
-  --card: #1e1f23;
-  --card-foreground: #f4f4f2;
-  --popover: #1e1f23;
-  --popover-foreground: #f4f4f2;
-  --secondary: #292a2e;
-  --secondary-foreground: #f4f4f2;
-  --muted: #26272b;
-  --muted-foreground: #a4a5aa;
-  --border: #34353a;
-  --input: #34353a;
+  --background:var(--v2-canvas,#fbfbfa);
+  --foreground:var(--v2-ink,#292a2e);
+  --card:var(--v2-surface,#ffffff);
+  --card-foreground:var(--v2-ink,#292a2e);
+  --popover:var(--v2-surface-raised,#ffffff);
+  --popover-foreground:var(--v2-ink,#292a2e);
+  --secondary:var(--v2-surface-muted,#f1f1ef);
+  --secondary-foreground:var(--v2-ink,#292a2e);
+  --muted:var(--v2-surface-muted,#f1f1ef);
+  --muted-foreground:var(--v2-muted,#727277);
+  --border:var(--v2-border,#e7e7e5);
+  --input:var(--v2-border,#e7e7e5);
 }
 .settings main, .data main { letter-spacing: -0.01em; }
 .settings main section > div:first-child h2 { color: var(--muted-foreground); font-size: .7rem; letter-spacing: .09em; text-transform: uppercase; }

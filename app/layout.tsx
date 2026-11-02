@@ -10,6 +10,7 @@ import { ClientUpdateNotice } from '@/components/common/client-update-notice'
 import { InterfacePreferenceProvider } from '@/components/layout/interface-preference'
 import { V2AddProvider } from '@/components/budget/v2-add-provider'
 import './globals.css'
+import './v2-design-system.css'
 
 export const metadata: Metadata = {
   title: 'Budget',

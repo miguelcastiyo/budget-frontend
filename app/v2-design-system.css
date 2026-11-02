@@ -1,0 +1,155 @@
+/* V2-only design tokens and shared portal treatment. Classic never receives
+   the v2-theme class, so its global palette and controls remain untouched. */
+html.v2-theme {
+  color-scheme: light;
+  --v2-canvas: #fbfbfa;
+  --v2-surface: #ffffff;
+  --v2-surface-raised: #ffffff;
+  --v2-surface-muted: #f1f1ef;
+  --v2-ink: #292a2e;
+  --v2-muted: #73737a;
+  --v2-tertiary: #a1a1a6;
+  --v2-border: #e5e5e3;
+  --v2-active: #efefed;
+  --v2-primary: #292a2e;
+  --v2-primary-ink: #fbfbfa;
+  --v2-ring: #77777c;
+  --v2-alert: #b54a42;
+  --v2-category-needs: #73747b;
+  --v2-category-wants: #b29369;
+  --v2-category-savings: #78a994;
+  --v2-radius-control: .7rem;
+  --v2-radius-surface: 1rem;
+  --v2-radius-dialog: 1.15rem;
+  --v2-shadow-popover: 0 14px 38px rgb(22 23 26 / 14%), 0 2px 8px rgb(22 23 26 / 7%);
+  --v2-shadow-dock: 0 10px 34px rgb(22 23 26 / 13%), 0 2px 6px rgb(22 23 26 / 6%);
+
+  --background: var(--v2-canvas);
+  --foreground: var(--v2-ink);
+  --card: var(--v2-surface);
+  --card-foreground: var(--v2-ink);
+  --popover: var(--v2-surface-raised);
+  --popover-foreground: var(--v2-ink);
+  --primary: var(--v2-primary);
+  --primary-foreground: var(--v2-primary-ink);
+  --secondary: var(--v2-surface-muted);
+  --secondary-foreground: var(--v2-ink);
+  --muted: var(--v2-surface-muted);
+  --muted-foreground: var(--v2-muted);
+  --accent: var(--v2-active);
+  --accent-foreground: var(--v2-ink);
+  --border: var(--v2-border);
+  --input: var(--v2-border);
+  --ring: var(--v2-ring);
+  --destructive: var(--v2-alert);
+  --needs: var(--v2-category-needs);
+  --wants: var(--v2-category-wants);
+  --savings: var(--v2-category-savings);
+  --radius: .75rem;
+
+  --mobile-nav-height: 4.25rem;
+  --mobile-nav-edge-gap: .5rem;
+  --mobile-nav-content-gap: 1.25rem;
+  --mobile-nav-surface: rgb(255 255 255 / 82%);
+  --mobile-nav-solid-fallback: #ffffff;
+  --mobile-nav-border: rgb(41 42 46 / 9%);
+  --mobile-nav-blur: 24px;
+  --mobile-nav-saturation: 145%;
+  --mobile-nav-shadow: var(--v2-shadow-dock);
+}
+
+html.dark.v2-theme {
+  color-scheme: dark;
+  --v2-canvas: #16171a;
+  --v2-surface: #202125;
+  --v2-surface-raised: #25262a;
+  --v2-surface-muted: #292a2e;
+  --v2-ink: #f0efed;
+  --v2-muted: #a2a2a8;
+  --v2-tertiary: #7b7c82;
+  --v2-border: #36373c;
+  --v2-active: #303136;
+  --v2-primary: #f0efed;
+  --v2-primary-ink: #16171a;
+  --v2-ring: #aaaab0;
+  --v2-alert: #ee8a80;
+  --v2-category-needs: #b0b1b8;
+  --v2-category-wants: #c9aa7d;
+  --v2-category-savings: #8cbaa7;
+  --v2-shadow-popover: 0 18px 48px rgb(0 0 0 / 42%), 0 2px 8px rgb(0 0 0 / 24%);
+  --v2-shadow-dock: 0 12px 34px rgb(0 0 0 / 38%), 0 2px 6px rgb(0 0 0 / 24%);
+  --mobile-nav-surface: rgb(32 33 37 / 86%);
+  --mobile-nav-solid-fallback: #202125;
+  --mobile-nav-border: rgb(240 239 237 / 12%);
+}
+
+html.dark.v2-theme {
+  --destructive: var(--v2-alert);
+  --needs: var(--v2-category-needs);
+  --wants: var(--v2-category-wants);
+  --savings: var(--v2-category-savings);
+}
+
+html.v2-theme body {
+  background: var(--v2-canvas);
+  color: var(--v2-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-feature-settings: "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.v2-theme main {
+    animation: v2-route-arrive 180ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+}
+
+@keyframes v2-route-arrive {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html.v2-theme :where(button, a, summary, [role="button"]) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html.v2-theme :where(.tnum, [data-v2-number]) {
+  font-variant-numeric: tabular-nums;
+}
+
+html.v2-theme :where(button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [role="button"]:focus-visible) {
+  outline-color: var(--v2-ring);
+}
+
+html.v2-theme :where([data-slot="dialog-content"], [data-slot="alert-dialog-content"], [data-slot="sheet-content"]) {
+  background: var(--v2-surface);
+  border-color: var(--v2-border);
+  color: var(--v2-ink);
+  max-height: calc(var(--v2-viewport-height, 100dvh) - env(safe-area-inset-top, 0px) - .75rem);
+  border-radius: var(--v2-radius-dialog);
+  overscroll-behavior: contain;
+}
+
+html.v2-theme :where([data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="select-content"]) {
+  border-color: var(--v2-border);
+  border-radius: .8rem;
+  box-shadow: var(--v2-shadow-popover);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.v2-theme :where(button, a, [role="button"], [data-slot="card"]) {
+    transition-property: background-color, border-color, color, box-shadow, transform;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(.2, .8, .2, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.v2-theme *, html.v2-theme *::before, html.v2-theme *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
