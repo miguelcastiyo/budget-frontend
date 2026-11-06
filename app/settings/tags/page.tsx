@@ -200,9 +200,9 @@ export default function TagsSettingsPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-4 px-5 pt-5">
-        <p className="text-sm text-muted-foreground">
+        {version !== "v2" && <p className="text-sm text-muted-foreground">
           Tags help you categorize your transactions. You can also create new tags when adding a transaction.
-        </p>
+        </p>}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

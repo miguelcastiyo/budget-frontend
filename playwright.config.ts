@@ -32,9 +32,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "NEXT_DIST_DIR=.next-playwright npm run dev -- --port 3100",
+    command: "NEXT_DIST_DIR=.next-playwright npm run build && NEXT_DIST_DIR=.next-playwright npm run start -- --hostname 127.0.0.1 --port 3100",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    reuseExistingServer: false,
+    timeout: 180_000,
   },
 })

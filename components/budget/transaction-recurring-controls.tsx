@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import type { RecurringEditScope } from "./transaction-editor-types"
 
 interface RecurringControlsProps {
+  compact?: boolean
   canCreateRecurringRule: boolean
   makeRecurring: boolean
   onMakeRecurringChange: (value: boolean) => void
@@ -24,6 +25,7 @@ interface RecurringControlsProps {
 }
 
 export function TransactionRecurringControls({
+  compact = false,
   canCreateRecurringRule,
   makeRecurring,
   onMakeRecurringChange,
@@ -46,7 +48,7 @@ export function TransactionRecurringControls({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <Label className="text-sm font-medium">Make recurring</Label>
-              <p className="text-xs text-muted-foreground">Automatically add this every month</p>
+              {!compact && <p className="text-xs text-muted-foreground">Automatically add this every month</p>}
             </div>
             <Switch
               checked={makeRecurring}

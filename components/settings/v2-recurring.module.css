@@ -12,8 +12,8 @@
 .row > div:first-child svg { color:var(--foreground); }
 .row p:last-child { color:var(--muted-foreground); }
 .row p { font-variant-numeric:tabular-nums; }
-.portal { background:var(--background); border-color:var(--border); }
-.portal :global([data-slot="dialog-header"]) { background:var(--background); border-color:var(--border); }
+.portal { background:var(--card); border-color:var(--border); }
+.portal :global([data-slot="dialog-header"]) { background:var(--card); border-color:var(--border); }
 .portal :global(input) { background:var(--card); border-color:var(--border); color:var(--foreground); }
 .root button:focus-visible,.root a:focus-visible,.portal button:focus-visible,.portal input:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 @media (max-width:639px) { .root button { min-height:2.75rem; }.row { min-height:4.75rem; } }

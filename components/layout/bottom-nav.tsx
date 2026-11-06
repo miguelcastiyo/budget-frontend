@@ -168,7 +168,7 @@ export function BottomNav({
         <button type="button" className={styles.action} onClick={handleAddClick}><Plus className={styles.icon} aria-hidden="true" />{addLabel}</button>
         <nav aria-label="Primary desktop" className={styles.items}>{renderRoutes(false)}</nav>
       </aside>
-      <nav className={cn(styles.nav, styles.mobile)} aria-label="Primary"><div className={styles.items}>{renderRoutes(true)}</div></nav>
+      <nav className={cn(styles.nav, styles.mobile)} aria-label="Primary" data-v2-mobile-nav="true"><div className={styles.items}>{renderRoutes(true)}</div></nav>
     </>
   }
 

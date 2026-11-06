@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { setupEncryptedFixture } from "./encrypted-fixture"
+import { openReview, enterQuickCaptureAmount, openInsightsFromMore, setupEncryptedFixture, openSettings } from "./encrypted-fixture"
 
 test.skip(process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED !== "true", "Requires v2 availability")
 test.use({ actionTimeout: 12000 })
@@ -7,14 +7,14 @@ test.use({ actionTimeout: 12000 })
 async function capture(page: Page, amount: string, description: string) {
   await page.getByRole("button", { name: "Add", exact: true }).click()
   const form = page.getByRole("form", { name: "Quick Capture" })
-  await form.getByLabel("Amount").fill(amount)
+  await enterQuickCaptureAmount(form, amount)
   await form.getByLabel("Description").fill(description)
   await form.getByRole("button", { name: "Save to Review" }).click()
   await expect(form).toHaveCount(0)
 }
 
 async function finalize(page: Page) {
-  await page.getByRole("link", { name: /Review/ }).first().click()
+  await openReview(page)
   const form = page.getByRole("form", { name: "Review transaction" })
   await form.getByRole("button", { name: /Needs/ }).click()
   await form.getByRole("button", { name: "All tags" }).click()
@@ -32,14 +32,14 @@ test("Insights shows the same finalized values in v2 and Classic, excluding pend
   await capture(page, "12.50", "Coffee")
   await finalize(page)
   await capture(page, "12.50", "Coffee")
-  await page.getByRole("link", { name: /Review/ }).first().click()
+  await openReview(page)
   const review = page.getByRole("form", { name: "Review transaction" })
   await review.getByRole("button", { name: /Needs/ }).click()
   await review.getByRole("button", { name: "Cafe", exact: true }).click()
   await review.getByRole("button", { name: "Confirm & Next" }).click()
   await expect(page.getByRole("status").filter({ hasText: "Transaction finalized" })).toBeVisible()
   await capture(page, "99", "Pending item")
-  await page.getByRole("link", { name: "Insights", exact: true }).first().click()
+  await openInsightsFromMore(page)
   const main = page.locator("main")
   await expect(page.getByTestId("v2-insights")).toBeVisible()
   await expect(main).toContainText("$25.00")
@@ -56,9 +56,9 @@ test("Insights shows the same finalized values in v2 and Classic, excluding pend
   await page.getByRole("button", { name: "3M", exact: true }).click()
   await expect(main).toContainText("Spending rhythm")
   await expect(main.getByRole("button", { name: "3M" })).toHaveAttribute("aria-pressed", "true")
-  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  await openSettings(page)
   await page.getByRole("switch", { name: "Use v2 interface" }).click()
-  await page.getByRole("link", { name: "Insights", exact: true }).first().click()
+  await openInsightsFromMore(page)
   await expect(page.getByTestId("v2-insights")).toHaveCount(0)
   await expect(main).toContainText("$25.00")
   await expect(main).toContainText("Cafe")
@@ -68,7 +68,7 @@ test("Insights shows the same finalized values in v2 and Classic, excluding pend
 test("v2 Insights range controls and portals fit phone and desktop viewports", async ({ page }) => {
   test.setTimeout(90000)
   await setupEncryptedFixture(page, true)
-  await page.getByRole("link", { name: "Insights", exact: true }).first().click()
+  await openInsightsFromMore(page)
   await expect(page.getByText("No spending found for this range.")).toBeVisible()
   for (const width of [375, 430, 1280]) {
     await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 })

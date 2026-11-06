@@ -5,6 +5,7 @@ import type { RecurringEditScope } from "./transaction-editor-types"
 import { TransactionRecurringControls } from "./transaction-recurring-controls"
 
 interface TransactionDetailsSectionProps {
+  compact?: boolean
   isSplit: boolean
   onSplitChange: (value: boolean) => void
   notes: string
@@ -27,7 +28,7 @@ interface TransactionDetailsSectionProps {
 }
 
 export function TransactionDetailsSection({
-  isSplit, onSplitChange, notes, notesError, onNotesChange,
+  compact = false, isSplit, onSplitChange, notes, notesError, onNotesChange,
   ...recurringProps
 }: TransactionDetailsSectionProps) {
   return (
@@ -37,11 +38,11 @@ export function TransactionDetailsSection({
           <Checkbox checked={isSplit} onCheckedChange={(checked) => onSplitChange(Boolean(checked))} />
           <div>
             <p className="text-sm font-medium">Split expense</p>
-            <p className="text-xs text-muted-foreground">Marks this transaction as your portion of a shared expense.</p>
+            {!compact && <p className="text-xs text-muted-foreground">Marks this transaction as your portion of a shared expense.</p>}
           </div>
         </label>
       </div>
-      <TransactionRecurringControls {...recurringProps} />
+      <TransactionRecurringControls {...recurringProps} compact={compact} />
       <div className="space-y-2">
         <TransactionNotesField value={notes} onChange={onNotesChange} error={notesError} />
       </div>

@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test"
-import { setupEncryptedFixture } from "./encrypted-fixture"
+import { setupEncryptedFixture, openSettings } from "./encrypted-fixture"
 
 test.skip(process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED !== "true", "Requires v2 availability")
 
 test("Settings destinations and an import draft remain available", async ({ page }) => {
   test.setTimeout(90000)
   await setupEncryptedFixture(page, true)
-  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  await openSettings(page)
   for (const path of ["budget", "tags", "cards", "contexts", "recurring", "data", "vault"]) {
     await expect(page.locator(`main a[href="/settings/${path}"]`).first()).toBeAttached()
   }

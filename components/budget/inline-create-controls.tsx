@@ -16,7 +16,7 @@ interface InlineCreateTagControlProps {
   onCancel: () => void
   onSubmit: () => void
   isSubmitting: boolean
-  subtitle: string
+  subtitle?: string
   compact?: boolean
 }
 
@@ -26,7 +26,7 @@ interface InlineCreateCardControlProps {
   onCancel: () => void
   onSubmit: () => void
   isSubmitting: boolean
-  subtitle: string
+  subtitle?: string
   surfaceClassName?: string
   compact?: boolean
 }
@@ -39,7 +39,7 @@ interface InlineCreateContextControlProps {
   onCancel: () => void
   onSubmit: () => void
   isSubmitting: boolean
-  subtitle: string
+  subtitle?: string
   surfaceClassName?: string
   compact?: boolean
 }
@@ -205,7 +205,7 @@ function InlineCreateHeader({
   cancelLabel,
 }: {
   title: string
-  subtitle: string
+  subtitle?: string
   onCancel: () => void
   cancelLabel: string
 }) {
@@ -213,7 +213,7 @@ function InlineCreateHeader({
     <div className="flex items-center justify-between gap-3 pb-3">
       <div className="min-w-0">
         <p className="text-sm font-medium">{title}</p>
-        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+        {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
       </div>
       <Button
         type="button"

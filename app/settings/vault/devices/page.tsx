@@ -107,7 +107,7 @@ export default function VaultDevicesPage() {
       </header>
 
       <main className="mx-auto max-w-lg space-y-4 px-5 pt-4">
-        <p className="text-sm text-muted-foreground">Manage the devices with an active Vault session.</p>
+        {version !== "v2" && <p className="text-sm text-muted-foreground">Manage the devices with an active Vault session.</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
         <Card className="overflow-hidden rounded-2xl border-border/70 py-0 shadow-sm">

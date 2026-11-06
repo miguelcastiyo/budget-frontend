@@ -22,6 +22,8 @@ import {
   Database,
   Layers,
   LockKeyhole,
+  LineChart,
+  PiggyBank,
 } from "lucide-react"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
@@ -224,9 +226,9 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-lg space-y-6 px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="hidden lg:block">
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          {interfacePreference.version !== "v2" && <p className="mt-1 text-sm text-muted-foreground">
             Manage your account, budget, and app preferences.
-          </p>
+          </p>}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -234,7 +236,7 @@ export default function SettingsPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.85fr)] lg:items-start">
           <div className="space-y-6 lg:order-1">
             <div className="lg:hidden">
-              <SettingsSection title="Profile" description="Name, email, and sign-in">
+              <SettingsSection title="Profile" description={interfacePreference.version === "v2" ? undefined : "Name, email, and sign-in"}>
                 <button
                   type="button"
                   className="block w-full text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -258,6 +260,10 @@ export default function SettingsPage() {
             </div>
 
             <SettingsSection title="Planning">
+              {interfacePreference.version === "v2" && <>
+                <SettingsItem icon={<LineChart className="w-5 h-5 text-muted-foreground" />} label="Insights" href="/insights" />
+                <SettingsItem icon={<PiggyBank className="w-5 h-5 text-muted-foreground" />} label="Funds" href="/insights/funds" />
+              </>}
               <SettingsItem
                 icon={<Wallet className="w-5 h-5 text-muted-foreground" />}
                 label="Budget"
@@ -305,7 +311,7 @@ export default function SettingsPage() {
 
           <div className="flex flex-col gap-6 lg:order-2">
             <div className="hidden lg:order-1 lg:block">
-              <SettingsSection title="Profile" description="Name, email, and sign-in">
+              <SettingsSection title="Profile" description={interfacePreference.version === "v2" ? undefined : "Name, email, and sign-in"}>
                 <button
                   type="button"
                   className="block w-full text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"

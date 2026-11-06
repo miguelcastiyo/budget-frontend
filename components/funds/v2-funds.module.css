@@ -1,6 +1,6 @@
 .root { --fund-bg:var(--v2-canvas,#fbfbfa); --fund-fg:var(--v2-ink,#292a2e); --fund-muted:var(--v2-muted,#727277); --fund-line:var(--v2-border,#e7e7e5); background:var(--fund-bg); min-height:calc(100vh - 6rem); padding-top:1rem; padding-bottom:calc(3rem + env(safe-area-inset-bottom)); }
 :global(.dark) .root { --fund-bg:var(--v2-canvas,#16171a); --fund-fg:var(--v2-ink,#f0efed); --fund-muted:var(--v2-muted,#a2a2a4); --fund-line:var(--v2-border,#36373c); }
-.heading h1 { font-size:1.25rem; font-weight:600; letter-spacing:-.025em; }
+.heading h1 { margin-top:0; font-size:1.25rem; font-weight:600; letter-spacing:-.025em; }
 .heading > div > p:first-child { color:var(--fund-muted); letter-spacing:.08em; }
 .fundRow { background:transparent; border:0; border-top:1px solid var(--fund-line); border-radius:0; box-shadow:none; }
 .fundRow:hover { background:transparent; border-color:var(--fund-line); }

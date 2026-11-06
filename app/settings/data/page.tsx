@@ -637,7 +637,7 @@ export default function DataSettingsPage() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-xl font-bold">Data Import / Export</h1>
-            <p className="hidden text-sm text-muted-foreground sm:block">Move transaction data in and out of Budget.</p>
+            {version !== "v2" && <p className="hidden text-sm text-muted-foreground sm:block">Move transaction data in and out of Budget.</p>}
           </div>
         </div>
       </header>
@@ -759,7 +759,7 @@ export default function DataSettingsPage() {
           <div className="flex items-center justify-between px-1">
             <div>
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent Activity</h2>
-              <p className="text-xs text-muted-foreground">Latest imports and exports.</p>
+              {version !== "v2" && <p className="text-xs text-muted-foreground">Latest imports and exports.</p>}
             </div>
             <Button
               type="button"

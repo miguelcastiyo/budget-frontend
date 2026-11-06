@@ -132,6 +132,23 @@ html.v2-theme :where([data-slot="dialog-content"], [data-slot="alert-dialog-cont
   overscroll-behavior: contain;
 }
 
+@media (max-width: 639px) {
+  html.v2-theme [data-slot="dialog-content"].budget-mobile-drawer,
+  html.v2-theme [data-slot="sheet-content"][data-side="bottom"] {
+    bottom: var(--v2-viewport-bottom-inset, 0px);
+    max-height: calc(var(--v2-viewport-height, 100dvh) - env(safe-area-inset-top, 0px) - .75rem);
+  }
+
+  html.v2-theme [data-slot="dialog-content"]:not(.budget-mobile-drawer),
+  html.v2-theme [data-slot="alert-dialog-content"] {
+    top: var(--v2-viewport-middle, 50%);
+  }
+
+  html.v2-theme:has(input:focus, textarea:focus, [contenteditable="true"]:focus) [data-v2-mobile-nav] {
+    display: none;
+  }
+}
+
 html.v2-theme :where([data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="select-content"]) {
   border-color: var(--v2-border);
   border-radius: .8rem;

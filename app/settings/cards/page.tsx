@@ -214,9 +214,9 @@ export default function CardsSettingsPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-4 px-5 pt-5">
-        <p className="text-sm text-muted-foreground">
+        {version !== "v2" && <p className="text-sm text-muted-foreground">
           Add your credit and debit cards to track which card you used for each transaction.
-        </p>
+        </p>}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

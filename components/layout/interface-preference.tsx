@@ -36,12 +36,18 @@ export function InterfacePreferenceProvider({ children }: { children: ReactNode 
   useEffect(() => {
     if (version !== "v2") {
       document.documentElement.style.removeProperty("--v2-viewport-height")
+      document.documentElement.style.removeProperty("--v2-viewport-middle")
+      document.documentElement.style.removeProperty("--v2-viewport-bottom-inset")
       return
     }
     const viewport = window.visualViewport
     const syncViewport = () => {
       const height = viewport?.height ?? window.innerHeight
+      const top = viewport?.offsetTop ?? 0
+      const bottomInset = Math.max(0, window.innerHeight - height - top)
       document.documentElement.style.setProperty("--v2-viewport-height", `${height}px`)
+      document.documentElement.style.setProperty("--v2-viewport-middle", `${top + height / 2}px`)
+      document.documentElement.style.setProperty("--v2-viewport-bottom-inset", `${bottomInset}px`)
     }
     syncViewport()
     viewport?.addEventListener("resize", syncViewport)
@@ -52,6 +58,8 @@ export function InterfacePreferenceProvider({ children }: { children: ReactNode 
       viewport?.removeEventListener("scroll", syncViewport)
       window.removeEventListener("resize", syncViewport)
       document.documentElement.style.removeProperty("--v2-viewport-height")
+      document.documentElement.style.removeProperty("--v2-viewport-middle")
+      document.documentElement.style.removeProperty("--v2-viewport-bottom-inset")
     }
   }, [version])
 

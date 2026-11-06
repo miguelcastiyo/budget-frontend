@@ -504,13 +504,13 @@ export function FundsOverviewPage() {
 
       <div className={cn("flex items-start justify-between gap-4", version === "v2" && styles.heading)}>
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Funds</p>
+          {version !== "v2" && <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">Funds</p>}
           <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight text-foreground lg:mt-2 lg:text-3xl">
-            Goals, buffers, and saved progress
+            {version === "v2" ? "Funds" : "Goals, buffers, and saved progress"}
           </h1>
-          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground lg:mt-2">
+          {version !== "v2" && <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground lg:mt-2">
             Track dedicated money without losing the monthly budget view.
-          </p>
+          </p>}
         </div>
         <Button className="hidden sm:inline-flex" onClick={() => {
           setDialogMode("create")

@@ -72,7 +72,7 @@ test("v2 budget editor validates hourly income and fits mobile dark mode", async
   await page.setViewportSize({ width: 375, height: 667 })
   await page.evaluate(() => document.documentElement.classList.add("dark"))
   const dialog = page.getByRole("dialog", { name: "Edit Budget" })
-  await expect(dialog).toHaveCSS("background-color", "rgb(22, 23, 26)")
+  await expect(dialog).toHaveCSS("background-color", "rgb(32, 33, 37)")
   await dialog.getByRole("tab", { name: "Hourly", exact: true }).first().click()
   await dialog.getByLabel("Hourly rate").fill("25")
   await dialog.getByLabel("Hours/week").fill("40")

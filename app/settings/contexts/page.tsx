@@ -124,7 +124,7 @@ export default function ContextsSettingsPage() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-4 px-5 pt-5">
-        <p className="text-sm text-muted-foreground">Group related spending across different tags. Contexts are useful for trips, events, projects, and other one-off expenses.</p>
+        {version !== "v2" && <p className="text-sm text-muted-foreground">Group related spending across different tags. Contexts are useful for trips, events, projects, and other one-off expenses.</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Card className="overflow-hidden border-0 shadow-sm">
           <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5"><div><h2 className="text-sm font-semibold">Contexts</h2><p className="text-xs text-muted-foreground">{isLoading ? "Loading contexts" : `${contexts.length} ${contexts.length === 1 ? "context" : "contexts"}`}</p></div></div>

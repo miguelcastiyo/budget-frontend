@@ -403,7 +403,7 @@ export default function InsightsPage() {
         <section className={cn("space-y-3 lg:space-y-4", version === "v2" && styles.heading)}>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Review your spending.</p>
+            {version !== "v2" && <p className="mt-1 text-sm text-muted-foreground">Review your spending.</p>}
           </div>
 
           <InsightsRangeSelector

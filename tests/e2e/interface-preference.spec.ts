@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { setupEncryptedFixture } from "./encrypted-fixture"
 
 const enabled = process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED === "true"
 
@@ -21,9 +22,12 @@ async function mockAccount(page: Page, capture = false) {
 }
 
 test("interface availability, persistence and navigation", async ({ page }) => {
-  await mockAccount(page, true)
+  test.setTimeout(90000)
+  if (enabled) await setupEncryptedFixture(page, true)
+  else await mockAccount(page, true)
   await page.goto("/settings")
   const toggle = page.getByRole("switch", { name: "Use v2 interface" })
+  if (enabled) await toggle.click()
   await expect(toggle).not.toBeChecked()
   if (!enabled) {
     await expect(toggle).toBeDisabled()

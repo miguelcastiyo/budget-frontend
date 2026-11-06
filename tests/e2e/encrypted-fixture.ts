@@ -1,4 +1,56 @@
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
+
+export async function enterQuickCaptureAmount(form: Locator, amount: string) {
+  await form.getByLabel("Amount", { exact: true }).fill(amount)
+}
+
+export async function openInsightsFromMore(page: Page) {
+  if (!(await currentInterfaceIsV2(page))) {
+    await page.getByRole("link", { name: "Insights", exact: true }).filter({ visible: true }).first().click()
+    await expect(page).toHaveURL(/\/insights$/)
+    return
+  }
+  await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "More" }).click()
+  await expect(page).toHaveURL(/\/settings$/)
+  await page.getByRole("link", { name: "Insights", exact: true }).first().click()
+  await expect(page).toHaveURL(/\/insights$/)
+}
+
+export async function openSettings(page: Page) {
+  if (await currentInterfaceIsV2(page)) await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "More" }).click()
+  else await page.getByRole("link", { name: "Settings", exact: true }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/\/settings$/)
+}
+
+export async function openActivity(page: Page) {
+  if (await currentInterfaceIsV2(page)) await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "Activity" }).click()
+  else await page.getByRole("link", { name: "Transactions", exact: true }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/\/transactions/)
+}
+
+export async function openReview(page: Page) {
+  if (await currentInterfaceIsV2(page)) await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: /Review/ }).click()
+  else await page.getByRole("link", { name: /Review/ }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/\/review$/)
+}
+
+export async function openFundsFromMore(page: Page) {
+  await openSettings(page)
+  await page.getByRole("link", { name: "Funds", exact: true }).click()
+  await expect(page).toHaveURL(/\/insights\/funds$/)
+}
+
+async function currentInterfaceIsV2(page: Page) {
+  const v2 = await page.evaluate(() => localStorage.getItem("budget.interface-version") === "v2")
+  if (v2) {
+    await expect(page.locator("html")).toHaveClass(/v2-theme/)
+    await expect(page.getByRole("navigation", { name: "Primary desktop" })).toBeVisible()
+  } else {
+    await expect(page.locator("html")).not.toHaveClass(/v2-theme/)
+    await expect(page.getByRole("navigation", { name: "Primary desktop" })).toHaveCount(0)
+  }
+  return v2
+}
 
 export async function setupEncryptedFixture(page: Page, capture: boolean) {
   let metadata: Record<string, unknown> | null = null
@@ -64,12 +116,14 @@ export async function setupEncryptedFixture(page: Page, capture: boolean) {
   await page.getByText("I've saved my Recovery Code somewhere safe.").click()
   await page.getByLabel("Enter the last 4 characters of your Recovery Code.").fill(recovery.replace(/-/g, "").slice(-4))
   await page.getByRole("button", { name: "Continue", exact: true }).click()
-  await page.goto("/settings")
-  await expect(page.getByRole("switch", { name: "Use v2 interface" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Vault status" })).toBeVisible()
+  await page.goto("/settings", { waitUntil: "domcontentloaded" })
+  await expect(page.getByRole("switch", { name: "Use v2 interface" })).toBeVisible({ timeout: 20000 })
   await page.goto("/")
   await page.getByRole("button", { name: "Use Vault passphrase" }).click()
   await page.getByLabel("Vault passphrase", { exact: true }).fill("test v2 vault password 2026")
   await page.getByRole("button", { name: "Unlock Vault" }).click()
   await expect(page.getByRole("navigation", { name: "Primary desktop" })).toBeVisible()
+  await expect(page.getByTestId("v2-overview")).toBeVisible({ timeout: 20000 })
   return { records, bodies, failNext: (count: number) => { failRequests = count }, failBeforeNext: (count: number) => { failBeforeCommit = count } }
 }

@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon, Check, ChevronDown, CreditCard, Delete, Plus, Star, X } from "lucide-react"
+import { CalendarIcon, Check, ChevronDown, CreditCard, Plus, Star, X } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { ApiError } from "@/lib/api/client"
@@ -89,7 +89,6 @@ export function TransactionEditorForm({
     canCreateRecurringRule,
   } = editor
   const [captureMode, setCaptureMode] = useState(initialCapture)
-  const [captureKeypadOpen, setCaptureKeypadOpen] = useState(true)
   const [v2Picker, setV2Picker] = useState<"tag" | "card" | null>(null)
   const [v2PickerQuery, setV2PickerQuery] = useState("")
   const [captureBusy, setCaptureBusy] = useState(false)
@@ -109,13 +108,6 @@ export function TransactionEditorForm({
     onSaved: () => { if (!saveAndNew.current) onOpenChange(false) },
     accountId: v2Create ? profile?.id : undefined,
   })
-  const enterCaptureDigit = (key: string) => {
-    if (key === "back") { setAmount(amount.slice(0, -1)); return }
-    if (key === ".") { if (!amount.includes(".")) setAmount(`${amount || "0"}.`); return }
-    const [whole = "", fraction = ""] = amount.split(".")
-    if (fraction.length >= 2 || amount.replace(/\D/g, "").length >= 8) return
-    setAmount(amount.includes(".") ? `${whole}.${fraction}${key}` : `${whole}${key}`)
-  }
   const closeV2Picker = () => { setV2Picker(null); setV2PickerQuery("") }
   const filteredV2Tags = tags.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
   const filteredV2Cards = cards.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
@@ -155,7 +147,8 @@ export function TransactionEditorForm({
 
   const focusAmountInput = () => {
     window.requestAnimationFrame(() => {
-      amountInputRef.current?.focus()
+      if (v2Create && captureMode) quick.amountRef.current?.focus()
+      else amountInputRef.current?.focus()
     })
   }
 
@@ -260,7 +253,9 @@ export function TransactionEditorForm({
 
     didAutoFocusOnOpenRef.current = true
     const timeoutId = window.setTimeout(() => {
-      amountInputRef.current?.focus()
+      if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return
+      if (v2Create && captureMode) quick.amountRef.current?.focus()
+      else amountInputRef.current?.focus()
     }, 200)
 
     return () => window.clearTimeout(timeoutId)
@@ -651,6 +646,31 @@ export function TransactionEditorForm({
   const hasValidRecurringConfig = hasRecurringSchedule(makeRecurring, recurringBillingType, recurringBillingDay)
   const moreDetailsSummary = "Optional transaction details"
   const submitButtonLabel = submitLabel({ isEditMode, isSubmitting, recurringEditScope, normalizedAmount, tagId })
+  const detailControls = <TransactionDetailsSection
+    compact={v2Create}
+    isSplit={isSplit}
+    onSplitChange={setIsSplit}
+    notes={notes}
+    notesError={notesError}
+    onNotesChange={(value) => {
+      setNotes(value)
+      if (notesError) setNotesError(validateTransactionNotes(value))
+    }}
+    canCreateRecurringRule={canCreateRecurringRule}
+    makeRecurring={makeRecurring}
+    onMakeRecurringChange={setMakeRecurring}
+    recurringBillingType={recurringBillingType}
+    onBillingTypeChange={setRecurringBillingType}
+    recurringBillingDay={recurringBillingDay}
+    onBillingDayChange={setRecurringBillingDay}
+    isEditMode={isEditMode}
+    transactionAlreadyRecurring={transactionAlreadyRecurring}
+    recurringEditScope={recurringEditScope}
+    onEditScopeChange={setRecurringEditScope}
+    onScheduleTouched={() => { recurringScheduleTouchedRef.current = true }}
+    shouldInitializeSchedule={(nextValue) => shouldInitializeRecurringOnEnable(nextValue, makeRecurring, recurringScheduleTouchedRef.current)}
+    onInitializeSchedule={() => applyRecurringDefaultsFromDate(date)}
+  />
   const swipeDismiss = useSwipeDismiss({
     open,
     onDismiss: () => requestOpenChange(false),
@@ -668,26 +688,32 @@ export function TransactionEditorForm({
           "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
           mobileDrawerDialogClassName,
           v2Style && styles.surface,
-          v2Style && styles.dialog
+          v2Style && styles.dialog,
+          v2Create && captureMode && styles.captureDialog
         )}
       >
         {v2Create && captureMode && <form onSubmit={quick.capture} className={styles.capture} aria-label="Quick Capture">
-          <div className={styles.captureHeader}><div><DialogTitle>Quick Capture</DialogTitle><p>Capture now, organize later.</p></div><DialogClose aria-label="Close" disabled={transitionBlocked}><X size={20} /></DialogClose></div>
+          <div className={styles.captureHeader}>
+            <DialogTitle>Quick add</DialogTitle>
+            <div className={styles.headerActions}>
+              <button type="button" disabled={transitionBlocked} onClick={() => setCaptureMode(false)}>Full details</button>
+              <DialogClose aria-label="Close" disabled={transitionBlocked}><X size={20} /></DialogClose>
+            </div>
+          </div>
           <div className={styles.captureBody}>
             <label className={styles.amountLabel} htmlFor="quick-capture-amount">Amount</label>
-            <AmountInput ref={quick.amountRef} id="quick-capture-amount" name="capture_amount" value={amount} onValueChange={setAmount} label="" readOnly className={styles.captureAmount} />
-            <label className={styles.captureDescription}>Description<input ref={captureDescriptionRef} value={expense} onFocus={() => setCaptureKeypadOpen(false)} disabled={Boolean(quick.captureBatch)} onChange={(event) => setExpense(event.target.value)} placeholder="What was it?" enterKeyHint="done" /></label>
+            <AmountInput ref={quick.amountRef} id="quick-capture-amount" name="capture_amount" value={amount} onValueChange={setAmount} onEnter={focusExpenseInput} label="" maxDigits={8} readOnly={transitionBlocked} className={styles.captureAmount} />
+            <label className={styles.captureDescription}><span>Description</span><input ref={captureDescriptionRef} value={expense} disabled={transitionBlocked} onChange={(event) => setExpense(event.target.value)} placeholder="Description (optional)" enterKeyHint="done" /></label>
             <div className={styles.quickDates} role="group" aria-label="Date">
-              <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getLocalDateKey()} onClick={() => setDate(new Date())}>Today</button>
-              <button type="button" aria-pressed={format(date, "yyyy-MM-dd") === getYesterdayKey()} onClick={() => { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); setDate(yesterday) }}>Yesterday</button>
+              <button type="button" disabled={Boolean(quick.captureBatch)} aria-pressed={format(date, "yyyy-MM-dd") === getLocalDateKey()} onClick={() => setDate(new Date())}>Today</button>
+              <button type="button" disabled={Boolean(quick.captureBatch)} aria-pressed={format(date, "yyyy-MM-dd") === getYesterdayKey()} onClick={() => { const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); setDate(yesterday) }}>Yesterday</button>
               <label className={styles.dateOther}>{format(date, "yyyy-MM-dd") !== getLocalDateKey() && format(date, "yyyy-MM-dd") !== getYesterdayKey() ? format(date, "MMM d") : "Other"}<input aria-label="Choose date" type="date" max={getLocalDateKey()} value={format(date, "yyyy-MM-dd")} disabled={Boolean(quick.captureBatch)} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
             </div>
-            {captureKeypadOpen && !quick.captureBatch && <div className={styles.captureKeypad} role="group" aria-label="Amount keypad">{["1","2","3","4","5","6","7","8","9",".","0","back"].map((key, index) => <button key={key} type="button" style={{ gridColumn: index % 3 + 1, gridRow: Math.floor(index / 3) + 1 }} aria-label={key === "back" ? "Delete amount digit" : key === "." ? "Decimal point" : key} onClick={() => enterCaptureDigit(key)}>{key === "back" ? <Delete size={18} /> : key}</button>)}<button type="button" className={styles.keypadDone} onClick={focusExpenseInput}>Next <Check size={16} /></button></div>}
-            <p className={styles.hint}>{quick.captureBatch ? "The save outcome is uncertain. Retry the same save or synchronize." : "Enter an amount, a description, or both."}</p>
+            {quick.captureBatch && <p className={styles.hint}>The save outcome is uncertain. Retry the same save or synchronize.</p>}
             {captureError && <p role="alert" className={styles.error}>{captureError}</p>}{captureNotice && <p role="status" className={styles.notice}>{captureNotice}</p>}
             {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}
           </div>
-          <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button><button type="button" disabled={transitionBlocked} onClick={() => { setCaptureMode(false); setCaptureKeypadOpen(false) }}>Full Entry</button></div>
+          <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button></div>
         </form>}
         <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && styles.fullEntry, v2Create && captureMode && "hidden")} autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
@@ -698,7 +724,7 @@ export function TransactionEditorForm({
                   {isEditMode ? "Edit Transaction" : "New Transaction"}
                 </DialogTitle>
                 {!v2Create && <p className="mt-0.5 truncate text-xs text-muted-foreground">{format(date, "EEE, MMM d")} · {categoryConfig[category].label}</p>}
-                {v2Create && financialAuthority.pendingCaptureEnabled && <div className={styles.modeSwitch} role="group" aria-label="Entry mode"><button type="button" disabled={transitionBlocked} aria-pressed={false} onClick={() => { closeV2Picker(); setCaptureMode(true); setCaptureKeypadOpen(true) }}>Quick Capture</button><span aria-current="page">Full Entry</span></div>}
+                {v2Create && financialAuthority.pendingCaptureEnabled && <button type="button" className={styles.backToCapture} aria-label="Quick add" disabled={transitionBlocked} onClick={() => { closeV2Picker(); setCaptureMode(true) }}>← Quick add</button>}
               </div>
               <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
                 <X className="h-4 w-4" />
@@ -807,7 +833,7 @@ export function TransactionEditorForm({
                         }}
                         onSubmit={() => void handleCreateTag()}
                         isSubmitting={isCreatingTag}
-                        subtitle="It will be selected for this transaction."
+                        subtitle={v2Create ? undefined : "It will be selected for this transaction."}
                       />
                     ) : (
                       <div className="min-w-0 max-w-full overflow-hidden">
@@ -898,11 +924,14 @@ export function TransactionEditorForm({
                     <button type="button" aria-haspopup="listbox" aria-expanded={v2Picker === "card"} onClick={() => { setV2Picker(v2Picker === "card" ? null : "card"); setV2PickerQuery("") }}><span>Card</span><span>{cards.find(item => item.id === cardId)?.name ?? "None"}</span><ChevronDown size={16} /></button>
                     {v2Picker === "card" && <div className={styles.pickerPanel}><input aria-label="Search cards" value={v2PickerQuery} onChange={event => setV2PickerQuery(event.target.value)} placeholder="Search cards" /><button type="button" onClick={() => { setCardId(""); closeV2Picker() }}>No card</button>{filteredV2Cards.map(item => <button type="button" key={item.id} onClick={() => { setCardId(item.id); closeV2Picker() }}>{item.name}{item.id === cardId && <Check size={16} />}</button>)}<button type="button" onClick={() => { closeV2Picker(); setShowNewCard(true) }}><Plus size={16} /> New card</button></div>}
                   </div>
-                  {showNewCard && <InlineCreateCardControl name={newCardName} onNameChange={setNewCardName} onCancel={() => { setShowNewCard(false); setNewCardName("") }} onSubmit={() => void handleCreateCard()} isSubmitting={isCreatingCard} subtitle="It will be selected for this transaction." surfaceClassName="bg-background" />}
+                  {showNewCard && <InlineCreateCardControl name={newCardName} onNameChange={setNewCardName} onCancel={() => { setShowNewCard(false); setNewCardName("") }} onSubmit={() => void handleCreateCard()} isSubmitting={isCreatingCard} surfaceClassName="bg-background" />}
                   <div className={styles.fieldPicker}><button type="button" aria-haspopup="dialog" onClick={() => setContextPickerOpen(true)}><span>Context</span><span>{contexts.find(item => item.id === contextId)?.name ?? "None"}</span><ChevronDown size={16} /></button></div>
+                  <div className={styles.advanced}>
+                    <button type="button" className={styles.advancedToggle} aria-expanded={showMoreDetails} onClick={() => setShowMoreDetails(current => !current)}>More options <ChevronDown size={16} aria-hidden="true" /></button>
+                    {showMoreDetails && <div className={styles.advancedBody}>{detailControls}</div>}
+                  </div>
                 </div>}
-                {/* Classic and v1-only transaction fields remain available in Classic. */}
-                <div className={cn("min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card", v2Create && "hidden")}>
+                {!v2Create && <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-border/60 bg-card">
                   <button
                     type="button"
                     onClick={() => setShowMoreDetails((current) => !current)}
@@ -1017,33 +1046,10 @@ export function TransactionEditorForm({
                           />}
                       </div>
 
-                      <TransactionDetailsSection
-                        isSplit={isSplit}
-                        onSplitChange={setIsSplit}
-                        notes={notes}
-                        notesError={notesError}
-                        onNotesChange={(value) => {
-                          setNotes(value)
-                          if (notesError) setNotesError(validateTransactionNotes(value))
-                        }}
-                        canCreateRecurringRule={canCreateRecurringRule}
-                        makeRecurring={makeRecurring}
-                        onMakeRecurringChange={setMakeRecurring}
-                        recurringBillingType={recurringBillingType}
-                        onBillingTypeChange={setRecurringBillingType}
-                        recurringBillingDay={recurringBillingDay}
-                        onBillingDayChange={setRecurringBillingDay}
-                        isEditMode={isEditMode}
-                        transactionAlreadyRecurring={transactionAlreadyRecurring}
-                        recurringEditScope={recurringEditScope}
-                        onEditScopeChange={setRecurringEditScope}
-                        onScheduleTouched={() => { recurringScheduleTouchedRef.current = true }}
-                        shouldInitializeSchedule={(nextValue) => shouldInitializeRecurringOnEnable(nextValue, makeRecurring, recurringScheduleTouchedRef.current)}
-                        onInitializeSchedule={() => applyRecurringDefaultsFromDate(date)}
-                      />
+                      {detailControls}
                     </div>
                   )}
-                </div>
+                </div>}
 
                 {error && (
                   <p className="rounded-lg bg-destructive/10 p-2 text-sm text-destructive">{error}</p>
