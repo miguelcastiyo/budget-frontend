@@ -134,11 +134,47 @@ test("Classic Review retains its existing inline capture and editor", async ({ p
   await capture(page, "11.00", "Classic check")
   await openSettings(page)
   await page.getByRole("switch", { name: "Use v2 interface" }).click()
-  await openReview(page)
+  await page.setViewportSize({ width: 375, height: 667 })
+  const mobileNav = page.getByRole("navigation", { name: "Primary", exact: true })
+  await mobileNav.getByRole("link", { name: "Overview" }).click()
+  await expect(mobileNav.getByRole("link", { name: /Review/ })).toHaveCount(0)
+  await expect(mobileNav.locator(".mobile-nav-item")).toHaveCount(5)
+  await expect(page.getByRole("link", { name: "Open Review, 1 pending transactions" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Open Funds" })).toBeVisible()
+  const shortcutRows = await page.locator("main").getByRole("link", { name: "Open Review, 1 pending transactions" }).evaluate(element => {
+    const review = element.getBoundingClientRect()
+    const funds = document.querySelector('a[aria-label="Open Funds"]')?.getBoundingClientRect()
+    return { reviewTop: review.top, fundsTop: funds?.top ?? -1 }
+  })
+  expect(shortcutRows.reviewTop).toBe(shortcutRows.fundsTop)
+  await page.getByRole("link", { name: "Open Review, 1 pending transactions" }).click()
   await expect(page.getByRole("form", { name: "Quick Capture" })).toBeVisible()
   const review = page.getByRole("form", { name: "Review transaction" })
   await expect(review.getByLabel("Description")).toHaveValue("Classic check")
   await expect(review.getByRole("button", { name: "Finalize" })).toBeVisible()
+})
+
+test("Classic Overview keeps Review available with zero pending captures", async ({ page }) => {
+  test.setTimeout(90000)
+  await setup(page, true)
+  await openSettings(page)
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.setViewportSize({ width: 375, height: 667 })
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("link", { name: "Overview" }).click()
+  await expect(page.getByRole("link", { name: "Open Review" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("link", { name: /Review/ })).toHaveCount(0)
+})
+
+test("Classic Overview hides Review when capture is disabled and nothing is pending", async ({ page }) => {
+  test.setTimeout(90000)
+  await setup(page, false)
+  await openSettings(page)
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.setViewportSize({ width: 375, height: 667 })
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("link", { name: "Overview" }).click()
+  await expect(page.getByRole("link", { name: "Open Review" })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "Open Funds" })).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "Primary", exact: true }).locator(".mobile-nav-item")).toHaveCount(5)
 })
 
 test("v2 Review fits a dark mobile viewport", async ({ page }) => {

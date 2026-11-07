@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X, ListChecks, House, ListFilter, Layers, Ellipsis } from "lucide-react"
+import { LayoutDashboard, LineChart, Plus, Receipt, Settings, X, House, ListFilter, Layers, Ellipsis } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCurrentMonthKey } from "@/lib/date-filters"
 import { useAuth } from "@/components/auth/auth-provider"
@@ -174,8 +174,8 @@ export function BottomNav({
 
   return (
     <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary">
-      <div className={cn("mx-auto grid h-full max-w-lg items-center gap-0.5 px-1.5 py-1", reviewEnabled ? "grid-cols-6" : "grid-cols-5")}>
-        {(reviewEnabled ? [...mobileNavItems.slice(0, 2), { type: "route" as const, href: "/review", icon: ListChecks, label: "Review" }, ...mobileNavItems.slice(2)] : mobileNavItems).map((item) => {
+      <div className="mx-auto grid h-full max-w-lg grid-cols-5 items-center gap-0.5 px-1.5 py-1">
+        {mobileNavItems.map((item) => {
           if (item.type === "action") {
             return (
               <div key={item.action} className="relative flex h-full items-center justify-center">
@@ -200,7 +200,7 @@ export function BottomNav({
 
           const isActive = isRouteActive(pathname, item.href)
           const href = item.href === "/transactions" ? transactionsHref : item.href
-          return <MobileBottomNavItem key={item.href} item={item} href={href} isActive={isActive} badge={item.href === "/review" && authority.isUnlocked && !authority.isLoading ? authority.pendingGlobalCount : undefined} />
+          return <MobileBottomNavItem key={item.href} item={item} href={href} isActive={isActive} />
         })}
       </div>
     </nav>

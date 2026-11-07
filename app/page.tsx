@@ -6,7 +6,6 @@ import { Header } from "@/components/layout/header"
 import { BottomNav, FloatingAddButton } from "@/components/layout/bottom-nav"
 import { MonthSelector } from "@/components/budget/month-selector"
 import { formatMonthValue, getCurrentMonthKey } from "@/lib/date-filters"
-import { formatCurrency } from "@/lib/formatters"
 import { SpendingSummary } from "@/components/budget/spending-summary"
 import { MonthCloseoutTray, type MonthCloseoutTrayMode } from "@/components/budget/month-closeout-tray"
 import { CategoryCard } from "@/components/budget/category-card"
@@ -24,8 +23,8 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { FirstMonthActionCard, FirstMonthProgressCard } from "@/components/budget/first-run-checklist-card"
 import type { SetupTask } from "@/lib/api/types"
 import { useFinancialAuthority } from "@/components/privacy/financial-authority-provider"
-import { formatMoneyCents } from "@/lib/domain/financial/money"
 import { FundsCta } from "@/components/funds/funds-cta"
+import { ArrowUpRight, ListChecks } from "lucide-react"
 import { useV2Add } from "@/components/budget/v2-add-provider"
 import { useInterfacePreference } from "@/components/layout/interface-preference"
 import { V2Overview } from "@/components/budget/v2-overview"
@@ -264,10 +263,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {reviewEnabled && authority.isUnlocked && !authority.isLoading && (() => {
-          const pending = authority.getPendingMonthSummary(currentMonth)
-          return pending.count > 0 ? <Link href="/review" className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-secondary/50 px-4 py-3 text-sm"><span>{pending.count} pending · {formatCurrency(Number(formatMoneyCents(pending.knownAmountCents)))} known{pending.unknownAmountCount > 0 ? ` · ${pending.unknownAmountCount} without amount` : ""}</span><span className="font-semibold">Review →</span></Link> : null
-        })()}
         <div className="space-y-6 lg:space-y-8">
           {shouldShowFirstMonthActionCard && (
             <FirstMonthActionCard
@@ -323,7 +318,18 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <FundsCta />
+          <div className={reviewEnabled && authority.isUnlocked && !authority.isLoading ? "grid grid-cols-2 gap-2 lg:gap-4" : ""}>
+            <FundsCta compact={reviewEnabled && authority.isUnlocked && !authority.isLoading} />
+            {reviewEnabled && authority.isUnlocked && !authority.isLoading && (
+              <Link href="/review" className="flex min-h-24 min-w-0 flex-col justify-between rounded-xl border border-border bg-card p-3 shadow-sm transition-colors hover:bg-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={`Open Review${authority.pendingGlobalCount > 0 ? `, ${authority.pendingGlobalCount} pending transactions` : ""}`}>
+                <span className="flex items-center justify-between gap-2">
+                  <ListChecks className="size-4 text-muted-foreground" aria-hidden="true" />
+                  {authority.pendingGlobalCount > 0 ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary" aria-hidden="true">{authority.pendingGlobalCount}</span> : <ArrowUpRight className="size-4 text-muted-foreground" aria-hidden="true" />}
+                </span>
+                <span className="text-sm font-semibold text-foreground">Review</span>
+              </Link>
+            )}
+          </div>
 
           <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
             <div className="flex items-center justify-between">
