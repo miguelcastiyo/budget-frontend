@@ -91,6 +91,7 @@ export function TransactionEditorForm({
   const [captureMode, setCaptureMode] = useState(initialCapture)
   const [v2Picker, setV2Picker] = useState<"tag" | "card" | null>(null)
   const [v2PickerQuery, setV2PickerQuery] = useState("")
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [captureBusy, setCaptureBusy] = useState(false)
   const [captureError, setCaptureError] = useState("")
   const [captureNotice, setCaptureNotice] = useState("")
@@ -203,6 +204,7 @@ export function TransactionEditorForm({
   useEffect(() => {
     if (!open) {
       setContextPickerOpen(false)
+      setDatePickerOpen(false)
     }
   }, [open])
 
@@ -893,7 +895,7 @@ export function TransactionEditorForm({
                       >
                         Yesterday
                       </Button>
-                      <Popover>
+                      <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -913,10 +915,8 @@ export function TransactionEditorForm({
                             mode="single"
                             selected={date}
                             onSelect={(d) => {
-                              if (!d) {
-                                return
-                              }
-                              updateTransactionDate(d)
+                              if (d) updateTransactionDate(d)
+                              setDatePickerOpen(false)
                             }}
                             initialFocus
                           />
