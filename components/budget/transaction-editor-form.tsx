@@ -730,14 +730,13 @@ export function TransactionEditorForm({
           classicQuickAdd && captureMode && "h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),30rem)] sm:max-w-md"
         )}
       >
-        {classicQuickAdd && (financialAuthority.pendingCaptureEnabled || captureMode) && <div className="flex shrink-0 gap-1 border-b border-border/50 bg-background px-4 py-3" role="group" aria-label="Add transaction mode">
-          <button type="button" aria-pressed={!captureMode} disabled={transitionBlocked} onClick={() => setCaptureMode(false)} className={cn("min-h-11 flex-1 rounded-lg px-3 text-sm font-medium", !captureMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Full Entry</button>
-          <button type="button" aria-pressed={captureMode} disabled={transitionBlocked || !financialAuthority.pendingCaptureEnabled} onClick={() => setCaptureMode(true)} className={cn("min-h-11 flex-1 rounded-lg px-3 text-sm font-medium", captureMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Quick Add</button>
-        </div>}
-        {classicQuickAdd && captureMode && <form onSubmit={quick.capture} className="flex min-h-0 flex-1 flex-col" aria-label="Quick Add">
+        {classicQuickAdd && captureMode && <form onSubmit={quick.capture} className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Quick Add">
           <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
             <DialogTitle className="text-lg font-semibold">Quick Add</DialogTitle>
-            <DialogClose aria-label="Close" disabled={transitionBlocked} className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"><X className="size-4" /></DialogClose>
+            <div className="flex shrink-0 items-center gap-1">
+              <button type="button" disabled={transitionBlocked} onClick={() => setCaptureMode(false)} className="min-h-10 rounded-lg px-2.5 text-xs font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Full Entry</button>
+              <DialogClose aria-label="Close" disabled={transitionBlocked} className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"><X className="size-4" /></DialogClose>
+            </div>
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5">
             <AmountInput ref={quick.amountRef} id="classic-quick-add-amount" name="capture_amount" value={amount} onValueChange={setAmount} onEnter={focusExpenseInput} maxDigits={8} readOnly={transitionBlocked} />
@@ -773,7 +772,7 @@ export function TransactionEditorForm({
           </div>
           <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button></div>
         </form>}
-        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && styles.fullEntry, (v2Create || classicQuickAdd) && captureMode && "hidden")} autoComplete="off" data-form-type="other">
+        <form onSubmit={handleSubmit} className={cn("flex min-h-0 min-w-0 w-full flex-1 flex-col", v2Create && styles.fullEntry, (v2Create || classicQuickAdd) && captureMode && "hidden")} autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
@@ -784,10 +783,13 @@ export function TransactionEditorForm({
                 {!v2Create && <p className="mt-0.5 truncate text-xs text-muted-foreground">{format(date, "EEE, MMM d")} · {categoryConfig[category].label}</p>}
                 {v2Create && financialAuthority.pendingCaptureEnabled && <button type="button" className={styles.backToCapture} aria-label="Quick add" disabled={transitionBlocked} onClick={() => { closeV2Picker(); setCaptureMode(true) }}>← Quick add</button>}
               </div>
-              <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </DialogClose>
+              <div className="flex shrink-0 items-center gap-1">
+                {classicQuickAdd && financialAuthority.pendingCaptureEnabled && <button type="button" disabled={transitionBlocked} onClick={() => setCaptureMode(true)} className="min-h-10 rounded-lg px-2.5 text-xs font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Quick Add</button>}
+                <DialogClose className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </DialogClose>
+              </div>
             </div>
           </div>
 
