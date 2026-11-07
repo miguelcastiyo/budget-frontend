@@ -98,6 +98,8 @@ export function TransactionEditorForm({
   const captureDescriptionRef = useRef<HTMLInputElement>(null)
   const saveAndNew = useRef(false)
   const v2Initialized = useRef(false)
+  const initializedEditorKey = useRef<string | null>(null)
+  const getTransactionReferences = financialAuthority.getTransactionReferences
   const quick = useQuickCapture({
     authority: v2Create ? financialAuthority.authority : null,
     busy: captureBusy,
@@ -164,7 +166,7 @@ export function TransactionEditorForm({
     setError(null)
 
     try {
-      const references = await financialAuthority.getTransactionReferences()
+      const references = await getTransactionReferences()
       setTags(references.tags)
       setQuickPickTags(references.quickPickTags)
       setCards(sortCards(references.cards))
@@ -177,7 +179,7 @@ export function TransactionEditorForm({
     } finally {
       setIsLoadingTaxonomy(false)
     }
-  }, [financialAuthority])
+  }, [getTransactionReferences])
 
   const loadContexts = useCallback(async () => {
     setIsLoadingContexts(true)
@@ -206,10 +208,15 @@ export function TransactionEditorForm({
 
   useEffect(() => {
     if (!open) {
+      initializedEditorKey.current = null
       return
     }
 
     void loadTaxonomy()
+
+    const editorKey = isEditMode && transaction ? `edit:${transaction.id}` : "create"
+    if (initializedEditorKey.current === editorKey) return
+    initializedEditorKey.current = editorKey
 
     if (isEditMode && transaction) {
       setDate(parseTransactionDate(transaction.date))
