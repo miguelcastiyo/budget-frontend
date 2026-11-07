@@ -1,0 +1,41 @@
+import { expect, test } from "@playwright/test"
+import { setupEncryptedFixture } from "./encrypted-fixture"
+
+test.skip(process.env.NEXT_PUBLIC_BUDGET_V2_ENABLED !== "true", "Requires interface switching")
+
+test("Classic Add defaults to Full Entry and can capture a shared draft for Review", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, true)
+  await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "More" }).click()
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.setViewportSize({ width: 375, height: 667 })
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("link", { name: "Overview" }).click()
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("button", { name: "Log transaction" }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByRole("heading", { name: "New Transaction" })).toBeVisible()
+  await expect(dialog.getByRole("button", { name: "Full Entry" })).toHaveAttribute("aria-pressed", "true")
+  await dialog.locator('input[name="transaction_amount"]').fill("12.50")
+  await dialog.getByRole("button", { name: "Quick Add" }).click()
+  const quick = dialog.getByRole("form", { name: "Quick Add" })
+  await expect(quick.getByLabel("Amount")).toHaveValue("12.50")
+  await quick.getByLabel("Description").fill("Coffee")
+  await dialog.getByRole("button", { name: "Full Entry" }).click()
+  await expect(dialog.getByLabel("Description")).toHaveValue("Coffee")
+  await dialog.getByRole("button", { name: "Quick Add" }).click()
+  await quick.getByRole("button", { name: "Save to Review" }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "Open Review, 1 pending transactions" })).toBeVisible()
+})
+
+test("Classic Add hides Quick Add when pending capture is disabled", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, false)
+  await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "More" }).click()
+  await page.getByRole("switch", { name: "Use v2 interface" }).click()
+  await page.setViewportSize({ width: 375, height: 667 })
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("link", { name: "Overview" }).click()
+  await page.getByRole("navigation", { name: "Primary", exact: true }).getByRole("button", { name: "Log transaction" }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByRole("heading", { name: "New Transaction" })).toBeVisible()
+  await expect(dialog.getByRole("button", { name: "Quick Add" })).toHaveCount(0)
+})

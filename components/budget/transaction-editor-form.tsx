@@ -71,6 +71,7 @@ export function TransactionEditorForm({
   const { version } = useInterfacePreference()
   const v2Style = v2Create || (mode === "edit" && version === "v2")
   const isEditMode = mode === "edit" && transaction !== null
+  const classicQuickAdd = !v2Create && !isEditMode && version === "classic"
   const transactionAlreadyRecurring = transaction?.recurring_expense_id != null
   const editor = useTransactionEditor({ mode, transaction })
   const {
@@ -102,20 +103,40 @@ export function TransactionEditorForm({
   const initializedEditorKey = useRef<string | null>(null)
   const getTransactionReferences = financialAuthority.getTransactionReferences
   const quick = useQuickCapture({
-    authority: v2Create ? financialAuthority.authority : null,
+    authority: v2Create || classicQuickAdd ? financialAuthority.authority : null,
     busy: captureBusy,
     setBusy: setCaptureBusy,
     onError: setCaptureError,
     onNotice: setCaptureNotice,
-    draft: v2Create ? { amount, setAmount, description: expense, setDescription: setExpense, date: format(date, "yyyy-MM-dd"), setDate: (value) => { const next = parseDateValue(value); if (next) setDate(next) } } : undefined,
-    onSaved: () => { if (!saveAndNew.current) onOpenChange(false) },
-    accountId: v2Create ? profile?.id : undefined,
+    draft: v2Create || classicQuickAdd ? { amount, setAmount, description: expense, setDescription: setExpense, date: format(date, "yyyy-MM-dd"), setDate: (value) => { const next = parseDateValue(value); if (next) setDate(next) } } : undefined,
+    onSaved: () => { onTransactionCreated?.(); if (!saveAndNew.current) onOpenChange(false) },
+    accountId: v2Create || classicQuickAdd ? profile?.id : undefined,
   })
   const closeV2Picker = () => { setV2Picker(null); setV2PickerQuery("") }
   const filteredV2Tags = tags.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
   const filteredV2Cards = cards.filter(item => item.name.toLocaleLowerCase().includes(v2PickerQuery.trim().toLocaleLowerCase()))
   const transitionBlocked = isSubmitting || isCreatingTag || isCreatingCard || isCreatingContext || captureBusy || Boolean(quick.captureBatch)
   const dirty = Boolean(amount || expense || category !== "needs" || tagId || cardId || contextId || notes || isSplit || makeRecurring || showNewTag || newTagName || newTagIconKey || showNewCard || newCardName || format(date, "yyyy-MM-dd") !== getLocalDateKey())
+  const synchronizeCapture = async () => {
+    const account = profile?.id ?? ""
+    const id = getRememberedCapture(account)
+    if (!id || !financialAuthority.authority) return
+    setCaptureBusy(true)
+    try {
+      await financialAuthority.syncFinancialState()
+      if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) {
+        clearRememberedCapture(account, id)
+        quick.resolveConfirmed()
+        setAmount("")
+        setExpense("")
+        setDate(new Date())
+        setCaptureNotice("The capture was found in Review.")
+        setCaptureError("")
+        onTransactionCreated?.()
+      } else setCaptureError("The save outcome is still uncertain. Retry or sync again.")
+    } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") }
+    finally { setCaptureBusy(false) }
+  }
 
   useEffect(() => {
     if (!v2Style || !open) return
@@ -132,9 +153,9 @@ export function TransactionEditorForm({
     }
   }, [open, v2Style])
   const requestOpenChange = (next: boolean) => {
-    if (!v2Create || next) { onOpenChange(next); return }
+    if (next) { onOpenChange(next); return }
     if (transitionBlocked) return
-    if (dirty && !window.confirm("Discard this unfinished transaction?")) return
+    if (v2Create && dirty && !window.confirm("Discard this unfinished transaction?")) return
     onOpenChange(false)
   }
 
@@ -150,17 +171,23 @@ export function TransactionEditorForm({
 
   const focusAmountInput = () => {
     window.requestAnimationFrame(() => {
-      if (v2Create && captureMode) quick.amountRef.current?.focus()
+      if ((v2Create || classicQuickAdd) && captureMode) quick.amountRef.current?.focus()
       else amountInputRef.current?.focus()
     })
   }
 
   const focusExpenseInput = () => {
     window.requestAnimationFrame(() => {
-      if (v2Create && captureMode) captureDescriptionRef.current?.focus()
+      if ((v2Create || classicQuickAdd) && captureMode) captureDescriptionRef.current?.focus()
       else expenseInputRef.current?.focus()
     })
   }
+
+  useEffect(() => {
+    if (!open || !classicQuickAdd || !captureMode) return
+    const frame = window.requestAnimationFrame(() => quick.amountRef.current?.focus())
+    return () => window.cancelAnimationFrame(frame)
+  }, [open, classicQuickAdd, captureMode])
 
   const loadTaxonomy = useCallback(async () => {
     setIsLoadingTaxonomy(true)
@@ -205,8 +232,9 @@ export function TransactionEditorForm({
     if (!open) {
       setContextPickerOpen(false)
       setDatePickerOpen(false)
+      if (classicQuickAdd) setCaptureMode(false)
     }
-  }, [open])
+  }, [open, classicQuickAdd])
 
   useEffect(() => {
     if (!open) {
@@ -698,9 +726,30 @@ export function TransactionEditorForm({
           mobileDrawerDialogClassName,
           v2Style && styles.surface,
           v2Style && styles.dialog,
-          v2Create && captureMode && styles.captureDialog
+          v2Create && captureMode && styles.captureDialog,
+          classicQuickAdd && captureMode && "h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),30rem)] sm:max-w-md"
         )}
       >
+        {classicQuickAdd && (financialAuthority.pendingCaptureEnabled || captureMode) && <div className="flex shrink-0 gap-1 border-b border-border/50 bg-background px-4 py-3" role="group" aria-label="Add transaction mode">
+          <button type="button" aria-pressed={!captureMode} disabled={transitionBlocked} onClick={() => setCaptureMode(false)} className={cn("min-h-11 flex-1 rounded-lg px-3 text-sm font-medium", !captureMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Full Entry</button>
+          <button type="button" aria-pressed={captureMode} disabled={transitionBlocked || !financialAuthority.pendingCaptureEnabled} onClick={() => setCaptureMode(true)} className={cn("min-h-11 flex-1 rounded-lg px-3 text-sm font-medium", captureMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}>Quick Add</button>
+        </div>}
+        {classicQuickAdd && captureMode && <form onSubmit={quick.capture} className="flex min-h-0 flex-1 flex-col" aria-label="Quick Add">
+          <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-4 py-3">
+            <DialogTitle className="text-lg font-semibold">Quick Add</DialogTitle>
+            <DialogClose aria-label="Close" disabled={transitionBlocked} className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"><X className="size-4" /></DialogClose>
+          </div>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5">
+            <AmountInput ref={quick.amountRef} id="classic-quick-add-amount" name="capture_amount" value={amount} onValueChange={setAmount} onEnter={focusExpenseInput} maxDigits={8} readOnly={transitionBlocked} />
+            <label className="block space-y-2 text-sm font-medium">Description<input ref={captureDescriptionRef} className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-base font-normal" value={expense} disabled={transitionBlocked} onChange={(event) => setExpense(event.target.value)} placeholder="Optional" enterKeyHint="done" /></label>
+            <label className="block space-y-2 text-sm font-medium">Date<input className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-base font-normal" aria-label="Date" type="date" max={getLocalDateKey()} value={format(date, "yyyy-MM-dd")} disabled={transitionBlocked} onChange={(event) => { const next = parseDateValue(event.target.value); if (next) setDate(next) }} /></label>
+            {quick.captureBatch && <p className="text-sm text-muted-foreground">The save outcome is uncertain. Retry the same save before leaving.</p>}
+            {captureError && <p role="alert" className="text-sm text-destructive">{captureError}</p>}
+            {captureNotice && <p role="status" className="text-sm text-foreground">{captureNotice}</p>}
+            {quick.captureBatch && <Button type="button" variant="outline" disabled={captureBusy || !financialAuthority.authority} onClick={() => void synchronizeCapture()}>Sync Review</Button>}
+          </div>
+          <div className="shrink-0 border-t border-border/50 bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"><Button type="submit" className="h-11 w-full" disabled={captureBusy || !financialAuthority.pendingCaptureEnabled || !financialAuthority.authority}>Save to Review</Button></div>
+        </form>}
         {v2Create && captureMode && <form onSubmit={quick.capture} className={styles.capture} aria-label="Quick Capture">
           <div className={styles.captureHeader}>
             <DialogTitle>Quick add</DialogTitle>
@@ -720,11 +769,11 @@ export function TransactionEditorForm({
             </div>
             {quick.captureBatch && <p className={styles.hint}>The save outcome is uncertain. Retry the same save or synchronize.</p>}
             {captureError && <p role="alert" className={styles.error}>{captureError}</p>}{captureNotice && <p role="status" className={styles.notice}>{captureNotice}</p>}
-            {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void (async () => { const account = profile?.id ?? ""; const id = getRememberedCapture(account); if (!id || !financialAuthority.authority) return; setCaptureBusy(true); try { await financialAuthority.syncFinancialState(); if (financialAuthority.authority.getState().pendingTransactions.some(item => item.id === id)) { clearRememberedCapture(account, id); quick.resolveConfirmed(); setAmount(""); setExpense(""); setDate(new Date()); setCaptureNotice("The capture was found in Review."); setCaptureError("") } else setCaptureError("The save outcome is still uncertain. Retry or sync again.") } catch { setCaptureError("Unable to sync Review. The save outcome remains uncertain.") } finally { setCaptureBusy(false) } })()}>Sync Review</button>}
+            {quick.captureBatch && <button type="button" disabled={captureBusy || !financialAuthority.authority} onClick={() => void synchronizeCapture()}>Sync Review</button>}
           </div>
           <div className={styles.actions}><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = false }}>Save to Review</button><button type="submit" disabled={captureBusy || !financialAuthority.authority} onClick={() => { saveAndNew.current = true }}>Save &amp; New</button></div>
         </form>}
-        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && styles.fullEntry, v2Create && captureMode && "hidden")} autoComplete="off" data-form-type="other">
+        <form onSubmit={handleSubmit} className={cn("flex min-h-0 flex-1 flex-col", v2Create && styles.fullEntry, (v2Create || classicQuickAdd) && captureMode && "hidden")} autoComplete="off" data-form-type="other">
           <div className="shrink-0 border-b border-border/50 bg-background/95 px-4 pb-3 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:py-4">
             <div data-swipe-handle="true" className={cn(mobileDrawerHandleClassName, "mb-3 sm:hidden")} aria-hidden="true" />
             <div className="flex items-center justify-between gap-3">
