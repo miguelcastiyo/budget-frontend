@@ -759,7 +759,6 @@ export default function DataSettingsPage() {
           <div className="flex items-center justify-between px-1">
             <div>
               <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent Activity</h2>
-              {version !== "v2" && <p className="text-xs text-muted-foreground">Latest imports and exports.</p>}
             </div>
             <Button
               type="button"

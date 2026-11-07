@@ -226,9 +226,6 @@ export default function SettingsPage() {
       <main className="mx-auto max-w-lg space-y-6 px-5 pt-standalone-safe-top lg:max-w-6xl lg:px-8 lg:pt-8">
         <div className="hidden lg:block">
           <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          {interfacePreference.version !== "v2" && <p className="mt-1 text-sm text-muted-foreground">
-            Manage your account, budget, and app preferences.
-          </p>}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -236,7 +233,7 @@ export default function SettingsPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.85fr)] lg:items-start">
           <div className="space-y-6 lg:order-1">
             <div className="lg:hidden">
-              <SettingsSection title="Profile" description={interfacePreference.version === "v2" ? undefined : "Name, email, and sign-in"}>
+              <SettingsSection title="Profile">
                 <button
                   type="button"
                   className="block w-full text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -267,13 +264,13 @@ export default function SettingsPage() {
               <SettingsItem
                 icon={<Wallet className="w-5 h-5 text-muted-foreground" />}
                 label="Budget"
-                description="Monthly plan and limits"
+                description={interfacePreference.version === "v2" ? "Monthly plan and limits" : undefined}
                 href="/settings/budget"
               />
               <SettingsItem
                 icon={<Repeat className="w-5 h-5 text-muted-foreground" />}
                 label="Recurring"
-                description="Bills and repeating expenses"
+                description={interfacePreference.version === "v2" ? "Bills and repeating expenses" : undefined}
                 href="/settings/recurring"
               />
             </SettingsSection>
@@ -282,7 +279,7 @@ export default function SettingsPage() {
               <SettingsItem
                 icon={<Tag className="w-5 h-5 text-muted-foreground" />}
                 label="Tags"
-                description="Categories for your spending"
+                description={interfacePreference.version === "v2" ? "Categories for your spending" : undefined}
                 href="/settings/tags"
               />
               <SettingsItem
@@ -294,7 +291,7 @@ export default function SettingsPage() {
               <SettingsItem
                 icon={<CreditCard className="w-5 h-5 text-muted-foreground" />}
                 label="Cards"
-                description="Payment methods"
+                description={interfacePreference.version === "v2" ? "Payment methods" : undefined}
                 href="/settings/cards"
               />
             </SettingsSection>
@@ -303,7 +300,7 @@ export default function SettingsPage() {
               <SettingsItem
                 icon={<Database className="w-5 h-5 text-muted-foreground" />}
                 label="Data"
-                description="Import or export CSVs"
+                description={interfacePreference.version === "v2" ? "Import or export CSVs" : undefined}
                 href="/settings/data"
               />
             </SettingsSection>
@@ -311,7 +308,7 @@ export default function SettingsPage() {
 
           <div className="flex flex-col gap-6 lg:order-2">
             <div className="hidden lg:order-1 lg:block">
-              <SettingsSection title="Profile" description={interfacePreference.version === "v2" ? undefined : "Name, email, and sign-in"}>
+              <SettingsSection title="Profile">
                 <button
                   type="button"
                   className="block w-full text-left transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"

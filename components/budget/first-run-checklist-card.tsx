@@ -31,11 +31,7 @@ export function FirstMonthActionCard({
     <Card className="overflow-hidden rounded-[1.75rem] border-border/70 bg-card/95 p-0 shadow-sm">
       <div className="border-b border-border/70 bg-[linear-gradient(135deg,rgba(120,141,96,0.14),rgba(201,175,124,0.08))] px-5 py-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">First month</p>
-            <h2 className="text-2xl font-semibold tracking-tight">Your {month} budget is ready</h2>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">Start with one small action.</p>
-          </div>
+          <h2 className="text-2xl font-semibold tracking-tight">Set up {month}</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -50,9 +46,9 @@ export function FirstMonthActionCard({
       </div>
 
       <div className="grid gap-3 px-5 py-5 sm:grid-cols-3 sm:px-6">
-        <PrimaryActionButton label="Add first transaction" sublabel="Start tracking spending now." onClick={onAddTransaction} />
-        <PrimaryActionLink label="Add fixed bills" sublabel="Set up recurring monthly expenses." href="/settings/recurring" icon={<Repeat className="size-4" />} />
-        <PrimaryActionLink label="Import CSV" sublabel="Bring in past transactions." href="/settings/data" icon={<Download className="size-4" />} />
+        <PrimaryActionButton label="Add transaction" onClick={onAddTransaction} />
+        <PrimaryActionLink label="Add recurring bills" href="/settings/recurring" icon={<Repeat className="size-4" />} />
+        <PrimaryActionLink label="Import CSV" href="/settings/data" icon={<Download className="size-4" />} />
       </div>
     </Card>
   )
@@ -72,10 +68,7 @@ export function FirstMonthProgressCard({
   return (
     <Card className="rounded-[1.5rem] border-border/70 bg-card/95 p-5 shadow-sm sm:p-6">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Setup progress</p>
-          <h3 className="text-lg font-semibold tracking-tight">What you&apos;ve completed</h3>
-        </div>
+        <h3 className="text-lg font-semibold tracking-tight">Setup</h3>
         <Button
           variant="ghost"
           size="icon"
@@ -99,11 +92,9 @@ export function FirstMonthProgressCard({
 
 function PrimaryActionButton({
   label,
-  sublabel,
   onClick,
 }: {
   label: string
-  sublabel: string
   onClick: () => void
 }) {
   return (
@@ -115,7 +106,6 @@ function PrimaryActionButton({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-medium">{label}</p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">{sublabel}</p>
         </div>
         <ChevronRight className="mt-0.5 size-4 text-muted-foreground" />
       </div>
@@ -125,12 +115,10 @@ function PrimaryActionButton({
 
 function PrimaryActionLink({
   label,
-  sublabel,
   href,
   icon,
 }: {
   label: string
-  sublabel: string
   href: string
   icon: ReactNode
 }) {
@@ -142,7 +130,6 @@ function PrimaryActionLink({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-medium">{label}</p>
-          <p className="mt-1 text-sm leading-5 text-muted-foreground">{sublabel}</p>
         </div>
         <span className="mt-0.5 text-muted-foreground">{icon}</span>
       </div>
@@ -182,7 +169,6 @@ function TaskRow({
           >
             {task.statusLabel}
           </span>
-          {isComplete && <span className="text-xs text-success">Completed</span>}
         </div>
       </div>
       <ChevronRight className="mt-0.5 size-4 text-muted-foreground" />

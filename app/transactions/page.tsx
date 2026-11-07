@@ -599,8 +599,7 @@ export default function TransactionsPage() {
                     <TransactionFilters {...transactionFiltersProps} desktopMode />
                     {totalItems > 0 && (
                       <section className="mt-8 border-t border-border/60 px-2 pt-5">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Current view</p>
-                        <div className="mt-4 grid gap-4">
+                        <div className="grid gap-4">
                           <div>
                             <p className="text-xl font-semibold tracking-tight">{formatCurrency(stats.totalSpent.toFixed(2))}</p>
                             <p className="text-xs text-muted-foreground">Total spent</p>
@@ -773,11 +772,9 @@ export default function TransactionsPage() {
 
       <FloatingAddButton
         onClick={() => setShowAddTransaction(true)}
-        showCoachmark={!isLoading && hasAnyTransactions === false}
       />
       <BottomNav
         onAddClick={() => setShowAddTransaction(true)}
-        showAddCoachmark={!isLoading && hasAnyTransactions === false}
       />
 
       <AddTransactionSheet

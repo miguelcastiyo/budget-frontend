@@ -23,10 +23,16 @@ export function CategoryCard({ metrics, onClick, compactOnMobile = false }: Cate
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all duration-200 hover:shadow-lg active:scale-[0.98] border-0 shadow-sm bg-card",
+        "cursor-pointer transition-all duration-200 hover:shadow-lg active:scale-[0.98] border-0 shadow-sm bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         compactOnMobile ? "p-3 lg:p-5" : "p-5"
       )}
       onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `View ${formatCategory(metrics.category)} transactions` : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onClick() }
+      } : undefined}
     >
       <div className={cn("flex items-center gap-5", compactOnMobile && "flex-col gap-2 text-center lg:flex-row lg:text-left")}>
         {compactOnMobile ? (

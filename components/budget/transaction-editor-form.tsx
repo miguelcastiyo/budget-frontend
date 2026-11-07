@@ -96,7 +96,7 @@ export function TransactionEditorForm({
   const [captureBusy, setCaptureBusy] = useState(false)
   const [captureError, setCaptureError] = useState("")
   const [captureNotice, setCaptureNotice] = useState("")
-  const [v2ViewportHeight, setV2ViewportHeight] = useState<number | null>(null)
+  const [visibleViewport, setVisibleViewport] = useState<{ height: number; bottomInset: number; mobile: boolean } | null>(null)
   const captureDescriptionRef = useRef<HTMLInputElement>(null)
   const saveAndNew = useRef(false)
   const v2Initialized = useRef(false)
@@ -139,9 +139,16 @@ export function TransactionEditorForm({
   }
 
   useEffect(() => {
-    if (!v2Style || !open) return
+    if (!open) {
+      setVisibleViewport(null)
+      return
+    }
     const viewport = window.visualViewport
-    const updateHeight = () => setV2ViewportHeight(Math.round(viewport?.height ?? window.innerHeight))
+    const updateHeight = () => setVisibleViewport({
+      height: Math.round(viewport?.height ?? window.innerHeight),
+      bottomInset: Math.max(0, Math.round(window.innerHeight - (viewport?.offsetTop ?? 0) - (viewport?.height ?? window.innerHeight))),
+      mobile: window.innerWidth < 640,
+    })
     updateHeight()
     viewport?.addEventListener("resize", updateHeight)
     viewport?.addEventListener("scroll", updateHeight)
@@ -151,7 +158,7 @@ export function TransactionEditorForm({
       viewport?.removeEventListener("scroll", updateHeight)
       window.removeEventListener("resize", updateHeight)
     }
-  }, [open, v2Style])
+  }, [open])
   const requestOpenChange = (next: boolean) => {
     if (next) { onOpenChange(next); return }
     if (transitionBlocked) return
@@ -290,6 +297,7 @@ export function TransactionEditorForm({
 
     didAutoFocusOnOpenRef.current = true
     const timeoutId = window.setTimeout(() => {
+      if (!v2Create && window.innerWidth < 640) return
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return
       if (v2Create && captureMode) quick.amountRef.current?.focus()
       else amountInputRef.current?.focus()
@@ -681,7 +689,6 @@ export function TransactionEditorForm({
   )
   const recurringDayNumber = parseInt(recurringBillingDay || "0", 10)
   const hasValidRecurringConfig = hasRecurringSchedule(makeRecurring, recurringBillingType, recurringBillingDay)
-  const moreDetailsSummary = "Optional transaction details"
   const submitButtonLabel = submitLabel({ isEditMode, isSubmitting, recurringEditScope, normalizedAmount, tagId })
   const detailControls = <TransactionDetailsSection
     compact={v2Create}
@@ -720,7 +727,13 @@ export function TransactionEditorForm({
       <DialogContent
         {...swipeDismiss}
         showCloseButton={false}
-        style={v2ViewportHeight ? ({ "--v2-viewport-height": `${v2ViewportHeight}px` } as CSSProperties) : undefined}
+        style={visibleViewport ? ({
+          "--v2-viewport-height": `${visibleViewport.height}px`,
+          ...(!v2Style && visibleViewport.mobile ? {
+            height: `min(calc(${visibleViewport.height}px - env(safe-area-inset-top) - .75rem),${classicQuickAdd && captureMode ? "30rem" : "44rem"})`,
+            bottom: `${visibleViewport.bottomInset}px`,
+          } : {}),
+        } as CSSProperties) : undefined}
         className={cn(
           "flex h-[min(calc(100dvh-env(safe-area-inset-top)-0.75rem),44rem)] w-full grid-rows-none gap-0 overflow-hidden p-0 sm:bottom-auto sm:h-auto sm:max-h-[min(90dvh,44rem)] sm:w-[min(calc(100dvw-2rem),36rem)] sm:max-w-[36rem] sm:rounded-2xl sm:border",
           mobileDrawerDialogClassName,
@@ -780,7 +793,6 @@ export function TransactionEditorForm({
                 <DialogTitle className="truncate text-lg font-semibold sm:text-xl">
                   {isEditMode ? "Edit Transaction" : "New Transaction"}
                 </DialogTitle>
-                {!v2Create && <p className="mt-0.5 truncate text-xs text-muted-foreground">{format(date, "EEE, MMM d")} · {categoryConfig[category].label}</p>}
                 {v2Create && financialAuthority.pendingCaptureEnabled && <button type="button" className={styles.backToCapture} aria-label="Quick add" disabled={transitionBlocked} onClick={() => { closeV2Picker(); setCaptureMode(true) }}>← Quick add</button>}
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -996,12 +1008,7 @@ export function TransactionEditorForm({
                     className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left"
                     aria-expanded={showMoreDetails}
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">More details</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {moreDetailsSummary}
-                      </p>
-                    </div>
+                    <span className="text-sm font-medium">More details</span>
                     <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", showMoreDetails && "rotate-180")} />
                   </button>
 

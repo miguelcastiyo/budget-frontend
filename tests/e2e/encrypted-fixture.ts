@@ -24,8 +24,14 @@ export async function openSettings(page: Page) {
 
 export async function openActivity(page: Page) {
   if (await currentInterfaceIsV2(page)) await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "Activity" }).click()
-  else await page.getByRole("link", { name: "Transactions", exact: true }).filter({ visible: true }).first().click()
+  else await page.getByRole("link", { name: /^(Transactions|Activity)$/ }).filter({ visible: true }).first().click()
   await expect(page).toHaveURL(/\/transactions/)
+}
+
+export async function openOverview(page: Page) {
+  if (await currentInterfaceIsV2(page)) await page.getByRole("navigation", { name: "Primary desktop" }).getByRole("link", { name: "Home" }).click()
+  else await page.getByRole("link", { name: "Overview", exact: true }).filter({ visible: true }).first().click()
+  await expect(page).toHaveURL(/\/$/)
 }
 
 export async function openReview(page: Page) {

@@ -362,9 +362,7 @@ export default function BudgetSettingsPage() {
       <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
         <div className="mb-4 sm:mb-5">
           <h2 className="font-semibold">Allocation</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Split your monthly budget into category targets.
-          </p>
+          {version === "v2" && <p className="mt-1 text-sm text-muted-foreground">Split your monthly budget into category targets.</p>}
         </div>
         <BudgetAllocationForm
           value={allocationForm}
@@ -379,9 +377,7 @@ export default function BudgetSettingsPage() {
       <section className="rounded-2xl border border-border/60 bg-card p-4 sm:p-5">
         <div className="mb-4">
           <h2 className="font-semibold">Preview</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Estimated budget and category targets before saving.
-          </p>
+          {version === "v2" && <p className="mt-1 text-sm text-muted-foreground">Estimated budget and category targets before saving.</p>}
         </div>
         <BudgetAllocationSummary allocationForm={allocationForm} income={income} />
       </section>
@@ -403,9 +399,7 @@ export default function BudgetSettingsPage() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold">Budget</h1>
-            <p className="truncate text-sm text-muted-foreground">
-              {headerSubtitle}
-            </p>
+            {version === "v2" && <p className="truncate text-sm text-muted-foreground">{headerSubtitle}</p>}
           </div>
         </div>
       </header>
@@ -588,11 +582,7 @@ function BudgetSummaryCard({
             {isLoading || error ? "--" : formatCurrency(income)}
             {!isLoading && error === null && <span className="text-base font-medium text-muted-foreground"> / month</span>}
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {error
-              ? "This month could not be loaded."
-              : "Used by dashboard targets and insights."}
-          </p>
+          {error && <p className="mt-1 text-sm text-muted-foreground">This month could not be loaded.</p>}
         </div>
         <Button
           variant="ghost"
@@ -624,7 +614,6 @@ function BudgetAllocationCard({
     <Card className="border-0 p-4 shadow-sm sm:p-5">
       <div className="mb-3 sm:mb-4">
         <h2 className="font-semibold">Budget allocation</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Category targets for the selected budget basis.</p>
       </div>
       {error ? (
         <p className="text-sm text-muted-foreground">Budget details are unavailable until the selected month loads.</p>

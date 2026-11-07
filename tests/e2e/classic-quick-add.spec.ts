@@ -26,6 +26,7 @@ test("Classic Add defaults to Full Entry and can capture a shared draft for Revi
   await quick.getByRole("button", { name: "Save to Review" }).click()
   await expect(dialog).toHaveCount(0)
   await expect(page.getByRole("link", { name: "Open Review, 1 pending transactions" })).toBeVisible()
+  await expect(page.getByText("No finalized transactions this month")).toBeVisible()
 })
 
 test("Classic Add hides Quick Add when pending capture is disabled", async ({ page }) => {

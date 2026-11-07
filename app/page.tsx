@@ -139,6 +139,13 @@ export default function DashboardPage() {
       const amount = Number.parseFloat(category.actual_spend)
       return Number.isFinite(amount) && amount > 0
     })
+  const pendingMonth = reviewEnabled && authority.isUnlocked && !authority.isLoading
+    ? authority.getPendingMonthSummary(currentMonth)
+    : null
+  const showEmptyBudgetSetup = Boolean(
+    overview && !isLoading && !error && !overview.budget.has_budget &&
+    !hasMonthTransactions && !isCloseoutLoading && closeout?.status === "missing_budget"
+  )
   const shouldShowFirstRunChecklist = Boolean(
     setupStatus?.budget_profile_complete &&
     setupStatus.setup_tasks.some((task) => !task.completed)
@@ -242,7 +249,7 @@ export default function DashboardPage() {
           closeout={closeout}
           closeoutLoading={isCloseoutLoading}
           loading={isLoading}
-          pending={reviewEnabled && authority.isUnlocked && !authority.isLoading ? authority.getPendingMonthSummary(currentMonth) : null}
+          pending={pendingMonth}
           onClose={() => openCloseoutTray("close")}
           onViewCloseout={() => openCloseoutTray("view")}
           onReviewCloseout={() => openCloseoutTray("review")}
@@ -282,7 +289,17 @@ export default function DashboardPage() {
             />
           )}
 
-          <div>
+          {showEmptyBudgetSetup ? (
+            <Card className="flex-row flex-wrap items-center justify-between gap-4 border-0 p-5 shadow-sm">
+              <div>
+                <h2 className="text-lg font-semibold">{formatMonthValue(currentMonth, { month: "long" }) ?? currentMonth} budget</h2>
+                <p className="text-sm text-muted-foreground">Not set</p>
+              </div>
+              <Button type="button" onClick={() => router.push(`/settings/budget?${new URLSearchParams({ month: currentMonth, edit: "1" })}`)}>
+                Set budget
+              </Button>
+            </Card>
+          ) : <div>
             <SpendingSummary
               categories={categories}
               overview={overview}
@@ -299,9 +316,9 @@ export default function DashboardPage() {
                 router.push(`/settings/budget?${params.toString()}`)
               }}
             />
-          </div>
+          </div>}
 
-          <div className="grid grid-cols-3 gap-2 lg:gap-6">
+          {!showEmptyBudgetSetup && <div className="grid grid-cols-3 gap-2 lg:gap-6">
             {categories.map((cat) => (
               <CategoryCard
                 key={cat.category}
@@ -316,7 +333,7 @@ export default function DashboardPage() {
                 }}
               />
             ))}
-          </div>
+          </div>}
 
           <div className={reviewEnabled && authority.isUnlocked && !authority.isLoading ? "grid grid-cols-2 gap-2 lg:gap-4" : ""}>
             <FundsCta compact={reviewEnabled && authority.isUnlocked && !authority.isLoading} />
@@ -331,13 +348,16 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Drill Down</p>
-                <h2 className="text-base font-semibold text-foreground">Where the money went</h2>
-              </div>
-              <TabsList className="h-9 rounded-full p-1">
+          {!hasMonthTransactions && !isLoading && !error ? (
+            <Card className="items-center gap-3 border-0 p-6 text-center shadow-sm">
+              <p className="text-sm font-medium">
+                {pendingMonth && pendingMonth.count > 0 ? "No finalized transactions this month" : "No transactions this month"}
+              </p>
+              <Button type="button" size="sm" onClick={openCreate}>Add Transaction</Button>
+            </Card>
+          ) : <Tabs value={detailView} onValueChange={(value) => setDetailView(value as "tags" | "recent")} className="gap-3">
+            <div className="flex justify-end">
+              <TabsList aria-label="Overview details" className="h-9 rounded-full p-1">
                 <TabsTrigger value="tags" className="rounded-full px-3 text-xs lg:text-sm">Tags</TabsTrigger>
                 <TabsTrigger value="recent" className="rounded-full px-3 text-xs lg:text-sm">Recent</TabsTrigger>
               </TabsList>
@@ -378,18 +398,16 @@ export default function DashboardPage() {
                 onTransactionClick={setEditingTransaction}
               />
             </TabsContent>
-          </Tabs>
+          </Tabs>}
         </div>
         </>}
       </main>
 
       <FloatingAddButton
         onClick={() => openCreate()}
-        showCoachmark={!hasMonthTransactions}
       />
       <BottomNav
         onAddClick={() => openCreate()}
-        showAddCoachmark={!hasMonthTransactions}
       />
 
       <AddTransactionSheet

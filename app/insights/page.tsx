@@ -403,7 +403,6 @@ export default function InsightsPage() {
         <section className={cn("space-y-3 lg:space-y-4", version === "v2" && styles.heading)}>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Insights</h1>
-            {version !== "v2" && <p className="mt-1 text-sm text-muted-foreground">Review your spending.</p>}
           </div>
 
           <InsightsRangeSelector
@@ -822,7 +821,7 @@ function FixedVsFlexibleCard({ data }: { data: InsightsMetricsResponse }) {
   const variablePercent = total > 0 ? numberFrom(data.recurring_vs_variable?.variable_percent) : 0
 
   return (
-    <ReviewSection title="Fixed vs flexible" description="Committed bills compared with variable spending.">
+    <ReviewSection title="Fixed vs flexible" description="Committed bills compared with variable spending." showDescriptionInClassic>
       {total <= 0 ? (
         <p className="text-sm text-muted-foreground">No fixed or variable spending found for this range.</p>
       ) : (
@@ -922,12 +921,13 @@ function NotableSpendingSection({
   items: NotableSpendingItem[]
   onGroupOpen: (group: Extract<NotableSpendingItem, { type: "group" }>) => void
 }) {
+  const { version } = useInterfacePreference()
   return (
     <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-0 p-0 shadow-sm">
       <div className="flex min-w-0 items-center justify-between border-b border-border/50 px-5 py-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">Notable spending</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Largest individual and repeated expenses in this range.</p>
+          {version === "v2" && <p className="mt-1 text-sm text-muted-foreground">Largest individual and repeated expenses in this range.</p>}
         </div>
         <Link href="/transactions" className="shrink-0 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
           See All
@@ -1116,7 +1116,7 @@ function RangeSummaryCard({
   largestTransaction: InsightsLargestTransactionItem | null
 }) {
   return (
-    <ReviewSection title="Review range" description={rangeLabel}>
+    <ReviewSection title="Review range" description={rangeLabel} showDescriptionInClassic>
       <div className="space-y-4">
         <SummaryLine icon={<CalendarIcon className="h-4 w-4" />} label="Dates" value={formatRange(range)} />
         <SummaryLine icon={<LineChart className="h-4 w-4" />} label="Months" value={`${monthsInRange}`} />
@@ -1143,20 +1143,23 @@ function SummaryLine({ icon, label, value }: { icon: React.ReactNode; label: str
 function ReviewSection({
   title,
   description,
+  showDescriptionInClassic = false,
   action,
   children,
 }: {
   title: string
   description?: string
+  showDescriptionInClassic?: boolean
   action?: React.ReactNode
   children: React.ReactNode
 }) {
+  const { version } = useInterfacePreference()
   return (
     <Card className="min-w-0 max-w-full gap-0 overflow-hidden border-0 p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-base font-semibold">{title}</h2>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          {description && (version === "v2" || showDescriptionInClassic) && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
         </div>
         {action}
       </div>
