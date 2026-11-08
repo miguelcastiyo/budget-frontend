@@ -64,11 +64,15 @@ export function planCsvImport(rows: CsvRow[], existing: TransactionRecord[], opt
   return { batchId: options.batchId, accepted, errors, skippedBlankAmountRows: rows.filter((row) => !row.amount.trim()).length, duplicates, newTags, newCards, newContexts, taxonomyCreates }
 }
 export function rollbackImport(records: TransactionRecord[], batchPrefix: string): TransactionRecord[] { return records.map((record) => record.id.startsWith(`${batchPrefix}:`) ? { ...record, isDeleted: true } : record) }
-export function escapeCsvField(value: string | null | undefined): string { const text = value ?? ""; return /^[=+\-@]/.test(text) ? `'${text}` : /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text }
+export function escapeCsvField(value: string | null | undefined): string {
+  const text = value ?? ""
+  const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text
+  return /[",\r\n]/.test(safeText) ? `"${safeText.replace(/"/g, '""')}"` : safeText
+}
 export function exportTransactions(records: TransactionRecord[], options: { tagName?: (id: string | null) => string | null; cardName?: (id: string | null) => string | null; contextName?: (id: string | null) => string | null; createdAt: string; updatedAt: string }): string {
   const header = "date,expense,amount,category,is_split,tag,card,context,created_at,updated_at,notes"
   const quote = (value: string) => `"${value.replace(/"/g, '""')}"`
-  const exportExpense = (value: string) => /^[=+\-@]/.test(value) ? `'${value}` : quote(value)
+  const exportExpense = (value: string) => /^[=+\-@]/.test(value) ? escapeCsvField(value) : quote(value)
   const rows = [...records].filter((record) => !record.isDeleted).sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)).map((record) => [record.date, exportExpense(record.expense), formatMoneyCents(record.amountCents), record.category, String(record.isSplit), escapeCsvField(options.tagName?.(record.tagId) ?? null), escapeCsvField(options.cardName?.(record.cardId) ?? null), escapeCsvField(options.contextName?.(record.contextId) ?? null), quote(options.createdAt), quote(options.updatedAt), escapeCsvField(record.notes)].join(","))
   return `${header}\n${rows.join("\n")}\n`
 }

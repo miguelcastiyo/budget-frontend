@@ -7,7 +7,7 @@ for (const classic of [false, true]) {
   test(`mapped CSV categories match the committed export and rollback (${classic ? "Classic" : "v2"})`, async ({ page }) => {
     test.setTimeout(120000)
     await setupEncryptedFixture(page, true)
-    await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+    await page.getByRole("link", { name: "More", exact: true }).first().click()
     if (classic) await page.getByRole("switch", { name: "Use v2 interface" }).click()
     await page.locator('main a[href="/settings/data"]').click()
     await page.getByRole("button", { name: "Import CSV", exact: true }).click()
@@ -60,7 +60,7 @@ for (const classic of [false, true]) {
 test("invalid exact-column categories prevent confirmation", async ({ page }) => {
   test.setTimeout(90000)
   await setupEncryptedFixture(page, true)
-  await page.getByRole("link", { name: "Settings", exact: true }).first().click()
+  await page.getByRole("link", { name: "More", exact: true }).first().click()
   await page.locator('main a[href="/settings/data"]').click()
   await page.getByRole("button", { name: "Import CSV", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "Import CSV" })
@@ -71,4 +71,36 @@ test("invalid exact-column categories prevent confirmation", async ({ page }) =>
   await dialog.getByRole("button", { name: "Validate" }).click()
   await expect(dialog.getByText(/Choose a valid Needs, Wants, or Savings category/)).toBeVisible()
   await expect(dialog.getByRole("button", { name: "Import 1 rows" })).toBeDisabled()
+})
+
+test("exported multiline notes remain one CSV record when imported again", async ({ page }) => {
+  test.setTimeout(90000)
+  await setupEncryptedFixture(page, true)
+  await page.getByRole("link", { name: "More", exact: true }).first().click()
+  await page.locator('main a[href="/settings/data"]').click()
+  await page.getByRole("button", { name: "Import CSV", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Import CSV" })
+  const note = "- toothpaste\n- mouth wash\n- scrub daddy"
+  const source = `date,expense,amount,category,tag,notes\n2026-08-23,"Target - Personal Care Items",26.48,needs,Personal,"${note}"\n`
+  await dialog.locator('input[type="file"]').setInputFiles({ name: "personal-care.csv", mimeType: "text/csv", buffer: Buffer.from(source) })
+  await expect(dialog.getByRole("heading", { name: "Map columns" })).toBeVisible()
+  await dialog.getByRole("button", { name: "Continue" }).click()
+  await dialog.getByRole("button", { name: "Continue" }).click()
+  await dialog.getByRole("button", { name: "Validate" }).click()
+  await dialog.getByRole("button", { name: "Import 1 rows" }).click()
+  await expect(dialog.getByText("Import complete", { exact: false }).first()).toBeVisible()
+  await dialog.getByRole("button", { name: "Done" }).click()
+
+  const downloadPromise = page.waitForEvent("download")
+  await page.getByRole("button", { name: "Export CSV", exact: true }).click()
+  const stream = await (await downloadPromise).createReadStream()
+  let exported = ""
+  for await (const chunk of stream) exported += chunk.toString()
+  expect(exported).toContain(`"'- toothpaste\n- mouth wash\n- scrub daddy"`)
+
+  await page.getByRole("button", { name: "Import CSV", exact: true }).click()
+  await dialog.locator('input[type="file"]').setInputFiles({ name: "transactions.csv", mimeType: "text/csv", buffer: Buffer.from(exported) })
+  await expect(dialog.getByRole("heading", { name: "Map columns" })).toBeVisible()
+  await expect(dialog.getByRole("table").getByRole("rowgroup").last().getByRole("row")).toHaveCount(1)
+  await expect(dialog.getByRole("table").getByRole("rowgroup").last()).toContainText("'- toothpaste")
 })

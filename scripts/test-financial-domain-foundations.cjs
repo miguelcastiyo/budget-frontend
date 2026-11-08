@@ -31,6 +31,13 @@ const csvPlan = csv.planCsvImport([
 ], [], { year: 2025, userId: "user_1", batchId: "csv_test" })
 assert(csvPlan.accepted.length === 1 && csvPlan.accepted[0].date === "2026-09-09" && csvPlan.accepted[0].amountCents === 1427, "CSV import accepts dated dollar amounts")
 assert(csvPlan.errors.length === 2 && csvPlan.errors[0].field === "date" && csvPlan.errors[1].field === "amount", "CSV import still rejects malformed dates and amounts")
+const personalCareNote = "- toothpaste\n- mouth wash\n- scrub daddy"
+const personalCare = transactions.createTransaction({ id: "csv_note", userId: "user_1", date: "2026-08-23", expense: "Target - Personal Care Items", amount: "26.48", category: "needs", notes: personalCareNote, tagId: "tag_1", cardId: "card_1" })
+const personalCareExport = csv.exportTransactions([personalCare], { tagName: () => "Personal", cardName: () => "United", createdAt: "", updatedAt: "" })
+assert(personalCareExport === `date,expense,amount,category,is_split,tag,card,context,created_at,updated_at,notes\n2026-08-23,"Target - Personal Care Items",26.48,needs,false,Personal,United,,"","","'- toothpaste\n- mouth wash\n- scrub daddy"\n`, "multiline note exports as one quoted CSV record")
+assert(csv.escapeCsvField('- item,\r\n"quoted"') === '"\'- item,\r\n""quoted"""', "formula safety and CSV quoting both apply to the same field")
+const formulaExpense = transactions.createTransaction({ id: "csv_expense", userId: "user_1", date: "2026-08-24", expense: "=SUM(A1,B1)", amount: "1.00", category: "needs" })
+assert(csv.exportTransactions([formulaExpense], { createdAt: "", updatedAt: "" }).includes('2026-08-24,"\'=SUM(A1,B1)",1.00,needs'), "formula-like expenses with commas remain in one CSV field")
 const transaction = transactions.createTransaction({ id: "txn_1", userId: "user_1", date: "2026-01-15", expense: " Coffee ", amount: "12.50", category: "needs", notes: " note " })
 assert(transaction.expense === "Coffee" && transaction.notes === "note" && transaction.amountCents === 1250, "transaction normalization")
 assert(transactions.transactionSummary([transaction], {}).totalSpent === "12.50", "transaction summary")
